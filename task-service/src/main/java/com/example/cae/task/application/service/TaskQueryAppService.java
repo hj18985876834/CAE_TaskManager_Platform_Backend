@@ -1,5 +1,96 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.exception.BizException;
+import com.example.cae.common.response.PageResult;
+import com.example.cae.task.application.assembler.TaskAssembler;
+import com.example.cae.task.domain.model.Task;
+import com.example.cae.task.domain.model.TaskFile;
+import com.example.cae.task.domain.model.TaskStatusHistory;
+import com.example.cae.task.domain.repository.TaskFileRepository;
+import com.example.cae.task.domain.repository.TaskRepository;
+import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
+import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
+import com.example.cae.task.interfaces.request.TaskListQueryRequest;
+import com.example.cae.task.interfaces.response.TaskDetailResponse;
+import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
 public class TaskQueryAppService {
+	private final TaskRepository taskRepository;
+	private final TaskFileRepository taskFileRepository;
+	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
+	private final TaskAssembler taskAssembler;
+	private final TaskPermissionChecker taskPermissionChecker;
+
+	public TaskQueryAppService(TaskRepository taskRepository, TaskFileRepository taskFileRepository, TaskStatusHistoryRepository taskStatusHistoryRepository, TaskAssembler taskAssembler, TaskPermissionChecker taskPermissionChecker) {
+		this.taskRepository = taskRepository;
+		this.taskFileRepository = taskFileRepository;
+		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
+		this.taskAssembler = taskAssembler;
+		this.taskPermissionChecker = taskPermissionChecker;
+	}
+
+	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
+		PageResult<Task> page = taskRepository.pageMyTasks(request, userId);
+		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).toList();
+		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
+	}
+
+	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
+		PageResult<Task> page = taskRepository.pageAdminTasks(request);
+		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).toList();
+		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
+	}
+
+	public TaskDetailResponse getTaskDetail(Long taskId, Long userId, String roleCode) {
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		return taskAssembler.toDetailResponse(task);
+	}
+
+	public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId, Long userId, String roleCode) {
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		return taskStatusHistoryRepository.listByTaskId(taskId).stream().map(this::toStatusHistoryResponse).toList();
+	}
+
+	public List<TaskFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskFileResponse).toList();
+	}
+
+	private TaskStatusHistoryResponse toStatusHistoryResponse(TaskStatusHistory history) {
+		TaskStatusHistoryResponse response = new TaskStatusHistoryResponse();
+		response.setId(history.getId());
+		response.setTaskId(history.getTaskId());
+		response.setFromStatus(history.getFromStatus());
+		response.setToStatus(history.getToStatus());
+		response.setChangeReason(history.getChangeReason());
+		response.setOperatorType(history.getOperatorType());
+		response.setOperatorId(history.getOperatorId());
+		response.setCreatedAt(history.getCreatedAt());
+		return response;
+	}
+
+	private TaskFileResponse toTaskFileResponse(TaskFile file) {
+		TaskFileResponse response = new TaskFileResponse();
+		response.setId(file.getId());
+		response.setTaskId(file.getTaskId());
+		response.setFileRole(file.getFileRole());
+		response.setFileKey(file.getFileKey());
+		response.setOriginName(file.getOriginName());
+		response.setStoragePath(file.getStoragePath());
+		response.setFileSize(file.getFileSize());
+		response.setFileSuffix(file.getFileSuffix());
+		response.setChecksum(file.getChecksum());
+		response.setCreatedAt(file.getCreatedAt());
+		return response;
+	}
 }
 

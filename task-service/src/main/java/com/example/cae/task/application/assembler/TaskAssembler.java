@@ -1,5 +1,121 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.enums.TaskStatusEnum;
+import com.example.cae.task.domain.model.Task;
+import com.example.cae.task.infrastructure.persistence.entity.TaskPO;
+import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.response.TaskCreateResponse;
+import com.example.cae.task.interfaces.response.TaskDetailResponse;
+import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import org.springframework.stereotype.Component;
+
+import java.time.LocalDateTime;
+
+@Component
 public class TaskAssembler {
+	public Task toTask(CreateTaskRequest request, Long userId) {
+		Task task = new Task();
+		task.setTaskName(request.getTaskName());
+		task.setUserId(userId);
+		task.setSolverId(request.getSolverId());
+		task.setProfileId(request.getProfileId());
+		task.setTaskType(request.getTaskType());
+		task.setParamsJson(String.valueOf(request.getParamsJson()));
+		task.setStatus(TaskStatusEnum.CREATED.name());
+		task.setPriority(0);
+		task.setDeletedFlag(0);
+		task.setCreatedAt(LocalDateTime.now());
+		task.setUpdatedAt(LocalDateTime.now());
+		return task;
+	}
+
+	public TaskCreateResponse toCreateResponse(Task task) {
+		TaskCreateResponse response = new TaskCreateResponse();
+		response.setTaskId(task.getId());
+		response.setStatus(task.getStatus());
+		return response;
+	}
+
+	public TaskDetailResponse toDetailResponse(Task task) {
+		TaskDetailResponse response = new TaskDetailResponse();
+		response.setTaskId(task.getId());
+		response.setTaskNo(task.getTaskNo());
+		response.setTaskName(task.getTaskName());
+		response.setUserId(task.getUserId());
+		response.setSolverId(task.getSolverId());
+		response.setProfileId(task.getProfileId());
+		response.setTaskType(task.getTaskType());
+		response.setStatus(task.getStatus());
+		response.setNodeId(task.getNodeId());
+		response.setParamsJson(task.getParamsJson());
+		response.setFailType(task.getFailType());
+		response.setFailMessage(task.getFailMessage());
+		response.setSubmitTime(task.getSubmitTime());
+		response.setStartTime(task.getStartTime());
+		response.setEndTime(task.getEndTime());
+		return response;
+	}
+
+	public TaskListItemResponse toListItemResponse(Task task) {
+		TaskListItemResponse response = new TaskListItemResponse();
+		response.setTaskId(task.getId());
+		response.setTaskNo(task.getTaskNo());
+		response.setTaskName(task.getTaskName());
+		response.setSolverId(task.getSolverId());
+		response.setProfileId(task.getProfileId());
+		response.setTaskType(task.getTaskType());
+		response.setStatus(task.getStatus());
+		response.setNodeId(task.getNodeId());
+		response.setSubmitTime(task.getSubmitTime());
+		response.setStartTime(task.getStartTime());
+		response.setEndTime(task.getEndTime());
+		return response;
+	}
+
+	public TaskPO toPO(Task task) {
+		TaskPO po = new TaskPO();
+		po.setId(task.getId());
+		po.setTaskNo(task.getTaskNo());
+		po.setTaskName(task.getTaskName());
+		po.setUserId(task.getUserId());
+		po.setSolverId(task.getSolverId());
+		po.setProfileId(task.getProfileId());
+		po.setTaskType(task.getTaskType());
+		po.setStatus(task.getStatus());
+		po.setPriority(task.getPriority());
+		po.setNodeId(task.getNodeId());
+		po.setParamsJson(task.getParamsJson());
+		po.setSubmitTime(task.getSubmitTime());
+		po.setStartTime(task.getStartTime());
+		po.setEndTime(task.getEndTime());
+		po.setFailType(task.getFailType());
+		po.setFailMessage(task.getFailMessage());
+		po.setDeletedFlag(task.getDeletedFlag());
+		return po;
+	}
+
+	public Task fromPO(TaskPO po) {
+		Task task = new Task();
+		task.setId(po.getId());
+		task.setTaskNo(po.getTaskNo());
+		task.setTaskName(po.getTaskName());
+		task.setUserId(po.getUserId());
+		task.setSolverId(po.getSolverId());
+		task.setProfileId(po.getProfileId());
+		task.setTaskType(po.getTaskType());
+		task.setStatus(po.getStatus());
+		task.setPriority(po.getPriority());
+		task.setNodeId(po.getNodeId());
+		task.setParamsJson(po.getParamsJson());
+		task.setSubmitTime(po.getSubmitTime());
+		task.setStartTime(po.getStartTime());
+		task.setEndTime(po.getEndTime());
+		task.setFailType(po.getFailType());
+		task.setFailMessage(po.getFailMessage());
+		task.setDeletedFlag(po.getDeletedFlag());
+		task.setCreatedAt(po.getCreatedAt());
+		task.setUpdatedAt(po.getUpdatedAt());
+		return task;
+	}
 }
 
