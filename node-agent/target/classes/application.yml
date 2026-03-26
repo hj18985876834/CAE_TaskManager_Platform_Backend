@@ -1,0 +1,12 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: node-agent
+
+cae:
+  node:
+    id: 1
+    name: "Worker_Node_1"
+    server-url: "http://localhost:8084" # scheduler-service url
