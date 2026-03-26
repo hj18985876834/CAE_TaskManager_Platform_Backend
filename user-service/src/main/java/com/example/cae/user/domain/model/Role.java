@@ -1,9 +1,12 @@
 package com.example.cae.user.domain.model;
 
+import java.time.LocalDateTime;
+
 public class Role {
 	private Long id;
 	private String roleCode;
 	private String roleName;
+	private LocalDateTime createdAt;
 
 	public Long getId() {
 		return id;
@@ -27,6 +30,14 @@ public class Role {
 
 	public void setRoleName(String roleName) {
 		this.roleName = roleName;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
 	}
 }
 

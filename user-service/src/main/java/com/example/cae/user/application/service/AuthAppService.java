@@ -9,6 +9,7 @@ import com.example.cae.user.domain.repository.UserRepository;
 import com.example.cae.user.infrastructure.security.JwtTokenService;
 import com.example.cae.user.infrastructure.security.PasswordEncoderService;
 import com.example.cae.user.interfaces.request.LoginRequest;
+import com.example.cae.user.interfaces.response.CurrentUserResponse;
 import com.example.cae.user.interfaces.response.LoginResponse;
 import org.springframework.stereotype.Service;
 
@@ -58,6 +59,24 @@ public class AuthAppService {
 
 		String token = jwtTokenService.generateToken(user.getId(), role.getRoleCode());
 		return UserAssembler.toLoginResponse(user, role, token);
+	}
+
+	public CurrentUserResponse getCurrentUser(Long userId) {
+		User user = userRepository.findById(userId)
+				.orElseThrow(() -> new BizException(404, "user not found"));
+
+		Role role = roleRepository.findById(user.getRoleId())
+				.orElseGet(() -> {
+					Role fallback = new Role();
+					fallback.setRoleCode("USER");
+					return fallback;
+				});
+
+		return UserAssembler.toCurrentUserResponse(user, role.getRoleCode());
+	}
+
+	public void logout(Long userId) {
+		// Stateless token flow: server-side logout is currently a no-op.
 	}
 
 	private boolean isBlank(String value) {

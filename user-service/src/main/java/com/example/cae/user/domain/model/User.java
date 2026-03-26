@@ -1,12 +1,17 @@
 package com.example.cae.user.domain.model;
 
+import java.time.LocalDateTime;
+
 public class User {
 	private Long id;
 	private String username;
 	private String password;
 	private String realName;
 	private Long roleId;
+	private String roleCode;
 	private Integer status;
+	private LocalDateTime createdAt;
+	private LocalDateTime updatedAt;
 
 	public Long getId() {
 		return id;
@@ -54,6 +59,46 @@ public class User {
 
 	public void setStatus(Integer status) {
 		this.status = status;
+	}
+
+	public String getRoleCode() {
+		return roleCode;
+	}
+
+	public void setRoleCode(String roleCode) {
+		this.roleCode = roleCode;
+	}
+
+	public LocalDateTime getCreatedAt() {
+		return createdAt;
+	}
+
+	public void setCreatedAt(LocalDateTime createdAt) {
+		this.createdAt = createdAt;
+	}
+
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+
+	public void enable() {
+		this.status = 1;
+	}
+
+	public void disable() {
+		this.status = 0;
+	}
+
+	public boolean isEnabled() {
+		return status != null && status == 1;
+	}
+
+	public void resetPassword(String encodedPassword) {
+		this.password = encodedPassword;
 	}
 }
 

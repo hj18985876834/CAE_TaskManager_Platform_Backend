@@ -9,6 +9,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\utils\IdGenerator.java
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\constant\TaskConstants.java
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\utils\BeanCopyUtil.java
+D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\cae\common\response\Result.java
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\constant\HeaderConstants.java
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\response\PageResult.java
 D:\Project\CAE_TaskManager_Platform\Backend\common-lib\src\main\java\com\example\cae\common\enums\NodeStatusEnum.java

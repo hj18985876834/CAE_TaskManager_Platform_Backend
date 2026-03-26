@@ -4,6 +4,7 @@ public class UserDetailResponse {
 	private Long userId;
 	private String username;
 	private String realName;
+	private Long roleId;
 	private String roleCode;
 	private String roleName;
 	private Integer status;
@@ -38,6 +39,14 @@ public class UserDetailResponse {
 
 	public void setRoleCode(String roleCode) {
 		this.roleCode = roleCode;
+	}
+
+	public Long getRoleId() {
+		return roleId;
+	}
+
+	public void setRoleId(Long roleId) {
+		this.roleId = roleId;
 	}
 
 	public String getRoleName() {

@@ -6,7 +6,10 @@ import com.example.cae.user.infrastructure.persistence.entity.UserPO;
 import com.example.cae.user.infrastructure.persistence.mapper.UserMapper;
 import org.springframework.stereotype.Repository;
 
+import com.example.cae.user.interfaces.request.UserPageQueryRequest;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 public class UserRepositoryImpl implements UserRepository {
@@ -26,6 +29,26 @@ public class UserRepositoryImpl implements UserRepository {
 		return Optional.ofNullable(userMapper.selectByUsername(username)).map(this::toDomain);
 	}
 
+	@Override
+	public void save(User user) {
+		userMapper.insert(toPO(user));
+	}
+
+	@Override
+	public void update(User user) {
+		userMapper.updateById(toPO(user));
+	}
+
+	@Override
+	public List<User> page(UserPageQueryRequest request, long offset, long pageSize) {
+		return userMapper.selectPage(request, offset, pageSize).stream().map(this::toDomain).collect(Collectors.toList());
+	}
+
+	@Override
+	public long count(UserPageQueryRequest request) {
+		return userMapper.count(request);
+	}
+
 	private User toDomain(UserPO po) {
 		User user = new User();
 		user.setId(po.getId());
@@ -34,7 +57,20 @@ public class UserRepositoryImpl implements UserRepository {
 		user.setRealName(po.getRealName());
 		user.setRoleId(po.getRoleId());
 		user.setStatus(po.getStatus());
+		user.setCreatedAt(po.getCreatedAt());
+		user.setUpdatedAt(po.getUpdatedAt());
 		return user;
+	}
+
+	private UserPO toPO(User user) {
+		UserPO po = new UserPO();
+		po.setId(user.getId());
+		po.setUsername(user.getUsername());
+		po.setPassword(user.getPassword());
+		po.setRealName(user.getRealName());
+		po.setRoleId(user.getRoleId());
+		po.setStatus(user.getStatus());
+		return po;
 	}
 }
 

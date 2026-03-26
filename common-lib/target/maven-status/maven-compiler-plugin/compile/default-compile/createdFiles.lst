@@ -32,6 +32,7 @@ com\example\cae\common\enums\TaskStatusEnum.class
 com\example\cae\common\utils\JsonUtil.class
 com\example\cae\common\exception\BizException.class
 com\example\cae\common\utils\JwtUtil.class
+com\cae\common\response\Result.class
 com\example\cae\common\exception\NotFoundException.class
 com\example\cae\common\model\BasePageQuery.class
 com\example\cae\common\constant\HeaderConstants.class
