@@ -8,5 +8,11 @@ spring:
 cae:
   node:
     id: 1
-    name: "Worker_Node_1"
-    server-url: "http://localhost:8084" # scheduler-service url
+    node-code: "NODE_1"
+    node-name: "Worker_Node_1"
+    node-port: 8085
+    max-concurrency: 2
+    scheduler-base-url: "http://localhost:8084"
+    task-base-url: "http://localhost:8083"
+    work-root: "./node-agent-work"
+    solver-ids: [0]
