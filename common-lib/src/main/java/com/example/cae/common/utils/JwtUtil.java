@@ -23,6 +23,14 @@ public final class JwtUtil {
         return dto;
     }
 
+    public static Long parseUserId(String token) {
+        return parseUserContext(token).getUserId();
+    }
+
+    public static String parseRoleCode(String token) {
+        return parseUserContext(token).getRoleCode();
+    }
+
     public static boolean validateToken(String token) {
         try {
             parseUserContext(token);

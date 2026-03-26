@@ -3,11 +3,16 @@ package com.example.cae.common.dto;
 public class NodeDTO {
     private Long nodeId;
     private String nodeCode;
+    private String nodeName;
     private String host;
     private Integer port;
+    private String status;
+    private Integer enabled;
+    private Integer maxConcurrency;
     private Double cpuUsage;
     private Double memoryUsage;
     private Integer runningCount;
+    private java.util.List<Long> solverIds;
 
     public Long getNodeId() {
         return nodeId;
@@ -63,5 +68,45 @@ public class NodeDTO {
 
     public void setRunningCount(Integer runningCount) {
         this.runningCount = runningCount;
+    }
+
+    public String getNodeName() {
+        return nodeName;
+    }
+
+    public void setNodeName(String nodeName) {
+        this.nodeName = nodeName;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Integer getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Integer enabled) {
+        this.enabled = enabled;
+    }
+
+    public Integer getMaxConcurrency() {
+        return maxConcurrency;
+    }
+
+    public void setMaxConcurrency(Integer maxConcurrency) {
+        this.maxConcurrency = maxConcurrency;
+    }
+
+    public java.util.List<Long> getSolverIds() {
+        return solverIds;
+    }
+
+    public void setSolverIds(java.util.List<Long> solverIds) {
+        this.solverIds = solverIds;
     }
 }

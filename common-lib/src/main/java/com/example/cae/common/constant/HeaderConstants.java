@@ -8,4 +8,5 @@ public final class HeaderConstants {
     public static final String X_USER_ID = "X-User-Id";
     public static final String X_ROLE_CODE = "X-Role-Code";
     public static final String X_NODE_TOKEN = "X-Node-Token";
+    public static final String TRACE_ID = "X-Trace-Id";
 }

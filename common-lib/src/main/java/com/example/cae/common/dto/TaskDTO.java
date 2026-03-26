@@ -5,8 +5,12 @@ public class TaskDTO {
     private String taskNo;
     private String taskName;
     private Long solverId;
+    private String solverCode;
     private Long profileId;
     private String taskType;
+    private String commandTemplate;
+    private String parserName;
+    private Integer timeoutSeconds;
     private String paramsJson;
     private Long nodeId;
 
@@ -72,5 +76,37 @@ public class TaskDTO {
 
     public void setNodeId(Long nodeId) {
         this.nodeId = nodeId;
+    }
+
+    public String getSolverCode() {
+        return solverCode;
+    }
+
+    public void setSolverCode(String solverCode) {
+        this.solverCode = solverCode;
+    }
+
+    public String getCommandTemplate() {
+        return commandTemplate;
+    }
+
+    public void setCommandTemplate(String commandTemplate) {
+        this.commandTemplate = commandTemplate;
+    }
+
+    public String getParserName() {
+        return parserName;
+    }
+
+    public void setParserName(String parserName) {
+        this.parserName = parserName;
+    }
+
+    public Integer getTimeoutSeconds() {
+        return timeoutSeconds;
+    }
+
+    public void setTimeoutSeconds(Integer timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
     }
 }
