@@ -1,5 +1,26 @@
 package com.example.cae.scheduler.application.manager;
 
+import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.response.PageResult;
+import com.example.cae.scheduler.application.service.ScheduleAppService;
+import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
+import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
+import org.springframework.stereotype.Component;
+
+@Component
 public class TaskScheduleManager {
+	private final ScheduleAppService scheduleAppService;
+
+	public TaskScheduleManager(ScheduleAppService scheduleAppService) {
+		this.scheduleAppService = scheduleAppService;
+	}
+
+	public Long schedule(TaskDTO task) {
+		return scheduleAppService.scheduleTask(task);
+	}
+
+	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
+		return scheduleAppService.pageRecords(request);
+	}
 }
 
