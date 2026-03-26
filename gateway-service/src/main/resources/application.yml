@@ -6,8 +6,13 @@ spring:
     name: gateway-service
   cloud:
     gateway:
-      routes:
-        - id: user-service
-          uri: http://localhost:8081
-          predicates:
-            - Path=/api/user/**
+      discovery:
+        locator:
+          enabled: true
+
+gateway:
+  security:
+    white-list:
+      - /api/auth/login
+      - /api/auth/logout
+      - /actuator/health
