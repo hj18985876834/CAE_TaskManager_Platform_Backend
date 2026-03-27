@@ -16,7 +16,7 @@ public class GatewayRouteConfig {
                         .uri("http://localhost:8082"))
                 .route("task-service", r -> r.path("/api/tasks/**", "/api/admin/tasks/**")
                         .uri("http://localhost:8083"))
-                .route("scheduler-service", r -> r.path("/api/nodes/**", "/api/schedules/**")
+                                .route("scheduler-service", r -> r.path("/api/scheduler/nodes/**", "/api/scheduler/records/**", "/api/nodes/**", "/api/schedules/**")
                         .uri("http://localhost:8084"))
                 .build();
     }
