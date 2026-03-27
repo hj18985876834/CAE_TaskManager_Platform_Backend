@@ -5,7 +5,7 @@ spring:
   application:
     name: solver-service
   datasource:
-    url: jdbc:mysql://localhost:3306/solver_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
-    username: root
-    password: password
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${SOLVER_DB_NAME:solver_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:password}
     driver-class-name: com.mysql.cj.jdbc.Driver
