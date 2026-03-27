@@ -5,8 +5,11 @@ import com.example.cae.scheduler.application.manager.NodeManageManager;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
+import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 public class NodeFacade {
@@ -30,5 +33,13 @@ public class NodeFacade {
 
 	public NodeDetailResponse getNodeDetail(Long nodeId) {
 		return nodeManageManager.getNodeDetail(nodeId);
+	}
+
+	public void updateNodeStatus(Long nodeId, NodeStatusUpdateRequest request) {
+		nodeManageManager.updateNodeStatus(nodeId, request);
+	}
+
+	public List<Long> listNodeSolvers(Long nodeId) {
+		return nodeManageManager.listNodeSolvers(nodeId);
 	}
 }

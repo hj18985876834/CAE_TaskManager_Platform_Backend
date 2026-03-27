@@ -6,11 +6,14 @@ import com.example.cae.scheduler.application.facade.ScheduleFacade;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
-@RequestMapping("/api/scheduler/records")
+@RequestMapping("/api")
 public class ScheduleController {
 	private final ScheduleFacade scheduleFacade;
 
@@ -18,9 +21,14 @@ public class ScheduleController {
 		this.scheduleFacade = scheduleFacade;
 	}
 
-	@GetMapping
+	@GetMapping("/schedules")
 	public Result<PageResult<ScheduleRecordResponse>> pageRecords(SchedulePageQueryRequest request) {
 		return Result.success(scheduleFacade.pageRecords(request));
+	}
+
+	@GetMapping("/tasks/{taskId}/schedules")
+	public Result<List<ScheduleRecordResponse>> listByTaskId(@PathVariable Long taskId) {
+		return Result.success(scheduleFacade.listByTaskId(taskId));
 	}
 }
 

@@ -40,4 +40,7 @@ public interface ScheduleRecordMapper {
 		"</script>"
 	})
 	long countPage(@Param("request") SchedulePageQueryRequest request);
+
+	@Select("SELECT id, task_id AS taskId, node_id AS nodeId, strategy_name AS strategyName, schedule_status AS scheduleStatus, schedule_message AS scheduleMessage, created_at AS createdAt FROM schedule_record WHERE task_id = #{taskId} ORDER BY id DESC")
+	List<ScheduleRecordPO> selectByTaskId(Long taskId);
 }

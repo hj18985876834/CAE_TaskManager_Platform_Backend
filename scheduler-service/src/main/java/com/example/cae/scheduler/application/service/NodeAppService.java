@@ -11,6 +11,7 @@ import com.example.cae.scheduler.domain.service.NodeDomainService;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
+import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import org.springframework.stereotype.Service;
@@ -81,6 +82,30 @@ public class NodeAppService {
 	public NodeDetailResponse getNodeDetail(Long nodeId) {
 		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
 		return toNodeDetail(node);
+	}
+
+	public void updateNodeStatus(Long nodeId, NodeStatusUpdateRequest request) {
+		if (nodeId == null || request == null || request.getStatus() == null || request.getStatus().isBlank()) {
+			throw new BizException(400, "invalid node status request");
+		}
+		String status = request.getStatus().trim().toUpperCase();
+		if (!Set.of("ONLINE", "OFFLINE", "DISABLED").contains(status)) {
+			throw new BizException(400, "unsupported node status");
+		}
+		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
+		node.setStatus(status);
+		computeNodeRepository.update(node);
+	}
+
+	public List<Long> listNodeSolvers(Long nodeId) {
+		if (nodeId == null) {
+			throw new BizException(400, "nodeId is required");
+		}
+		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
+		return nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
+				.filter(NodeSolverCapability::isEnabled)
+				.map(NodeSolverCapability::getSolverId)
+				.toList();
 	}
 
 	public void markNodeOffline(String nodeCode) {

@@ -7,6 +7,8 @@ import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class TaskScheduleManager {
 	private final ScheduleAppService scheduleAppService;
@@ -21,6 +23,10 @@ public class TaskScheduleManager {
 
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
 		return scheduleAppService.pageRecords(request);
+	}
+
+	public List<ScheduleRecordResponse> listByTaskId(Long taskId) {
+		return scheduleAppService.listByTaskId(taskId);
 	}
 }
 

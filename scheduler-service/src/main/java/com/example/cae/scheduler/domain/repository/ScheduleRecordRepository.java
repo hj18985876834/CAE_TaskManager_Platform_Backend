@@ -8,4 +8,6 @@ public interface ScheduleRecordRepository {
 	void save(ScheduleRecord record);
 
 	PageResult<ScheduleRecord> page(SchedulePageQueryRequest request, long offset, int pageSize);
+
+	java.util.List<ScheduleRecord> listByTaskId(Long taskId);
 }

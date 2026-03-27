@@ -30,4 +30,9 @@ public class ScheduleRecordRepositoryImpl implements ScheduleRecordRepository {
 		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
 		return PageResult.of(total, pageNum, pageSize, records);
 	}
+
+	@Override
+	public List<ScheduleRecord> listByTaskId(Long taskId) {
+		return scheduleRecordMapper.selectByTaskId(taskId).stream().map(ScheduleAssembler::fromPO).toList();
+	}
 }

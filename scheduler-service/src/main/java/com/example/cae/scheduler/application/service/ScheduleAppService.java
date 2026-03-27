@@ -88,5 +88,12 @@ public class ScheduleAppService {
 		);
 		scheduleRecordRepository.save(record);
 	}
+
+	public List<ScheduleRecordResponse> listByTaskId(Long taskId) {
+		if (taskId == null) {
+			throw new BizException(400, "taskId is required");
+		}
+		return scheduleRecordRepository.listByTaskId(taskId).stream().map(ScheduleAssembler::toResponse).toList();
+	}
 }
 
