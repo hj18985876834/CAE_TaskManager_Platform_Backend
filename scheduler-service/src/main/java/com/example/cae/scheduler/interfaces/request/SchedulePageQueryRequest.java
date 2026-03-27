@@ -7,6 +7,8 @@ public class SchedulePageQueryRequest {
 	private Long nodeId;
 	private String scheduleStatus;
 	private String strategyName;
+	private String startTime;
+	private String endTime;
 
 	public Integer getPageNum() {
 		return pageNum;
@@ -54,6 +56,22 @@ public class SchedulePageQueryRequest {
 
 	public void setStrategyName(String strategyName) {
 		this.strategyName = strategyName;
+	}
+
+	public String getStartTime() {
+		return startTime;
+	}
+
+	public void setStartTime(String startTime) {
+		this.startTime = startTime;
+	}
+
+	public String getEndTime() {
+		return endTime;
+	}
+
+	public void setEndTime(String endTime) {
+		this.endTime = endTime;
 	}
 }
 

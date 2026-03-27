@@ -8,12 +8,14 @@ import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.service.NodeDomainService;
+import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -61,6 +63,21 @@ public class NodeAppService {
 		return node.getId();
 	}
 
+	public Long registerNodeFromAgent(NodeAgentRegisterRequest request) {
+		NodeRegisterRequest registerRequest = new NodeRegisterRequest();
+		registerRequest.setNodeCode(request == null ? null : request.getNodeCode());
+		registerRequest.setNodeName(request == null ? null : request.getNodeName());
+		registerRequest.setHost(request == null ? null : request.getHost());
+		registerRequest.setPort(request == null ? null : request.getPort());
+		registerRequest.setMaxConcurrency(request == null ? null : request.getMaxConcurrency());
+		registerRequest.setSolverIds(extractSolverIds(request));
+
+		Long nodeId = registerNode(registerRequest);
+		List<NodeSolverCapability> capabilities = toCapabilities(nodeId, request);
+		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(nodeId, capabilities);
+		return nodeId;
+	}
+
 	public void heartbeat(NodeHeartbeatRequest request) {
 		nodeDomainService.validateHeartbeatRequest(request);
 		ComputeNode node;
@@ -104,14 +121,20 @@ public class NodeAppService {
 		computeNodeRepository.update(node);
 	}
 
-	public List<Long> listNodeSolvers(Long nodeId) {
+	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(400, "nodeId is required");
 		}
 		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
 		return nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
 				.filter(NodeSolverCapability::isEnabled)
-				.map(NodeSolverCapability::getSolverId)
+				.map(capability -> {
+					NodeSolverResponse response = new NodeSolverResponse();
+					response.setSolverId(capability.getSolverId());
+					response.setSolverVersion(capability.getSolverVersion());
+					response.setEnabled(capability.getEnabled());
+					return response;
+				})
 				.toList();
 	}
 
@@ -170,6 +193,33 @@ public class NodeAppService {
 		response.setRunningCount(node.getRunningCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		return response;
+	}
+
+	private List<Long> extractSolverIds(NodeAgentRegisterRequest request) {
+		if (request == null || request.getSolvers() == null || request.getSolvers().isEmpty()) {
+			return List.of();
+		}
+		return request.getSolvers().stream()
+				.map(NodeAgentRegisterRequest.SolverItem::getSolverId)
+				.filter(id -> id != null)
+				.toList();
+	}
+
+	private List<NodeSolverCapability> toCapabilities(Long nodeId, NodeAgentRegisterRequest request) {
+		if (request == null || request.getSolvers() == null || request.getSolvers().isEmpty()) {
+			return List.of();
+		}
+		return request.getSolvers().stream()
+				.filter(item -> item != null && item.getSolverId() != null)
+				.map(item -> {
+					NodeSolverCapability capability = new NodeSolverCapability();
+					capability.setNodeId(nodeId);
+					capability.setSolverId(item.getSolverId());
+					capability.setSolverVersion(item.getSolverVersion());
+					capability.setEnabled(1);
+					return capability;
+				})
+				.toList();
 	}
 }
 

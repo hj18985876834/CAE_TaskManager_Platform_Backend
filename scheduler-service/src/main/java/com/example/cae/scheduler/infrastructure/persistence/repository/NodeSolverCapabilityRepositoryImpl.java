@@ -6,7 +6,6 @@ import com.example.cae.scheduler.infrastructure.persistence.entity.NodeSolverCap
 import com.example.cae.scheduler.infrastructure.persistence.mapper.NodeSolverCapabilityMapper;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collections;
 import java.util.List;
 
 @Repository
@@ -36,6 +35,16 @@ public class NodeSolverCapabilityRepositoryImpl implements NodeSolverCapabilityR
 		nodeSolverCapabilityMapper.batchInsert(nodeId, solverIds);
 	}
 
+	@Override
+	public void replaceNodeCapabilitiesWithDetails(Long nodeId, List<NodeSolverCapability> capabilities) {
+		nodeSolverCapabilityMapper.deleteByNodeId(nodeId);
+		if (capabilities == null || capabilities.isEmpty()) {
+			return;
+		}
+		List<NodeSolverCapabilityPO> poList = capabilities.stream().map(this::toPO).toList();
+		nodeSolverCapabilityMapper.batchInsertWithDetails(nodeId, poList);
+	}
+
 	private NodeSolverCapability fromPO(NodeSolverCapabilityPO po) {
 		NodeSolverCapability capability = new NodeSolverCapability();
 		capability.setId(po.getId());
@@ -45,5 +54,13 @@ public class NodeSolverCapabilityRepositoryImpl implements NodeSolverCapabilityR
 		capability.setEnabled(po.getEnabled());
 		capability.setCreatedAt(po.getCreatedAt());
 		return capability;
+	}
+
+	private NodeSolverCapabilityPO toPO(NodeSolverCapability capability) {
+		NodeSolverCapabilityPO po = new NodeSolverCapabilityPO();
+		po.setSolverId(capability.getSolverId());
+		po.setSolverVersion(capability.getSolverVersion());
+		po.setEnabled(capability.getEnabled());
+		return po;
 	}
 }

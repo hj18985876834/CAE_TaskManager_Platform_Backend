@@ -29,4 +29,14 @@ public interface NodeSolverCapabilityMapper {
 		"</script>"
 	})
 	int batchInsert(@Param("nodeId") Long nodeId, @Param("solverIds") List<Long> solverIds);
+
+	@Insert({
+		"<script>",
+		"INSERT INTO node_solver_capability(node_id, solver_id, solver_version, enabled) VALUES",
+		"<foreach collection='capabilities' item='capability' separator=','>",
+		"(#{nodeId}, #{capability.solverId}, #{capability.solverVersion}, #{capability.enabled})",
+		"</foreach>",
+		"</script>"
+	})
+	int batchInsertWithDetails(@Param("nodeId") Long nodeId, @Param("capabilities") List<NodeSolverCapabilityPO> capabilities);
 }

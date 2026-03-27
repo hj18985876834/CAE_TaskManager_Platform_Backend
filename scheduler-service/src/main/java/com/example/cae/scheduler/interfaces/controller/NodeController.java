@@ -6,6 +6,7 @@ import com.example.cae.scheduler.application.facade.NodeFacade;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,7 +42,7 @@ public class NodeController {
 	}
 
 	@GetMapping("/{nodeId}/solvers")
-	public Result<List<Long>> listNodeSolvers(@PathVariable Long nodeId) {
+	public Result<List<NodeSolverResponse>> listNodeSolvers(@PathVariable Long nodeId) {
 		return Result.success(nodeFacade.listNodeSolvers(nodeId));
 	}
 }

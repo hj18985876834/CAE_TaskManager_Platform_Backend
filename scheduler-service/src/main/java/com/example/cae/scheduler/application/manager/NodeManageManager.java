@@ -2,11 +2,13 @@ package com.example.cae.scheduler.application.manager;
 
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.service.NodeAppService;
+import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -21,6 +23,10 @@ public class NodeManageManager {
 
 	public Long registerNode(NodeRegisterRequest request) {
 		return nodeAppService.registerNode(request);
+	}
+
+	public Long registerNodeFromAgent(NodeAgentRegisterRequest request) {
+		return nodeAppService.registerNodeFromAgent(request);
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {
@@ -39,7 +45,7 @@ public class NodeManageManager {
 		nodeAppService.updateNodeStatus(nodeId, request);
 	}
 
-	public List<Long> listNodeSolvers(Long nodeId) {
+	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
 		return nodeAppService.listNodeSolvers(nodeId);
 	}
 }
