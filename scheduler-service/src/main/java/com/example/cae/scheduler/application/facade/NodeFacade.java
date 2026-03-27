@@ -19,8 +19,8 @@ public class NodeFacade {
 		this.nodeManageManager = nodeManageManager;
 	}
 
-	public void registerNode(NodeRegisterRequest request) {
-		nodeManageManager.registerNode(request);
+	public Long registerNode(NodeRegisterRequest request) {
+		return nodeManageManager.registerNode(request);
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {

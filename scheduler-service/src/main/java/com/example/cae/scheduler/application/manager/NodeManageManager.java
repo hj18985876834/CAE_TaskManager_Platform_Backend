@@ -19,8 +19,8 @@ public class NodeManageManager {
 		this.nodeAppService = nodeAppService;
 	}
 
-	public void registerNode(NodeRegisterRequest request) {
-		nodeAppService.registerNode(request);
+	public Long registerNode(NodeRegisterRequest request) {
+		return nodeAppService.registerNode(request);
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {

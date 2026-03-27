@@ -31,6 +31,7 @@ public interface ComputeNodeMapper {
 		"  <if test='request.nodeCode != null and request.nodeCode != \"\"'>AND node_code = #{request.nodeCode}</if>",
 		"  <if test='request.nodeName != null and request.nodeName != \"\"'>AND node_name LIKE CONCAT('%', #{request.nodeName}, '%')</if>",
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
+		"  <if test='request.solverId != null'>AND EXISTS (SELECT 1 FROM node_solver_capability nsc WHERE nsc.node_id = compute_node.id AND nsc.solver_id = #{request.solverId} AND nsc.enabled = 1)</if>",
 		"</where>",
 		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
@@ -44,6 +45,7 @@ public interface ComputeNodeMapper {
 		"  <if test='request.nodeCode != null and request.nodeCode != \"\"'>AND node_code = #{request.nodeCode}</if>",
 		"  <if test='request.nodeName != null and request.nodeName != \"\"'>AND node_name LIKE CONCAT('%', #{request.nodeName}, '%')</if>",
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
+		"  <if test='request.solverId != null'>AND EXISTS (SELECT 1 FROM node_solver_capability nsc WHERE nsc.node_id = compute_node.id AND nsc.solver_id = #{request.solverId} AND nsc.enabled = 1)</if>",
 		"</where>",
 		"</script>"
 	})

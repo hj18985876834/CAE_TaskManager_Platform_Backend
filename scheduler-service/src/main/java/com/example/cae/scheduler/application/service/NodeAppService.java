@@ -36,7 +36,7 @@ public class NodeAppService {
 		this.nodeDomainService = nodeDomainService;
 	}
 
-	public void registerNode(NodeRegisterRequest request) {
+	public Long registerNode(NodeRegisterRequest request) {
 		nodeDomainService.validateRegisterRequest(request);
 		Optional<ComputeNode> existingNode = computeNodeRepository.findByNodeCode(request.getNodeCode());
 		if (existingNode.isPresent()) {
@@ -49,7 +49,7 @@ public class NodeAppService {
 			node.setLastHeartbeatTime(LocalDateTime.now());
 			computeNodeRepository.update(node);
 			nodeSolverCapabilityRepository.replaceNodeCapabilities(node.getId(), request.getSolverIds());
-			return;
+			return node.getId();
 		}
 
 		ComputeNode node = NodeAssembler.toNode(request);
@@ -58,12 +58,19 @@ public class NodeAppService {
 		node.setLastHeartbeatTime(LocalDateTime.now());
 		computeNodeRepository.save(node);
 		nodeSolverCapabilityRepository.replaceNodeCapabilities(node.getId(), request.getSolverIds());
+		return node.getId();
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {
 		nodeDomainService.validateHeartbeatRequest(request);
-		ComputeNode node = computeNodeRepository.findByNodeCode(request.getNodeCode())
-				.orElseThrow(() -> new BizException(404, "node not found"));
+		ComputeNode node;
+		if (request.getNodeId() != null) {
+			node = computeNodeRepository.findById(request.getNodeId())
+					.orElseThrow(() -> new BizException(404, "node not found"));
+		} else {
+			node = computeNodeRepository.findByNodeCode(request.getNodeCode())
+					.orElseThrow(() -> new BizException(404, "node not found"));
+		}
 		node.refreshHeartbeat(request.getCpuUsage(), request.getMemoryUsage(), request.getRunningCount(), LocalDateTime.now());
 		node.markOnline();
 		computeNodeRepository.update(node);

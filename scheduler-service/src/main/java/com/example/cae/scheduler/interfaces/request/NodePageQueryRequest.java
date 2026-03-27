@@ -6,6 +6,7 @@ public class NodePageQueryRequest {
 	private String nodeCode;
 	private String nodeName;
 	private String status;
+	private Long solverId;
 
 	public Integer getPageNum() {
 		return pageNum;
@@ -45,6 +46,14 @@ public class NodePageQueryRequest {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Long getSolverId() {
+		return solverId;
+	}
+
+	public void setSolverId(Long solverId) {
+		this.solverId = solverId;
 	}
 }
 

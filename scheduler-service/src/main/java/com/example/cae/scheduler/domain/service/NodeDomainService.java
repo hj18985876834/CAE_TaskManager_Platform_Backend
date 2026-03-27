@@ -18,7 +18,7 @@ public class NodeDomainService {
 	}
 
 	public void validateHeartbeatRequest(NodeHeartbeatRequest request) {
-		if (request == null || isBlank(request.getNodeCode())) {
+		if (request == null || (request.getNodeId() == null && isBlank(request.getNodeCode()))) {
 			throw new BizException(400, "invalid heartbeat request");
 		}
 	}
