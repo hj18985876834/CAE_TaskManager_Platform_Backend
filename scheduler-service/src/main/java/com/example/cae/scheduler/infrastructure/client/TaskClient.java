@@ -8,5 +8,7 @@ public interface TaskClient {
 	List<TaskDTO> listPendingTasks();
 
 	void markTaskScheduled(Long taskId, Long nodeId);
+
+	void markTaskDispatched(Long taskId, Long nodeId);
 }
 

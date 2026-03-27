@@ -12,6 +12,8 @@ public class TaskDTO {
     private String parserName;
     private Integer timeoutSeconds;
     private String paramsJson;
+    private java.util.List<TaskFileDTO> inputFiles;
+    private java.util.Map<String, Object> params;
     private Long nodeId;
 
     public Long getTaskId() {
@@ -108,5 +110,21 @@ public class TaskDTO {
 
     public void setTimeoutSeconds(Integer timeoutSeconds) {
         this.timeoutSeconds = timeoutSeconds;
+    }
+
+    public java.util.List<TaskFileDTO> getInputFiles() {
+        return inputFiles;
+    }
+
+    public void setInputFiles(java.util.List<TaskFileDTO> inputFiles) {
+        this.inputFiles = inputFiles;
+    }
+
+    public java.util.Map<String, Object> getParams() {
+        return params;
+    }
+
+    public void setParams(java.util.Map<String, Object> params) {
+        this.params = params;
     }
 }

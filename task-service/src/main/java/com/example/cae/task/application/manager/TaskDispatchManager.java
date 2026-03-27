@@ -1,23 +1,30 @@
 package com.example.cae.task.application.manager;
 
+import com.example.cae.common.dto.TaskFileDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.Task;
+import com.example.cae.task.domain.model.TaskFile;
+import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TaskDispatchManager {
 	private final TaskRepository taskRepository;
+	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 
-	public TaskDispatchManager(TaskRepository taskRepository, TaskStatusDomainService taskStatusDomainService) {
+	public TaskDispatchManager(TaskRepository taskRepository, TaskFileRepository taskFileRepository, TaskStatusDomainService taskStatusDomainService) {
 		this.taskRepository = taskRepository;
+		this.taskFileRepository = taskFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 	}
 
@@ -48,8 +55,43 @@ public class TaskDispatchManager {
 		dto.setProfileId(task.getProfileId());
 		dto.setTaskType(task.getTaskType());
 		dto.setParamsJson(task.getParamsJson());
+		dto.setParams(parseParams(task.getParamsJson()));
+		dto.setInputFiles(loadInputFiles(task.getId()));
 		dto.setNodeId(task.getNodeId());
 		return dto;
+	}
+
+	private List<TaskFileDTO> loadInputFiles(Long taskId) {
+		return taskFileRepository.listByTaskId(taskId).stream()
+				.filter(TaskFile::isInputFile)
+				.map(this::toTaskFileDTO)
+				.toList();
+	}
+
+	private TaskFileDTO toTaskFileDTO(TaskFile file) {
+		TaskFileDTO dto = new TaskFileDTO();
+		dto.setTaskId(file.getTaskId());
+		dto.setFileKey(file.getFileKey());
+		dto.setOriginName(file.getOriginName());
+		dto.setStoragePath(file.getStoragePath());
+		dto.setFileSize(file.getFileSize());
+		return dto;
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> parseParams(String paramsJson) {
+		if (paramsJson == null || paramsJson.isBlank()) {
+			return Map.of();
+		}
+		try {
+			Object parsed = JsonUtil.fromJson(paramsJson, Map.class);
+			if (parsed instanceof Map<?, ?> map) {
+				return (Map<String, Object>) map;
+			}
+		} catch (Exception ignored) {
+			// keep dispatch payload resilient when params are malformed.
+		}
+		return Map.of();
 	}
 }
 
