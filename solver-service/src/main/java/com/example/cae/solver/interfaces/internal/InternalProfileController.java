@@ -1,0 +1,37 @@
+package com.example.cae.solver.interfaces.internal;
+
+import com.example.cae.common.response.Result;
+import com.example.cae.solver.application.facade.ProfileFacade;
+import com.example.cae.solver.interfaces.response.InternalProfileDetailResponse;
+import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/internal/profiles")
+public class InternalProfileController {
+	private final ProfileFacade profileFacade;
+
+	public InternalProfileController(ProfileFacade profileFacade) {
+		this.profileFacade = profileFacade;
+	}
+
+	@GetMapping("/{profileId}")
+	public Result<InternalProfileDetailResponse> getProfileDetail(@PathVariable Long profileId) {
+		ProfileDetailResponse detail = profileFacade.getProfileDetail(profileId);
+		InternalProfileDetailResponse response = new InternalProfileDetailResponse();
+		response.setProfileId(detail.getProfileId());
+		response.setSolverId(detail.getSolverId());
+		response.setProfileCode(detail.getProfileCode());
+		response.setTaskType(detail.getTaskType());
+		response.setProfileName(detail.getProfileName());
+		response.setCommandTemplate(detail.getCommandTemplate());
+		response.setParserName(detail.getParserName());
+		response.setTimeoutSeconds(detail.getTimeoutSeconds());
+		response.setEnabled(detail.getEnabled());
+		response.setFileRules(profileFacade.getFileRules(profileId));
+		return Result.success(response);
+	}
+}

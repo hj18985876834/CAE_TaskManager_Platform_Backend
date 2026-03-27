@@ -11,6 +11,7 @@ import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.client.SolverClient;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,11 +22,16 @@ public class TaskDispatchManager {
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
+	private final SolverClient solverClient;
 
-	public TaskDispatchManager(TaskRepository taskRepository, TaskFileRepository taskFileRepository, TaskStatusDomainService taskStatusDomainService) {
+	public TaskDispatchManager(TaskRepository taskRepository,
+						   TaskFileRepository taskFileRepository,
+						   TaskStatusDomainService taskStatusDomainService,
+						   SolverClient solverClient) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
+		this.solverClient = solverClient;
 	}
 
 	public List<TaskDTO> listQueuedTasks() {
@@ -57,8 +63,37 @@ public class TaskDispatchManager {
 		dto.setParamsJson(task.getParamsJson());
 		dto.setParams(parseParams(task.getParamsJson()));
 		dto.setInputFiles(loadInputFiles(task.getId()));
+		enrichExecutionMeta(task, dto);
 		dto.setNodeId(task.getNodeId());
 		return dto;
+	}
+
+	private void enrichExecutionMeta(Task task, TaskDTO dto) {
+		try {
+			String solverCode = solverClient.getSolverCode(task.getSolverId());
+			if (solverCode != null && !solverCode.isBlank()) {
+				dto.setSolverCode(solverCode);
+			}
+		} catch (Exception ignored) {
+			// keep queued API resilient even if solver-service is temporarily unavailable.
+		}
+
+		try {
+			SolverClient.ProfileExecutionMeta meta = solverClient.getProfileExecutionMeta(task.getProfileId());
+			if (meta != null) {
+				if (meta.getCommandTemplate() != null && !meta.getCommandTemplate().isBlank()) {
+					dto.setCommandTemplate(meta.getCommandTemplate());
+				}
+				if (meta.getParserName() != null && !meta.getParserName().isBlank()) {
+					dto.setParserName(meta.getParserName());
+				}
+				if (meta.getTimeoutSeconds() != null && meta.getTimeoutSeconds() > 0) {
+					dto.setTimeoutSeconds(meta.getTimeoutSeconds());
+				}
+			}
+		} catch (Exception ignored) {
+			// keep queued API resilient even if solver-service is temporarily unavailable.
+		}
 	}
 
 	private List<TaskFileDTO> loadInputFiles(Long taskId) {
