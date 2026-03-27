@@ -30,6 +30,11 @@ public class ComputeNodeRepositoryImpl implements ComputeNodeRepository {
 	}
 
 	@Override
+	public Optional<ComputeNode> findByNodeToken(String nodeToken) {
+		return Optional.ofNullable(computeNodeMapper.selectByNodeToken(nodeToken)).map(NodeAssembler::fromPO);
+	}
+
+	@Override
 	public void save(ComputeNode node) {
 		computeNodeMapper.insert(NodeAssembler.toPO(node));
 		computeNodeMapper.selectByNodeCode(node.getNodeCode());

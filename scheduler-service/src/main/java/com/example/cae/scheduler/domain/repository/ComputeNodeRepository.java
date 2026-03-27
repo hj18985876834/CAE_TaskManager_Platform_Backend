@@ -12,6 +12,8 @@ public interface ComputeNodeRepository {
 
 	Optional<ComputeNode> findByNodeCode(String nodeCode);
 
+	Optional<ComputeNode> findByNodeToken(String nodeToken);
+
 	void save(ComputeNode node);
 
 	void update(ComputeNode node);

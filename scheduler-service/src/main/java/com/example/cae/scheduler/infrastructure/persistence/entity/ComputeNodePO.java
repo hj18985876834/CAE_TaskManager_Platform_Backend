@@ -9,6 +9,7 @@ public class ComputeNodePO {
 	private String nodeName;
 	private String host;
 	private Integer port;
+	private String nodeToken;
 	private String status;
 	private Integer maxConcurrency;
 	private Integer runningCount;
@@ -56,6 +57,14 @@ public class ComputeNodePO {
 
 	public void setPort(Integer port) {
 		this.port = port;
+	}
+
+	public String getNodeToken() {
+		return nodeToken;
+	}
+
+	public void setNodeToken(String nodeToken) {
+		this.nodeToken = nodeToken;
 	}
 
 	public String getStatus() {

@@ -33,6 +33,10 @@ public class NodeFacade {
 		nodeManageManager.heartbeat(request);
 	}
 
+	public void heartbeat(NodeHeartbeatRequest request, String nodeToken) {
+		nodeManageManager.heartbeat(request, nodeToken);
+	}
+
 	public PageResult<NodeDetailResponse> pageNodes(NodePageQueryRequest request) {
 		return nodeManageManager.pageNodes(request);
 	}
@@ -47,5 +51,9 @@ public class NodeFacade {
 
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
 		return nodeManageManager.listNodeSolvers(nodeId);
+	}
+
+	public String getNodeToken(Long nodeId) {
+		return nodeManageManager.getNodeToken(nodeId);
 	}
 }

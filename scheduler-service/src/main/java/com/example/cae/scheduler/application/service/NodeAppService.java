@@ -18,11 +18,14 @@ import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class NodeAppService {
@@ -47,6 +50,9 @@ public class NodeAppService {
 			node.setHost(request.getHost());
 			node.setPort(request.getPort());
 			node.setMaxConcurrency(request.getMaxConcurrency());
+			if (node.getNodeToken() == null || node.getNodeToken().isBlank()) {
+				node.setNodeToken(generateNodeToken(node.getNodeCode()));
+			}
 			node.markOnline();
 			node.setLastHeartbeatTime(LocalDateTime.now());
 			computeNodeRepository.update(node);
@@ -55,6 +61,7 @@ public class NodeAppService {
 		}
 
 		ComputeNode node = NodeAssembler.toNode(request);
+		node.setNodeToken(generateNodeToken(node.getNodeCode()));
 		node.markOnline();
 		node.setRunningCount(0);
 		node.setLastHeartbeatTime(LocalDateTime.now());
@@ -79,14 +86,19 @@ public class NodeAppService {
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {
+		heartbeat(request, null);
+	}
+
+	public void heartbeat(NodeHeartbeatRequest request, String nodeToken) {
 		nodeDomainService.validateHeartbeatRequest(request);
-		ComputeNode node;
-		if (request.getNodeId() != null) {
-			node = computeNodeRepository.findById(request.getNodeId())
-					.orElseThrow(() -> new BizException(404, "node not found"));
-		} else {
-			node = computeNodeRepository.findByNodeCode(request.getNodeCode())
-					.orElseThrow(() -> new BizException(404, "node not found"));
+		ComputeNode node = resolveNode(request);
+		if (nodeToken != null) {
+			if (nodeToken.isBlank()) {
+				throw new BizException(401, "node token required");
+			}
+			if (node.getNodeToken() == null || !nodeToken.equals(node.getNodeToken())) {
+				throw new BizException(401, "invalid node token");
+			}
 		}
 		node.refreshHeartbeat(request.getCpuUsage(), request.getMemoryUsage(), request.getRunningCount(), LocalDateTime.now());
 		node.markOnline();
@@ -176,6 +188,15 @@ public class NodeAppService {
 		computeNodeRepository.update(node);
 	}
 
+	public String getNodeToken(Long nodeId) {
+		if (nodeId == null) {
+			throw new BizException(400, "nodeId is required");
+		}
+		return computeNodeRepository.findById(nodeId)
+				.map(ComputeNode::getNodeToken)
+				.orElseThrow(() -> new BizException(404, "node not found"));
+	}
+
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
@@ -193,6 +214,20 @@ public class NodeAppService {
 		response.setRunningCount(node.getRunningCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		return response;
+	}
+
+	private ComputeNode resolveNode(NodeHeartbeatRequest request) {
+		if (request.getNodeId() != null) {
+			return computeNodeRepository.findById(request.getNodeId())
+					.orElseThrow(() -> new BizException(404, "node not found"));
+		}
+		return computeNodeRepository.findByNodeCode(request.getNodeCode())
+				.orElseThrow(() -> new BizException(404, "node not found"));
+	}
+
+	private String generateNodeToken(String nodeCode) {
+		String source = (nodeCode == null ? "node" : nodeCode) + ":" + UUID.randomUUID();
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(source.getBytes(StandardCharsets.UTF_8));
 	}
 
 	private List<Long> extractSolverIds(NodeAgentRegisterRequest request) {
