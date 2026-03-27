@@ -22,6 +22,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\manager\TaskScheduleManager.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\domain\model\NodeSolverCapability.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\SchedulerApplication.java
+D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\response\AvailableNodeResponse.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\domain\model\ComputeNode.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\config\SchedulingConfig.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\domain\repository\ScheduleRecordRepository.java
@@ -30,12 +31,12 @@ D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\support\ScheduleLogWriter.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\client\impl\TaskClientStub.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\response\ScheduleRecordResponse.java
-D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\cae\scheduler\SchedulerApplication.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\persistence\entity\NodeSolverCapabilityPO.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\facade\ScheduleFacade.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\persistence\repository\ComputeNodeRepositoryImpl.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\config\SchedulerServiceConfig.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\scheduler\TaskScheduleJob.java
+D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\request\UpdateNodeStatusRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\client\NodeAgentClient.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\client\TaskClient.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\manager\NodeManageManager.java
@@ -43,6 +44,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\service\NodeAppService.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\request\NodeHeartbeatRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\internal\NodeRegisterController.java
+D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\response\NodeListItemResponse.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\infrastructure\persistence\repository\ScheduleRecordRepositoryImpl.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\interfaces\controller\NodeController.java
 D:\Project\CAE_TaskManager_Platform\Backend\scheduler-service\src\main\java\com\example\cae\scheduler\application\service\ScheduleAppService.java

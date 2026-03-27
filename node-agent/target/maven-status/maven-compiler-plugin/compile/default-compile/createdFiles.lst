@@ -14,10 +14,12 @@ com\example\cae\nodeagent\domain\executor\MockExecutor.class
 com\example\cae\nodeagent\domain\executor\SolverExecutor.class
 com\example\cae\nodeagent\infrastructure\process\ProcessLogReader.class
 com\example\cae\nodeagent\infrastructure\support\NodeInfoCollector.class
+com\example\cae\nodeagent\config\FeignClientConfig.class
 com\example\cae\nodeagent\domain\model\ExecutionResult.class
 com\example\cae\nodeagent\NodeAgentApplication.class
 com\example\cae\nodeagent\application\service\HeartbeatAppService.class
 com\example\cae\nodeagent\interfaces\response\CancelTaskResponse.class
+com\example\cae\nodeagent\config\ExecutorConfig.class
 com\example\cae\nodeagent\interfaces\response\DispatchTaskResponse.class
 com\example\cae\nodeagent\config\NodeAgentConfig.class
 com\example\cae\nodeagent\domain\model\InputFileMeta.class
@@ -36,7 +38,6 @@ com\example\cae\nodeagent\domain\executor\CalculixExecutor.class
 com\example\cae\nodeagent\infrastructure\client\TaskReportClient.class
 com\example\cae\nodeagent\application\scheduler\HeartbeatJob.class
 com\example\cae\nodeagent\infrastructure\support\LogPushBuffer.class
-com\cae\agent\NodeAgentApplication.class
 com\example\cae\nodeagent\domain\executor\AbstractSolverExecutor.class
 com\example\cae\nodeagent\application\manager\TaskExecuteManager.class
 com\example\cae\nodeagent\application\service\NodeRegisterAppService.class

@@ -6,7 +6,6 @@ com\example\cae\user\config\UserServiceConfig.class
 com\example\cae\user\domain\repository\RoleRepository.class
 com\example\cae\user\infrastructure\persistence\entity\RolePO.class
 com\example\cae\user\infrastructure\security\JwtTokenService.class
-com\cae\user\UserApplication.class
 com\example\cae\user\config\MybatisPlusConfig.class
 com\example\cae\user\infrastructure\security\PasswordEncoderService.class
 com\example\cae\user\interfaces\request\LoginRequest.class

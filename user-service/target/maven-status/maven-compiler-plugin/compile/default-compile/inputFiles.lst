@@ -13,7 +13,6 @@ D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\examp
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\interfaces\request\ResetPasswordRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\infrastructure\persistence\entity\RolePO.java
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\support\UserQueryBuilder.java
-D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\cae\user\UserApplication.java
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\interfaces\response\LoginResponse.java
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\interfaces\response\UserListItemResponse.java
 D:\Project\CAE_TaskManager_Platform\Backend\user-service\src\main\java\com\example\cae\user\application\facade\UserFacade.java

@@ -25,6 +25,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\examp
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\repository\TaskFileRepositoryImpl.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\controller\TaskQueryController.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\support\LogChunkAppender.java
+D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\service\TaskResultDomainService.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\response\TaskResultSummaryResponse.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\application\manager\TaskValidationManager.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\controller\TaskResultController.java
@@ -48,6 +49,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\examp
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\request\LogReportRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\TaskApplication.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\enums\TaskSortFieldEnum.java
+D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\rule\TaskValidationRule.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\model\TaskResultSummary.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\entity\TaskResultSummaryPO.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\mapper\TaskMapper.java
@@ -57,6 +59,7 @@ D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\examp
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\service\TaskValidationDomainService.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\controller\TaskLogController.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\entity\TaskPO.java
+D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\domain\service\TaskDomainService.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\entity\TaskResultFilePO.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\request\SubmitTaskRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\mapper\TaskResultSummaryMapper.java
@@ -73,7 +76,6 @@ D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\examp
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\internal\InternalTaskReportController.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\config\FeignClientConfig.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\request\TaskListQueryRequest.java
-D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\cae\task\TaskApplication.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\infrastructure\persistence\mapper\TaskResultFileMapper.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\interfaces\controller\TaskController.java
 D:\Project\CAE_TaskManager_Platform\Backend\task-service\src\main\java\com\example\cae\task\application\assembler\TaskAssembler.java

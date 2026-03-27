@@ -3,7 +3,6 @@ com\example\cae\task\domain\rule\TaskStatusRule.class
 com\example\cae\task\infrastructure\storage\TaskFileStorageService.class
 com\example\cae\task\domain\model\TaskResultSummary.class
 com\example\cae\task\interfaces\response\TaskStatusHistoryResponse.class
-com\cae\task\TaskApplication.class
 com\example\cae\task\interfaces\request\ResultFileReportRequest.class
 com\example\cae\task\infrastructure\persistence\mapper\TaskStatusHistoryMapper.class
 com\example\cae\task\domain\model\TaskStatusHistory.class
@@ -11,6 +10,7 @@ com\example\cae\task\interfaces\request\CreateTaskRequest.class
 com\example\cae\task\interfaces\response\TaskListItemResponse.class
 com\example\cae\task\infrastructure\client\SolverClient.class
 com\example\cae\task\domain\model\TaskFile.class
+com\example\cae\task\domain\service\TaskDomainService.class
 com\example\cae\task\infrastructure\persistence\entity\TaskStatusHistoryPO.class
 com\example\cae\task\TaskApplication.class
 com\example\cae\task\config\FeignClientConfig.class
@@ -30,6 +30,7 @@ com\example\cae\task\application\assembler\TaskResultAssembler.class
 com\example\cae\task\domain\model\Task.class
 com\example\cae\task\infrastructure\persistence\mapper\TaskLogChunkMapper.class
 com\example\cae\task\infrastructure\persistence\repository\TaskResultFileRepositoryImpl.class
+com\example\cae\task\domain\service\TaskResultDomainService.class
 com\example\cae\task\domain\model\TaskResultFile.class
 com\example\cae\task\infrastructure\persistence\entity\TaskResultSummaryPO.class
 com\example\cae\task\domain\repository\TaskFileRepository.class
@@ -45,6 +46,7 @@ com\example\cae\task\interfaces\controller\TaskResultController.class
 com\example\cae\task\application\manager\TaskLifecycleManager.class
 com\example\cae\task\domain\enums\TaskSortFieldEnum.class
 com\example\cae\task\infrastructure\persistence\repository\TaskFileRepositoryImpl.class
+com\example\cae\task\domain\rule\TaskValidationRule.class
 com\example\cae\task\interfaces\response\TaskCreateResponse.class
 com\example\cae\task\application\assembler\TaskAssembler.class
 com\example\cae\task\domain\repository\TaskResultSummaryRepository.class

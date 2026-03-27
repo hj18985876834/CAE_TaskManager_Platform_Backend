@@ -9,6 +9,6 @@ import org.springframework.stereotype.Component;
 public class NodeAgentClientStub implements NodeAgentClient {
 	@Override
 	public void notifyDispatch(Long nodeId, Long taskId) {
-		// TODO: integrate with node-agent
+		// Structural placeholder for node-agent dispatch integration.
 	}
 }

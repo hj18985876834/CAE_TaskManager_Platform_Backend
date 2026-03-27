@@ -37,7 +37,6 @@ com\example\cae\solver\interfaces\response\UploadSpecResponse.class
 com\example\cae\solver\interfaces\response\ProfileListItemResponse.class
 com\example\cae\solver\interfaces\response\FileRuleResponse.class
 com\example\cae\solver\domain\enums\SolverExecModeEnum.class
-com\cae\solver\SolverApplication.class
 com\example\cae\solver\interfaces\request\UpdateSolverRequest.class
 com\example\cae\solver\application\assembler\ProfileAssembler.class
 com\example\cae\solver\support\SolverQueryBuilder.class

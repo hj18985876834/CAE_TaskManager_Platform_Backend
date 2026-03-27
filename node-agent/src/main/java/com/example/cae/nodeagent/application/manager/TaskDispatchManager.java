@@ -5,6 +5,7 @@ import com.example.cae.nodeagent.config.NodeAgentConfig;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
 import com.example.cae.nodeagent.interfaces.request.DispatchTaskRequest;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.Executor;
@@ -20,7 +21,7 @@ public class TaskDispatchManager {
 	public TaskDispatchManager(ExecutionContextAssembler executionContextAssembler,
 						   TaskExecuteManager taskExecuteManager,
 						   TaskReportManager taskReportManager,
-						   Executor taskExecutor,
+						   @Qualifier("taskExecutor") Executor taskExecutor,
 						   NodeAgentConfig nodeAgentConfig) {
 		this.executionContextAssembler = executionContextAssembler;
 		this.taskExecuteManager = taskExecuteManager;

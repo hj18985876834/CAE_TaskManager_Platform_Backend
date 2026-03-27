@@ -4,7 +4,6 @@ D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\exa
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\interfaces\request\UpdateProfileStatusRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\interfaces\request\ProfilePageQueryRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\interfaces\request\UpdateFileRuleRequest.java
-D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\cae\solver\SolverApplication.java
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\application\assembler\FileRuleAssembler.java
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\interfaces\request\CreateFileRuleRequest.java
 D:\Project\CAE_TaskManager_Platform\Backend\solver-service\src\main\java\com\example\cae\solver\application\facade\SolverFacade.java

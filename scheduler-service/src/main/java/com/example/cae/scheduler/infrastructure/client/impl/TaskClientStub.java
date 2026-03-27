@@ -18,6 +18,6 @@ public class TaskClientStub implements TaskClient {
 
 	@Override
 	public void markTaskScheduled(Long taskId, Long nodeId) {
-		// TODO: integrate with task-service internal APIs
+		// Structural placeholder for cross-service integration in later stage.
 	}
 }
