@@ -11,12 +11,15 @@ import com.example.cae.scheduler.domain.service.NodeDomainService;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
+import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class NodeAppService {
@@ -91,10 +94,49 @@ public class NodeAppService {
 		return computeNodeRepository.listByStatus("ONLINE");
 	}
 
+	public List<AvailableNodeResponse> listAvailableNodes(Long solverId) {
+		if (solverId == null) {
+			return List.of();
+		}
+		Set<Long> capableNodeIds = new HashSet<>(nodeSolverCapabilityRepository.listBySolverId(solverId).stream()
+				.filter(NodeSolverCapability::isEnabled)
+				.map(NodeSolverCapability::getNodeId)
+				.toList());
+
+		return computeNodeRepository.listByStatus("ONLINE").stream()
+				.filter(node -> capableNodeIds.contains(node.getId()))
+				.filter(nodeDomainService::canDispatch)
+				.map(this::toAvailableNodeResponse)
+				.toList();
+	}
+
+	public void updateRunningCount(Long nodeId, Integer delta) {
+		if (nodeId == null || delta == null || delta == 0) {
+			return;
+		}
+		ComputeNode node = computeNodeRepository.findById(nodeId)
+				.orElseThrow(() -> new BizException(404, "node not found"));
+		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
+		node.setRunningCount(Math.max(0, current + delta));
+		computeNodeRepository.update(node);
+	}
+
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
 		response.setSolverIds(capabilities.stream().filter(NodeSolverCapability::isEnabled).map(NodeSolverCapability::getSolverId).toList());
+		return response;
+	}
+
+	private AvailableNodeResponse toAvailableNodeResponse(ComputeNode node) {
+		AvailableNodeResponse response = new AvailableNodeResponse();
+		response.setNodeId(node.getId());
+		response.setNodeCode(node.getNodeCode());
+		response.setNodeName(node.getNodeName());
+		response.setHost(node.getHost());
+		response.setPort(node.getPort());
+		response.setRunningCount(node.getRunningCount());
+		response.setMaxConcurrency(node.getMaxConcurrency());
 		return response;
 	}
 }

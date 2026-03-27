@@ -8,6 +8,7 @@ public class ComputeNodePO {
 	private String nodeCode;
 	private String nodeName;
 	private String host;
+	private Integer port;
 	private String status;
 	private Integer maxConcurrency;
 	private Integer runningCount;
@@ -47,6 +48,14 @@ public class ComputeNodePO {
 
 	public void setHost(String host) {
 		this.host = host;
+	}
+
+	public Integer getPort() {
+		return port;
+	}
+
+	public void setPort(Integer port) {
+		this.port = port;
 	}
 
 	public String getStatus() {

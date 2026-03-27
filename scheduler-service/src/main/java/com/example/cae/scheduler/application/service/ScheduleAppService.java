@@ -11,6 +11,7 @@ import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepositor
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
+import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.stereotype.Service;
@@ -72,6 +73,20 @@ public class ScheduleAppService {
 		PageResult<ScheduleRecord> page = scheduleRecordRepository.page(request, offset, pageSize);
 		List<ScheduleRecordResponse> records = page.getRecords().stream().map(ScheduleAssembler::toResponse).toList();
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
+	}
+
+	public void recordSchedule(InternalScheduleRecordRequest request) {
+		if (request == null || request.getTaskId() == null) {
+			throw new BizException(400, "invalid schedule record request");
+		}
+		ScheduleRecord record = ScheduleAssembler.newRecord(
+				request.getTaskId(),
+				request.getNodeId(),
+				request.getStrategyName() == null || request.getStrategyName().isBlank() ? "FCFS_LEAST_LOAD" : request.getStrategyName(),
+				request.getScheduleStatus() == null || request.getScheduleStatus().isBlank() ? "UNKNOWN" : request.getScheduleStatus(),
+				request.getScheduleMessage()
+		);
+		scheduleRecordRepository.save(record);
 	}
 }
 

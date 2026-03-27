@@ -41,6 +41,7 @@ public final class NodeAssembler {
 		node.setNodeCode(po.getNodeCode());
 		node.setNodeName(po.getNodeName());
 		node.setHost(po.getHost());
+		node.setPort(po.getPort());
 		node.setStatus(po.getStatus());
 		node.setMaxConcurrency(po.getMaxConcurrency());
 		node.setRunningCount(po.getRunningCount());
@@ -58,6 +59,7 @@ public final class NodeAssembler {
 		po.setNodeCode(node.getNodeCode());
 		po.setNodeName(node.getNodeName());
 		po.setHost(node.getHost());
+		po.setPort(node.getPort());
 		po.setStatus(node.getStatus());
 		po.setMaxConcurrency(node.getMaxConcurrency());
 		po.setRunningCount(node.getRunningCount());
