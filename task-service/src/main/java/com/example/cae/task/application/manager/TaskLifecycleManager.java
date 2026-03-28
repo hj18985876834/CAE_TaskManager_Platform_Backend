@@ -92,8 +92,36 @@ public class TaskLifecycleManager {
 
 	public void reportStatus(Long taskId, StatusReportRequest request) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
-		taskStatusDomainService.transfer(task, request.getStatus(), request.getReason(), OperatorTypeEnum.NODE.name(), null);
+		String targetStatus = pickStatus(request);
+		String reason = pickReason(request);
+		String operatorType = request == null || request.getOperatorType() == null || request.getOperatorType().isBlank()
+				? OperatorTypeEnum.NODE.name()
+				: request.getOperatorType();
+		taskStatusDomainService.transfer(task, targetStatus, reason, operatorType, null);
 		taskRepository.update(task);
+	}
+
+	private String pickStatus(StatusReportRequest request) {
+		if (request == null) {
+			throw new BizException(400, "status report request is required");
+		}
+		if (request.getToStatus() != null && !request.getToStatus().isBlank()) {
+			return request.getToStatus();
+		}
+		if (request.getStatus() != null && !request.getStatus().isBlank()) {
+			return request.getStatus();
+		}
+		throw new BizException(400, "status is required");
+	}
+
+	private String pickReason(StatusReportRequest request) {
+		if (request == null) {
+			return null;
+		}
+		if (request.getChangeReason() != null && !request.getChangeReason().isBlank()) {
+			return request.getChangeReason();
+		}
+		return request.getReason();
 	}
 
 	private Task loadAndCheckOwner(Long taskId, Long userId) {

@@ -17,6 +17,10 @@ public class NodeAgentAuthService {
 	}
 
 	public void validateTaskNodeToken(Long taskId, String nodeToken) {
+		validateTaskNodeToken(taskId, null, nodeToken);
+	}
+
+	public void validateTaskNodeToken(Long taskId, Long reportedNodeId, String nodeToken) {
 		if (taskId == null) {
 			throw new BizException(400, "taskId is required");
 		}
@@ -26,6 +30,9 @@ public class NodeAgentAuthService {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		if (task.getNodeId() == null) {
 			throw new BizException(409, "task not bound to node");
+		}
+		if (reportedNodeId != null && !reportedNodeId.equals(task.getNodeId())) {
+			throw new BizException(403, "reported node mismatch");
 		}
 		boolean valid = schedulerClient.verifyNodeToken(task.getNodeId(), nodeToken);
 		if (!valid) {

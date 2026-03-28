@@ -6,6 +6,8 @@ import com.example.cae.task.application.manager.TaskLifecycleManager;
 import com.example.cae.task.application.manager.TaskResultManager;
 import com.example.cae.task.application.service.NodeAgentAuthService;
 import com.example.cae.task.interfaces.request.LogReportRequest;
+import com.example.cae.task.interfaces.request.MarkFailedRequest;
+import com.example.cae.task.interfaces.request.MarkFinishedRequest;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import com.example.cae.task.interfaces.request.StatusReportRequest;
@@ -14,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -36,7 +37,7 @@ public class InternalTaskReportController {
 	public Result<Void> reportStatus(@PathVariable Long taskId,
 								 @RequestBody StatusReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
 		taskLifecycleManager.reportStatus(taskId, request);
 		return Result.success();
 	}
@@ -45,8 +46,8 @@ public class InternalTaskReportController {
 	public Result<Void> reportLog(@PathVariable Long taskId,
 							  @RequestBody LogReportRequest request,
 							  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
-		taskResultManager.appendLog(taskId, request.getSeqNo(), request.getContent());
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		taskResultManager.appendLog(taskId, request.getSeqNo(), request.getLogContent());
 		return Result.success();
 	}
 
@@ -54,7 +55,7 @@ public class InternalTaskReportController {
 	public Result<Void> reportResultSummary(@PathVariable Long taskId,
 									@RequestBody ResultSummaryReportRequest request,
 									@RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
 		taskResultManager.saveResultSummary(taskId, request);
 		return Result.success();
 	}
@@ -63,26 +64,26 @@ public class InternalTaskReportController {
 	public Result<Void> reportResultFile(@PathVariable Long taskId,
 								 @RequestBody ResultFileReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
 		taskResultManager.saveResultFile(taskId, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/mark-finished")
 	public Result<Void> markFinished(@PathVariable Long taskId,
+								 @RequestBody MarkFinishedRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
-		taskResultManager.finishTask(taskId);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		taskResultManager.finishTask(taskId, request == null ? null : request.getFinalStatus());
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/mark-failed")
 	public Result<Void> markFailed(@PathVariable Long taskId,
-							   @RequestParam String failType,
-							   @RequestParam String failMessage,
+							   @RequestBody MarkFailedRequest request,
 							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, nodeToken);
-		taskResultManager.failTask(taskId, failType, failMessage);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		taskResultManager.failTask(taskId, request == null ? null : request.getFailType(), request == null ? null : request.getFailMessage());
 		return Result.success();
 	}
 }

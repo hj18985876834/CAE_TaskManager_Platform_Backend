@@ -15,11 +15,11 @@ public class Result<T> {
     }
 
     public static <T> Result<T> success() {
-        return new Result<>(200, "Success", null);
+        return new Result<>(0, "success", null);
     }
 
     public static <T> Result<T> success(T data) {
-        return new Result<>(200, "Success", data);
+        return new Result<>(0, "success", data);
     }
 
     public static <T> Result<T> fail(Integer code, String message) {

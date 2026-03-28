@@ -1,10 +1,19 @@
 package com.example.cae.task.interfaces.request;
 
 public class ResultFileReportRequest {
+	private Long nodeId;
 	private String fileType;
 	private String fileName;
 	private String storagePath;
 	private Long fileSize;
+
+	public Long getNodeId() {
+		return nodeId;
+	}
+
+	public void setNodeId(Long nodeId) {
+		this.nodeId = nodeId;
+	}
 
 	public String getFileType() {
 		return fileType;

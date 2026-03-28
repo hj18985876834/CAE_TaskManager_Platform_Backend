@@ -38,8 +38,11 @@ public class TaskReportClientImpl implements TaskReportClient {
 	public void reportStatus(Long taskId, String status, String reason) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/status-report";
 		Map<String, Object> body = new HashMap<>();
-		body.put("status", status);
-		body.put("reason", reason);
+		body.put("nodeId", nodeAgentConfig.getNodeId());
+		body.put("fromStatus", null);
+		body.put("toStatus", status);
+		body.put("changeReason", reason);
+		body.put("operatorType", "NODE");
 		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
@@ -47,8 +50,9 @@ public class TaskReportClientImpl implements TaskReportClient {
 	public void reportLog(Long taskId, Integer seqNo, String content) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/log-report";
 		Map<String, Object> body = new HashMap<>();
+		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("seqNo", seqNo);
-		body.put("content", content);
+		body.put("logContent", content);
 		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
@@ -56,7 +60,8 @@ public class TaskReportClientImpl implements TaskReportClient {
 	public void reportResultSummary(Long taskId, ExecutionResult result) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/result-summary-report";
 		Map<String, Object> body = new HashMap<>();
-		body.put("success", result.getSuccess());
+		body.put("nodeId", nodeAgentConfig.getNodeId());
+		body.put("successFlag", Boolean.TRUE.equals(result.getSuccess()) ? 1 : 0);
 		body.put("durationSeconds", result.getDurationSeconds());
 		body.put("summaryText", result.getSummaryText());
 		body.put("metrics", result.getMetrics());
@@ -67,6 +72,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 	public void reportResultFile(Long taskId, File file) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/result-file-report";
 		Map<String, Object> body = new HashMap<>();
+		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("fileType", getFileType(file));
 		body.put("fileName", file == null ? null : file.getName());
 		body.put("storagePath", file == null ? null : file.getAbsolutePath());
@@ -77,18 +83,23 @@ public class TaskReportClientImpl implements TaskReportClient {
 	@Override
 	public void markFinished(Long taskId) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/mark-finished";
-		restTemplate.postForEntity(url, withToken(null), Object.class);
+		Map<String, Object> body = new HashMap<>();
+		body.put("nodeId", nodeAgentConfig.getNodeId());
+		body.put("finalStatus", "SUCCESS");
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	@Override
 	public void markFailed(Long taskId, String failType, String failMessage) {
 		String url = UriComponentsBuilder
 				.fromHttpUrl(taskBaseUrl() + "/internal/tasks/{taskId}/mark-failed")
-				.queryParam("failType", failType)
-				.queryParam("failMessage", failMessage)
 				.buildAndExpand(taskId)
 				.toUriString();
-		restTemplate.postForEntity(url, withToken(null), Object.class);
+		Map<String, Object> body = new HashMap<>();
+		body.put("nodeId", nodeAgentConfig.getNodeId());
+		body.put("failType", failType);
+		body.put("failMessage", failMessage);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	private String taskBaseUrl() {

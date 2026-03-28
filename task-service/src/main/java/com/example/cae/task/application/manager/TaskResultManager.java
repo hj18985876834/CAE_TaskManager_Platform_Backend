@@ -43,7 +43,11 @@ public class TaskResultManager {
 	public void saveResultSummary(Long taskId, ResultSummaryReportRequest request) {
 		TaskResultSummary summary = new TaskResultSummary();
 		summary.setTaskId(taskId);
-		summary.setSuccessFlag(Boolean.TRUE.equals(request.getSuccess()) ? 1 : 0);
+		Integer successFlag = request.getSuccessFlag();
+		if (successFlag == null) {
+			successFlag = Boolean.TRUE.equals(request.getSuccess()) ? 1 : 0;
+		}
+		summary.setSuccessFlag(successFlag);
 		summary.setDurationSeconds(request.getDurationSeconds());
 		summary.setSummaryText(request.getSummaryText());
 		summary.setMetricsJson(String.valueOf(request.getMetrics()));
@@ -60,9 +64,10 @@ public class TaskResultManager {
 		taskResultFileRepository.save(file);
 	}
 
-	public void finishTask(Long taskId) {
+	public void finishTask(Long taskId, String finalStatus) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
-		taskStatusDomainService.transfer(task, TaskStatusEnum.SUCCESS.name(), "task finished", OperatorTypeEnum.NODE.name(), null);
+		String target = finalStatus == null || finalStatus.isBlank() ? TaskStatusEnum.SUCCESS.name() : finalStatus;
+		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 	}
 
