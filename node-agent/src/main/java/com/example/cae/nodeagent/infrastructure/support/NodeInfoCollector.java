@@ -20,8 +20,7 @@ public class NodeInfoCollector {
 		NodeInfo info = new NodeInfo();
 		info.setNodeCode(nodeAgentConfig.getNodeCode());
 		info.setNodeName(nodeAgentConfig.getNodeName());
-		info.setHost(resolveHost());
-		info.setPort(nodeAgentConfig.getNodePort());
+		info.setHost(resolveHostWithPort());
 		info.setMaxConcurrency(nodeAgentConfig.getMaxConcurrency());
 		info.setCpuUsage(BigDecimal.ZERO);
 		info.setMemoryUsage(BigDecimal.ZERO);
@@ -30,12 +29,14 @@ public class NodeInfoCollector {
 		return info;
 	}
 
-	private String resolveHost() {
+	private String resolveHostWithPort() {
+		String host;
 		try {
-			return InetAddress.getLocalHost().getHostAddress();
+			host = InetAddress.getLocalHost().getHostAddress();
 		} catch (Exception ex) {
-			return "127.0.0.1";
+			host = "127.0.0.1";
 		}
+		return host + ":" + nodeAgentConfig.getNodePort();
 	}
 }
 

@@ -6,7 +6,6 @@ public class NodeRegisterRequest {
 	private String nodeCode;
 	private String nodeName;
 	private String host;
-	private Integer port;
 	private Integer maxConcurrency;
 	private List<Long> solverIds;
 
@@ -32,14 +31,6 @@ public class NodeRegisterRequest {
 
 	public void setHost(String host) {
 		this.host = host;
-	}
-
-	public Integer getPort() {
-		return port;
-	}
-
-	public void setPort(Integer port) {
-		this.port = port;
 	}
 
 	public Integer getMaxConcurrency() {

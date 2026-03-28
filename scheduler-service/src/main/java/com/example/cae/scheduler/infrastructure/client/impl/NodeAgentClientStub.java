@@ -25,7 +25,10 @@ public class NodeAgentClientStub implements NodeAgentClient {
 	public void notifyDispatch(Long nodeId, TaskDTO task) {
 		ComputeNode node = computeNodeRepository.findById(nodeId)
 				.orElseThrow(() -> new BizException(404, "node not found: " + nodeId));
-		String url = "http://" + node.getHost() + ":" + node.getPort() + "/internal/dispatch-task";
+		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
+				? node.getHost()
+				: "http://" + node.getHost();
+		String url = baseUrl + "/internal/dispatch-task";
 
 		Map<String, Object> request = new HashMap<>();
 		request.put("taskId", task.getTaskId());

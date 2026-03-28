@@ -48,7 +48,6 @@ public class NodeAppService {
 			ComputeNode node = existingNode.get();
 			node.setNodeName(request.getNodeName());
 			node.setHost(request.getHost());
-			node.setPort(request.getPort());
 			node.setMaxConcurrency(request.getMaxConcurrency());
 			if (node.getNodeToken() == null || node.getNodeToken().isBlank()) {
 				node.setNodeToken(generateNodeToken(node.getNodeCode()));
@@ -74,8 +73,7 @@ public class NodeAppService {
 		NodeRegisterRequest registerRequest = new NodeRegisterRequest();
 		registerRequest.setNodeCode(request == null ? null : request.getNodeCode());
 		registerRequest.setNodeName(request == null ? null : request.getNodeName());
-		registerRequest.setHost(request == null ? null : request.getHost());
-		registerRequest.setPort(request == null ? null : request.getPort());
+		registerRequest.setHost(composeHost(request == null ? null : request.getHost()));
 		registerRequest.setMaxConcurrency(request == null ? null : request.getMaxConcurrency());
 		registerRequest.setSolverIds(extractSolverIds(request));
 
@@ -219,10 +217,16 @@ public class NodeAppService {
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
-		response.setPort(node.getPort());
 		response.setRunningCount(node.getRunningCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		return response;
+	}
+
+	private String composeHost(String host) {
+		if (host == null || host.isBlank()) {
+			return host;
+		}
+		return host;
 	}
 
 	private ComputeNode resolveNode(NodeHeartbeatRequest request) {
