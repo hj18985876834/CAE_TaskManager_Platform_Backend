@@ -1,12 +1,22 @@
 package com.example.cae.solver.interfaces.response;
 
 public class SolverListItemResponse {
+	private Long id;
 	private Long solverId;
 	private String solverCode;
 	private String solverName;
 	private String version;
 	private String execMode;
 	private Integer enabled;
+	private String description;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Long getSolverId() {
 		return solverId;
@@ -54,5 +64,13 @@ public class SolverListItemResponse {
 
 	public void setEnabled(Integer enabled) {
 		this.enabled = enabled;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 }

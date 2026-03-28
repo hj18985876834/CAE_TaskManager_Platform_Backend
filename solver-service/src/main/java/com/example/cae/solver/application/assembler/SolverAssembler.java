@@ -23,12 +23,14 @@ public class SolverAssembler {
 
 	public static SolverListItemResponse toListItemResponse(SolverDefinition solver) {
 		SolverListItemResponse response = new SolverListItemResponse();
+		response.setId(solver.getId());
 		response.setSolverId(solver.getId());
 		response.setSolverCode(solver.getSolverCode());
 		response.setSolverName(solver.getSolverName());
 		response.setVersion(solver.getVersion());
 		response.setExecMode(solver.getExecMode());
 		response.setEnabled(solver.getEnabled());
+		response.setDescription(solver.getRemark());
 		return response;
 	}
 
