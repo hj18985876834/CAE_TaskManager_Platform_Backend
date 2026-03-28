@@ -1,6 +1,7 @@
 package com.example.cae.user.interfaces.response;
 
 public class UserDetailResponse {
+	private Long id;
 	private Long userId;
 	private String username;
 	private String realName;
@@ -8,6 +9,14 @@ public class UserDetailResponse {
 	private String roleCode;
 	private String roleName;
 	private Integer status;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Long getUserId() {
 		return userId;

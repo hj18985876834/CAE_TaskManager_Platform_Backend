@@ -55,6 +55,12 @@ public class UserController {
 		return Result.success();
 	}
 
+	@PostMapping("/{id}/status")
+	public Result<Void> updateStatusPost(@PathVariable("id") Long id, @RequestBody UpdateUserStatusRequest request) {
+		userFacade.updateStatus(id, request);
+		return Result.success();
+	}
+
 	@PostMapping("/{id}/reset-password")
 	public Result<Void> resetPassword(@PathVariable("id") Long id, @RequestBody ResetPasswordRequest request) {
 		userFacade.resetPassword(id, request);

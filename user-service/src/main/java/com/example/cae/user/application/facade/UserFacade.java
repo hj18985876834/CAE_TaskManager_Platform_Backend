@@ -7,6 +7,7 @@ import com.example.cae.user.interfaces.request.ResetPasswordRequest;
 import com.example.cae.user.interfaces.request.UpdateUserRequest;
 import com.example.cae.user.interfaces.request.UpdateUserStatusRequest;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
+import com.example.cae.user.interfaces.response.InternalUserBasicResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 import org.springframework.stereotype.Component;
@@ -41,6 +42,10 @@ public class UserFacade {
 
 	public void resetPassword(Long userId, ResetPasswordRequest request) {
 		userAppService.resetPassword(userId, request);
+	}
+
+	public InternalUserBasicResponse getInternalById(Long userId) {
+		return userAppService.getInternalById(userId);
 	}
 }
 

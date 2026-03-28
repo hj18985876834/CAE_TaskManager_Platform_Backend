@@ -16,23 +16,32 @@ public class UserAssembler {
 		LoginResponse response = new LoginResponse();
 		response.setToken(token);
 		response.setTokenType("Bearer");
-		response.setUserId(user.getId());
-		response.setUsername(user.getUsername());
-		response.setRoleCode(role.getRoleCode());
-		return response;
-	}
-
-	public static CurrentUserResponse toCurrentUserResponse(User user, String roleCode) {
-		CurrentUserResponse response = new CurrentUserResponse();
+		response.setId(user.getId());
 		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
-		response.setRoleCode(roleCode);
+		response.setRoleId(role.getId());
+		response.setRoleCode(role.getRoleCode());
+		response.setRoleName(role.getRoleName());
+		return response;
+	}
+
+	public static CurrentUserResponse toCurrentUserResponse(User user, Role role) {
+		CurrentUserResponse response = new CurrentUserResponse();
+		response.setId(user.getId());
+		response.setUserId(user.getId());
+		response.setUsername(user.getUsername());
+		response.setRealName(user.getRealName());
+		response.setRoleId(role.getId());
+		response.setRoleCode(role.getRoleCode());
+		response.setRoleName(role.getRoleName());
+		response.setStatus(user.getStatus());
 		return response;
 	}
 
 	public static UserDetailResponse toUserDetailResponse(User user, Role role) {
 		UserDetailResponse response = new UserDetailResponse();
+		response.setId(user.getId());
 		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
@@ -43,14 +52,17 @@ public class UserAssembler {
 		return response;
 	}
 
-	public static UserListItemResponse toUserListItem(User user, String roleCode) {
+	public static UserListItemResponse toUserListItem(User user, Role role) {
 		UserListItemResponse response = new UserListItemResponse();
+		response.setId(user.getId());
 		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
 		response.setRoleId(user.getRoleId());
-		response.setRoleCode(roleCode);
+		response.setRoleCode(role.getRoleCode());
+		response.setRoleName(role.getRoleName());
 		response.setStatus(user.getStatus());
+		response.setCreatedAt(user.getCreatedAt());
 		return response;
 	}
 

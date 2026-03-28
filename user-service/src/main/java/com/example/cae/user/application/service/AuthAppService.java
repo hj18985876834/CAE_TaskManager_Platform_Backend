@@ -68,11 +68,13 @@ public class AuthAppService {
 		Role role = roleRepository.findById(user.getRoleId())
 				.orElseGet(() -> {
 					Role fallback = new Role();
+					fallback.setId(user.getRoleId());
 					fallback.setRoleCode("USER");
+					fallback.setRoleName("Default User");
 					return fallback;
 				});
 
-		return UserAssembler.toCurrentUserResponse(user, role.getRoleCode());
+		return UserAssembler.toCurrentUserResponse(user, role);
 	}
 
 	public void logout(Long userId) {

@@ -14,6 +14,7 @@ import com.example.cae.user.interfaces.request.ResetPasswordRequest;
 import com.example.cae.user.interfaces.request.UpdateUserRequest;
 import com.example.cae.user.interfaces.request.UpdateUserStatusRequest;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
+import com.example.cae.user.interfaces.response.InternalUserBasicResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 import org.springframework.stereotype.Service;
@@ -49,8 +50,9 @@ public class UserAppService {
 		List<User> users = userRepository.page(request, offset, pageSize);
 		List<UserListItemResponse> records = new ArrayList<>();
 		for (User user : users) {
-			Role role = roleRepository.findById(user.getRoleId()).orElse(null);
-			records.add(UserAssembler.toUserListItem(user, role == null ? "USER" : role.getRoleCode()));
+			Role role = roleRepository.findById(user.getRoleId())
+					.orElseGet(() -> fallbackRole(user.getRoleId()));
+			records.add(UserAssembler.toUserListItem(user, role));
 		}
 		return PageResult.of(total, pageNum, pageSize, records);
 	}
@@ -76,15 +78,32 @@ public class UserAppService {
 				.orElseThrow(() -> new BizException(404, "user not found"));
 
 		Role role = roleRepository.findById(user.getRoleId())
-				.orElseGet(() -> {
-					Role fallback = new Role();
-					fallback.setId(user.getRoleId());
-					fallback.setRoleCode("USER");
-					fallback.setRoleName("Default User");
-					return fallback;
-				});
+				.orElseGet(() -> fallbackRole(user.getRoleId()));
 
 		return UserAssembler.toUserDetailResponse(user, role);
+	}
+
+	public User findUserById(Long id) {
+		return userRepository.findById(id)
+				.orElseThrow(() -> new BizException(404, "user not found"));
+	}
+
+	public InternalUserBasicResponse getInternalById(Long id) {
+		User user = findUserById(id);
+		InternalUserBasicResponse response = new InternalUserBasicResponse();
+		response.setId(user.getId());
+		response.setUsername(user.getUsername());
+		response.setRealName(user.getRealName());
+		response.setStatus(user.getStatus());
+		return response;
+	}
+
+	private Role fallbackRole(Long roleId) {
+		Role fallback = new Role();
+		fallback.setId(roleId);
+		fallback.setRoleCode("USER");
+		fallback.setRoleName("Default User");
+		return fallback;
 	}
 
 	public void updateUser(Long userId, UpdateUserRequest request) {
