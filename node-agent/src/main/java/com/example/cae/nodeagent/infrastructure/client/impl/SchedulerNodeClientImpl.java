@@ -73,8 +73,19 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		return solverIds.stream().filter(id -> id != null).map(id -> {
 			Map<String, Object> item = new HashMap<>();
 			item.put("solverId", id);
-			item.put("solverVersion", "unknown");
+			item.put("solverVersion", resolveSolverVersion(id));
 			return item;
 		}).toList();
+	}
+
+	private String resolveSolverVersion(Long solverId) {
+		if (solverId == null || nodeAgentConfig.getSolverVersions() == null) {
+			return "v1";
+		}
+		String version = nodeAgentConfig.getSolverVersions().get(String.valueOf(solverId));
+		if (version == null || version.isBlank()) {
+			return "v1";
+		}
+		return version;
 	}
 }

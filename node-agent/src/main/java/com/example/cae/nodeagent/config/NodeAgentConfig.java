@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 @ConfigurationProperties(prefix = "cae.node")
@@ -18,6 +19,7 @@ public class NodeAgentConfig {
 	private String nodeToken;
 	private String workRoot = "./node-agent-work";
 	private List<Long> solverIds;
+	private Map<String, String> solverVersions;
 
 	public Long getNodeId() {
 		return nodeId;
@@ -97,5 +99,13 @@ public class NodeAgentConfig {
 
 	public void setSolverIds(List<Long> solverIds) {
 		this.solverIds = solverIds;
+	}
+
+	public Map<String, String> getSolverVersions() {
+		return solverVersions;
+	}
+
+	public void setSolverVersions(Map<String, String> solverVersions) {
+		this.solverVersions = solverVersions;
 	}
 }

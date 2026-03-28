@@ -16,3 +16,5 @@ cae:
     task-base-url: "http://localhost:8083"
     work-root: "./node-agent-work"
     solver-ids: [0]
+    solver-versions:
+      "0": "mock-v1"

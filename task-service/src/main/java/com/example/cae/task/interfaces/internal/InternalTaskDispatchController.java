@@ -3,9 +3,11 @@ package com.example.cae.task.interfaces.internal;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
+import com.example.cae.task.interfaces.request.TaskNodeMarkRequest;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,14 +29,20 @@ public class InternalTaskDispatchController {
 	}
 
 	@PostMapping("/{taskId}/mark-scheduled")
-	public Result<Void> markScheduled(@PathVariable Long taskId, @RequestParam Long nodeId) {
-		taskDispatchManager.markScheduled(taskId, nodeId);
+	public Result<Void> markScheduled(@PathVariable Long taskId,
+								 @RequestBody(required = false) TaskNodeMarkRequest request,
+								 @RequestParam(required = false) Long nodeId) {
+		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
+		taskDispatchManager.markScheduled(taskId, effectiveNodeId);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/mark-dispatched")
-	public Result<Void> markDispatched(@PathVariable Long taskId, @RequestParam Long nodeId) {
-		taskDispatchManager.markDispatched(taskId, nodeId);
+	public Result<Void> markDispatched(@PathVariable Long taskId,
+								  @RequestBody(required = false) TaskNodeMarkRequest request,
+								  @RequestParam(required = false) Long nodeId) {
+		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
+		taskDispatchManager.markDispatched(taskId, effectiveNodeId);
 		return Result.success();
 	}
 }

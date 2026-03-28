@@ -40,13 +40,17 @@ public class TaskClientStub implements TaskClient {
 
 	@Override
 	public void markTaskScheduled(Long taskId, Long nodeId) {
-		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-scheduled?nodeId=" + nodeId;
-		restTemplate.postForEntity(url, null, Result.class);
+		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-scheduled";
+		java.util.Map<String, Object> request = new java.util.HashMap<>();
+		request.put("nodeId", nodeId);
+		restTemplate.postForEntity(url, request, Result.class);
 	}
 
 	@Override
 	public void markTaskDispatched(Long taskId, Long nodeId) {
-		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-dispatched?nodeId=" + nodeId;
-		restTemplate.postForEntity(url, null, Result.class);
+		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-dispatched";
+		java.util.Map<String, Object> request = new java.util.HashMap<>();
+		request.put("nodeId", nodeId);
+		restTemplate.postForEntity(url, request, Result.class);
 	}
 }

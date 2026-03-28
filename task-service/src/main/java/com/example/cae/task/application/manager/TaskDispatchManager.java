@@ -39,6 +39,9 @@ public class TaskDispatchManager {
 	}
 
 	public void markScheduled(Long taskId, Long nodeId) {
+		if (nodeId == null) {
+			throw new BizException(400, "nodeId is required");
+		}
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
@@ -46,6 +49,9 @@ public class TaskDispatchManager {
 	}
 
 	public void markDispatched(Long taskId, Long nodeId) {
+		if (nodeId == null) {
+			throw new BizException(400, "nodeId is required");
+		}
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
