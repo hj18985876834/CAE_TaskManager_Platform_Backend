@@ -43,4 +43,9 @@ public class InternalSchedulerController {
 		nodeAppService.updateRunningCount(nodeId, request == null ? null : request.getDelta());
 		return Result.success();
 	}
+
+	@GetMapping("/nodes/{nodeId}/token/verify")
+	public Result<Boolean> verifyNodeToken(@PathVariable Long nodeId, @RequestParam String nodeToken) {
+		return Result.success(nodeAppService.validateNodeToken(nodeId, nodeToken));
+	}
 }

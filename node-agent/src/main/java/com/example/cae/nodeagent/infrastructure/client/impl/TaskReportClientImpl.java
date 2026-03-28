@@ -1,8 +1,11 @@
 package com.example.cae.nodeagent.infrastructure.client.impl;
 
+import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
 import com.example.cae.nodeagent.infrastructure.client.TaskReportClient;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -28,7 +31,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 				.queryParam("nodeId", nodeId)
 				.buildAndExpand(taskId)
 				.toUriString();
-		restTemplate.postForEntity(url, null, Object.class);
+		restTemplate.postForEntity(url, withToken(null), Object.class);
 	}
 
 	@Override
@@ -37,7 +40,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		Map<String, Object> body = new HashMap<>();
 		body.put("status", status);
 		body.put("reason", reason);
-		restTemplate.postForEntity(url, body, Object.class);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	@Override
@@ -46,7 +49,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		Map<String, Object> body = new HashMap<>();
 		body.put("seqNo", seqNo);
 		body.put("content", content);
-		restTemplate.postForEntity(url, body, Object.class);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	@Override
@@ -57,7 +60,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("durationSeconds", result.getDurationSeconds());
 		body.put("summaryText", result.getSummaryText());
 		body.put("metrics", result.getMetrics());
-		restTemplate.postForEntity(url, body, Object.class);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	@Override
@@ -68,13 +71,13 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("fileName", file == null ? null : file.getName());
 		body.put("storagePath", file == null ? null : file.getAbsolutePath());
 		body.put("fileSize", file == null ? null : file.length());
-		restTemplate.postForEntity(url, body, Object.class);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
 	@Override
 	public void markFinished(Long taskId) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/mark-finished";
-		restTemplate.postForEntity(url, null, Object.class);
+		restTemplate.postForEntity(url, withToken(null), Object.class);
 	}
 
 	@Override
@@ -85,7 +88,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 				.queryParam("failMessage", failMessage)
 				.buildAndExpand(taskId)
 				.toUriString();
-		restTemplate.postForEntity(url, null, Object.class);
+		restTemplate.postForEntity(url, withToken(null), Object.class);
 	}
 
 	private String taskBaseUrl() {
@@ -102,5 +105,11 @@ public class TaskReportClientImpl implements TaskReportClient {
 			return "unknown";
 		}
 		return name.substring(dotIndex + 1).toLowerCase();
+	}
+
+	private HttpEntity<?> withToken(Object body) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
+		return new HttpEntity<>(body, headers);
 	}
 }

@@ -15,6 +15,7 @@ public class NodeAgentConfig {
 	private Integer maxConcurrency = 2;
 	private String schedulerBaseUrl = "http://localhost:8084";
 	private String taskBaseUrl = "http://localhost:8083";
+	private String nodeToken;
 	private String workRoot = "./node-agent-work";
 	private List<Long> solverIds;
 
@@ -72,6 +73,14 @@ public class NodeAgentConfig {
 
 	public void setTaskBaseUrl(String taskBaseUrl) {
 		this.taskBaseUrl = taskBaseUrl;
+	}
+
+	public String getNodeToken() {
+		return nodeToken;
+	}
+
+	public void setNodeToken(String nodeToken) {
+		this.nodeToken = nodeToken;
 	}
 
 	public String getWorkRoot() {

@@ -197,6 +197,15 @@ public class NodeAppService {
 				.orElseThrow(() -> new BizException(404, "node not found"));
 	}
 
+	public boolean validateNodeToken(Long nodeId, String nodeToken) {
+		if (nodeId == null || nodeToken == null || nodeToken.isBlank()) {
+			return false;
+		}
+		return computeNodeRepository.findById(nodeId)
+				.map(node -> nodeToken.equals(node.getNodeToken()))
+				.orElse(false);
+	}
+
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
