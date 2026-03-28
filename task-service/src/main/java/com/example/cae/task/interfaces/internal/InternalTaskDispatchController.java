@@ -31,7 +31,7 @@ public class InternalTaskDispatchController {
 	@PostMapping("/{taskId}/mark-scheduled")
 	public Result<Void> markScheduled(@PathVariable("taskId") Long taskId,
 								 @RequestBody(required = false) TaskNodeMarkRequest request,
-								 @RequestParam(required = false) Long nodeId) {
+							 @RequestParam(value = "nodeId", required = false) Long nodeId) {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
 		taskDispatchManager.markScheduled(taskId, effectiveNodeId);
 		return Result.success();
@@ -40,7 +40,7 @@ public class InternalTaskDispatchController {
 	@PostMapping("/{taskId}/mark-dispatched")
 	public Result<Void> markDispatched(@PathVariable("taskId") Long taskId,
 								  @RequestBody(required = false) TaskNodeMarkRequest request,
-								  @RequestParam(required = false) Long nodeId) {
+							  @RequestParam(value = "nodeId", required = false) Long nodeId) {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
 		taskDispatchManager.markDispatched(taskId, effectiveNodeId);
 		return Result.success();

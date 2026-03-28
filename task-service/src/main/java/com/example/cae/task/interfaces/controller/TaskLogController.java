@@ -24,8 +24,8 @@ public class TaskLogController {
 	@GetMapping("/{taskId}/logs")
 	public Result<List<TaskLogResponse>> getLogs(
 			@PathVariable("taskId") Long taskId,
-			@RequestParam(defaultValue = "0") Integer fromSeq,
-			@RequestParam(defaultValue = "100") Integer pageSize,
+			@RequestParam(value = "fromSeq", defaultValue = "0") Integer fromSeq,
+			@RequestParam(value = "pageSize", defaultValue = "100") Integer pageSize,
 			@RequestHeader("X-User-Id") Long userId,
 			@RequestHeader(value = "X-Role-Code", required = false) String roleCode
 	) {
