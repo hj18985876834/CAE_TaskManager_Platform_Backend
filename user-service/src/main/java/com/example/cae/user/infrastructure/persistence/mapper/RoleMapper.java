@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface RoleMapper {
-	@Select("SELECT id, role_code AS roleCode, role_name AS roleName FROM sys_role WHERE id = #{id} LIMIT 1")
+	@Select("SELECT id, role_code AS roleCode, role_name AS roleName, created_at AS createdAt FROM sys_role WHERE id = #{id} LIMIT 1")
 	RolePO selectById(Long id);
 }
 

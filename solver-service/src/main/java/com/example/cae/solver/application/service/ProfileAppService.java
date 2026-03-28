@@ -66,8 +66,10 @@ public class ProfileAppService {
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setCommandTemplate(request.getCommandTemplate());
+		profile.setParamsSchemaJson(request.getParamsSchemaJson());
 		profile.setParserName(request.getParserName());
 		profile.changeTimeout(request.getTimeoutSeconds());
+		profile.setDescription(request.getDescription());
 		profileRepository.update(profile);
 	}
 

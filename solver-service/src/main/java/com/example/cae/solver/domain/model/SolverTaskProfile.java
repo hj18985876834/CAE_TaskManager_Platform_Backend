@@ -9,9 +9,11 @@ public class SolverTaskProfile {
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
 	private Integer enabled;
+	private String description;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 
@@ -79,6 +81,14 @@ public class SolverTaskProfile {
 		this.commandTemplate = commandTemplate;
 	}
 
+	public String getParamsSchemaJson() {
+		return paramsSchemaJson;
+	}
+
+	public void setParamsSchemaJson(String paramsSchemaJson) {
+		this.paramsSchemaJson = paramsSchemaJson;
+	}
+
 	public String getParserName() {
 		return parserName;
 	}
@@ -101,6 +111,14 @@ public class SolverTaskProfile {
 
 	public void setEnabled(Integer enabled) {
 		this.enabled = enabled;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public LocalDateTime getCreatedAt() {

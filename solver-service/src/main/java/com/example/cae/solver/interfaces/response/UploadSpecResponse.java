@@ -7,7 +7,9 @@ public class UploadSpecResponse {
 	private String profileCode;
 	private String taskType;
 	private String profileName;
+	private String paramsSchemaJson;
 	private Integer timeoutSeconds;
+	private String description;
 	private List<FileRuleResponse> requiredFiles;
 	private List<FileRuleResponse> optionalFiles;
 
@@ -49,6 +51,22 @@ public class UploadSpecResponse {
 
 	public void setTimeoutSeconds(Integer timeoutSeconds) {
 		this.timeoutSeconds = timeoutSeconds;
+	}
+
+	public String getParamsSchemaJson() {
+		return paramsSchemaJson;
+	}
+
+	public void setParamsSchemaJson(String paramsSchemaJson) {
+		this.paramsSchemaJson = paramsSchemaJson;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public List<FileRuleResponse> getRequiredFiles() {

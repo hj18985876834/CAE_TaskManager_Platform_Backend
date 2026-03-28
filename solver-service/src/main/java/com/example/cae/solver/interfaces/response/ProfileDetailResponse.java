@@ -7,8 +7,10 @@ public class ProfileDetailResponse {
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
+	private String description;
 	private Integer enabled;
 
 	public Long getProfileId() {
@@ -67,6 +69,14 @@ public class ProfileDetailResponse {
 		this.parserName = parserName;
 	}
 
+	public String getParamsSchemaJson() {
+		return paramsSchemaJson;
+	}
+
+	public void setParamsSchemaJson(String paramsSchemaJson) {
+		this.paramsSchemaJson = paramsSchemaJson;
+	}
+
 	public Integer getTimeoutSeconds() {
 		return timeoutSeconds;
 	}
@@ -81,6 +91,14 @@ public class ProfileDetailResponse {
 
 	public void setEnabled(Integer enabled) {
 		this.enabled = enabled;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 }
 

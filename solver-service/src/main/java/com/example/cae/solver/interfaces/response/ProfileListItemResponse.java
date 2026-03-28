@@ -7,6 +7,7 @@ public class ProfileListItemResponse {
 	private String taskType;
 	private String profileName;
 	private Integer timeoutSeconds;
+	private String description;
 	private Integer enabled;
 
 	public Long getProfileId() {
@@ -55,6 +56,14 @@ public class ProfileListItemResponse {
 
 	public void setTimeoutSeconds(Integer timeoutSeconds) {
 		this.timeoutSeconds = timeoutSeconds;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public Integer getEnabled() {

@@ -18,7 +18,9 @@ public class UploadSpecBuilder {
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
+		response.setParamsSchemaJson(profile.getParamsSchemaJson());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
+		response.setDescription(profile.getDescription());
 
 		List<FileRuleResponse> requiredFiles = rules.stream()
 				.filter(SolverProfileFileRule::isRequired)

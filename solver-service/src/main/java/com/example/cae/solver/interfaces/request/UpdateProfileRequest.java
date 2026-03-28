@@ -4,8 +4,10 @@ public class UpdateProfileRequest {
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
+	private String description;
 
 	public String getTaskType() {
 		return taskType;
@@ -39,11 +41,27 @@ public class UpdateProfileRequest {
 		this.parserName = parserName;
 	}
 
+	public String getParamsSchemaJson() {
+		return paramsSchemaJson;
+	}
+
+	public void setParamsSchemaJson(String paramsSchemaJson) {
+		this.paramsSchemaJson = paramsSchemaJson;
+	}
+
 	public Integer getTimeoutSeconds() {
 		return timeoutSeconds;
 	}
 
 	public void setTimeoutSeconds(Integer timeoutSeconds) {
 		this.timeoutSeconds = timeoutSeconds;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 }

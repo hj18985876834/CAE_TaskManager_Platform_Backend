@@ -17,8 +17,10 @@ public class ProfileAssembler {
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setCommandTemplate(request.getCommandTemplate());
+		profile.setParamsSchemaJson(request.getParamsSchemaJson());
 		profile.setParserName(request.getParserName());
 		profile.setTimeoutSeconds(request.getTimeoutSeconds());
+		profile.setDescription(request.getDescription());
 		return profile;
 	}
 
@@ -30,6 +32,7 @@ public class ProfileAssembler {
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
+		response.setDescription(profile.getDescription());
 		response.setEnabled(profile.getEnabled());
 		return response;
 	}
@@ -42,8 +45,10 @@ public class ProfileAssembler {
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
 		response.setCommandTemplate(profile.getCommandTemplate());
+		response.setParamsSchemaJson(profile.getParamsSchemaJson());
 		response.setParserName(profile.getParserName());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
+		response.setDescription(profile.getDescription());
 		response.setEnabled(profile.getEnabled());
 		return response;
 	}
@@ -56,8 +61,10 @@ public class ProfileAssembler {
 		profile.setTaskType(po.getTaskType());
 		profile.setProfileName(po.getProfileName());
 		profile.setCommandTemplate(po.getCommandTemplate());
+		profile.setParamsSchemaJson(po.getParamsSchemaJson());
 		profile.setParserName(po.getParserName());
 		profile.setTimeoutSeconds(po.getTimeoutSeconds());
+		profile.setDescription(po.getDescription());
 		profile.setEnabled(po.getEnabled());
 		profile.setCreatedAt(po.getCreatedAt());
 		profile.setUpdatedAt(po.getUpdatedAt());
@@ -72,8 +79,10 @@ public class ProfileAssembler {
 		po.setTaskType(profile.getTaskType());
 		po.setProfileName(profile.getProfileName());
 		po.setCommandTemplate(profile.getCommandTemplate());
+		po.setParamsSchemaJson(profile.getParamsSchemaJson());
 		po.setParserName(profile.getParserName());
 		po.setTimeoutSeconds(profile.getTimeoutSeconds());
+		po.setDescription(profile.getDescription());
 		po.setEnabled(profile.getEnabled());
 		return po;
 	}

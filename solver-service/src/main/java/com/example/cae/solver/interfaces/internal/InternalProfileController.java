@@ -28,8 +28,10 @@ public class InternalProfileController {
 		response.setTaskType(detail.getTaskType());
 		response.setProfileName(detail.getProfileName());
 		response.setCommandTemplate(detail.getCommandTemplate());
+		response.setParamsSchemaJson(detail.getParamsSchemaJson());
 		response.setParserName(detail.getParserName());
 		response.setTimeoutSeconds(detail.getTimeoutSeconds());
+		response.setDescription(detail.getDescription());
 		response.setEnabled(detail.getEnabled());
 		response.setFileRules(profileFacade.getFileRules(profileId));
 		return Result.success(response);
