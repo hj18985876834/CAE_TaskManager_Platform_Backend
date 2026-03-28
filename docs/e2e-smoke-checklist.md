@@ -44,15 +44,15 @@ Expected:
 
 Current scheduler public paths are:
 
-- /api/scheduler/nodes
-- /api/scheduler/records
+- /api/nodes
+- /api/schedules
+- /api/tasks/{taskId}/schedules
 
-Gateway route config now forwards scheduler requests from:
+Gateway route config should at least forward:
 
-- /api/scheduler/nodes/**
-- /api/scheduler/records/**
 - /api/nodes/**
 - /api/schedules/**
+- /api/tasks/*/schedules
 
 Result:
 
@@ -77,7 +77,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 - response contains token
 
 Output to capture:
@@ -93,7 +93,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 - user id returned
 
 Output to capture:
@@ -109,7 +109,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 - taskId returned
 
 Output to capture:
@@ -125,7 +125,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 
 ## TC-05 Validate Task
 
@@ -136,7 +136,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 - task status becomes VALIDATED or equivalent
 
 ## TC-06 Submit Task
@@ -148,7 +148,7 @@ Request:
 
 Expected:
 
-- code=200
+- code=0
 - task enters QUEUED/PENDING for scheduler pickup
 
 ## TC-07 Scheduler Picks Task
@@ -168,6 +168,10 @@ Verification API:
 - GET /api/tasks/{task_id}/status-history
 
 ## TC-08 Node-Agent Executes and Reports
+
+Security note:
+
+- All node-agent callbacks except register must carry X-Node-Token.
 
 Expected:
 
