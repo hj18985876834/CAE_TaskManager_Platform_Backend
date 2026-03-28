@@ -40,6 +40,14 @@ Expected:
 - All services are started.
 - Gateway can access all downstream services.
 
+Recommended command (repository docs folder):
+
+- `./e2e-precheck.ps1`
+
+Optional with explicit DB/env inputs:
+
+- `./e2e-precheck.ps1 -GatewayBaseUrl "http://localhost:8080" -DbHost "localhost" -DbPort 3306`
+
 ### 3.3 Route Consistency Gate
 
 Current scheduler public paths are:
