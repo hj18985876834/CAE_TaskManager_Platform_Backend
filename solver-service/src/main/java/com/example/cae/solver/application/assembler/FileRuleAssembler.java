@@ -17,12 +17,13 @@ public class FileRuleAssembler {
 		rule.setFileType(request.getFileType());
 		rule.setRequiredFlag(request.getRequiredFlag());
 		rule.setSortOrder(request.getSortOrder());
-		rule.setRemark(request.getRemark());
+		rule.setRemark(resolveDescription(request.getDescription(), request.getRemark()));
 		return rule;
 	}
 
 	public static FileRuleResponse toResponse(SolverProfileFileRule rule) {
 		FileRuleResponse response = new FileRuleResponse();
+		response.setId(rule.getId());
 		response.setRuleId(rule.getId());
 		response.setProfileId(rule.getProfileId());
 		response.setFileKey(rule.getFileKey());
@@ -30,8 +31,16 @@ public class FileRuleAssembler {
 		response.setFileType(rule.getFileType());
 		response.setRequiredFlag(rule.getRequiredFlag());
 		response.setSortOrder(rule.getSortOrder());
+		response.setDescription(rule.getRemark());
 		response.setRemark(rule.getRemark());
 		return response;
+	}
+
+	private static String resolveDescription(String description, String remark) {
+		if (description != null && !description.isBlank()) {
+			return description;
+		}
+		return remark;
 	}
 
 	public static SolverProfileFileRule fromPO(SolverProfileFileRulePO po) {

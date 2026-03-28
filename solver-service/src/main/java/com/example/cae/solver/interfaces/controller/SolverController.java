@@ -57,6 +57,17 @@ public class SolverController {
 		return Result.success();
 	}
 
+	@PostMapping("/{solverId}/status")
+	public Result<Void> updateSolverStatusPost(@PathVariable("solverId") Long solverId, @RequestBody UpdateSolverStatusRequest request) {
+		solverFacade.updateSolverStatus(solverId, request);
+		return Result.success();
+	}
+
+	@GetMapping("/{solverId}/profiles")
+	public Result<List<ProfileListItemResponse>> getSolverProfiles(@PathVariable("solverId") Long solverId) {
+		return Result.success(solverFacade.getSolverProfiles(solverId));
+	}
+
 	@GetMapping("/{solverId}/task-options")
 	public Result<List<ProfileListItemResponse>> getSolverTaskOptions(@PathVariable("solverId") Long solverId) {
 		return Result.success(solverFacade.getSolverTaskOptions(solverId));

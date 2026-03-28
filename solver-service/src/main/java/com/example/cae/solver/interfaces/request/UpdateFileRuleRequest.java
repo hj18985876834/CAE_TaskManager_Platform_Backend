@@ -5,6 +5,7 @@ public class UpdateFileRuleRequest {
 	private String fileType;
 	private Integer requiredFlag;
 	private Integer sortOrder;
+	private String description;
 	private String remark;
 
 	public String getFileNamePattern() {
@@ -37,6 +38,14 @@ public class UpdateFileRuleRequest {
 
 	public void setSortOrder(Integer sortOrder) {
 		this.sortOrder = sortOrder;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public String getRemark() {

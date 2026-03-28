@@ -1,17 +1,27 @@
 package com.example.cae.solver.interfaces.response;
 
 public class ProfileDetailResponse {
+	private Long id;
 	private Long profileId;
 	private Long solverId;
 	private String profileCode;
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchema;
 	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
 	private String description;
 	private Integer enabled;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Long getProfileId() {
 		return profileId;
@@ -59,6 +69,14 @@ public class ProfileDetailResponse {
 
 	public void setCommandTemplate(String commandTemplate) {
 		this.commandTemplate = commandTemplate;
+	}
+
+	public String getParamsSchema() {
+		return paramsSchema;
+	}
+
+	public void setParamsSchema(String paramsSchema) {
+		this.paramsSchema = paramsSchema;
 	}
 
 	public String getParserName() {

@@ -44,4 +44,8 @@ public class SolverFacade {
 	public List<ProfileListItemResponse> getSolverTaskOptions(Long solverId) {
 		return solverAppService.getSolverTaskOptions(solverId);
 	}
+
+	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
+		return solverAppService.getSolverProfiles(solverId);
+	}
 }

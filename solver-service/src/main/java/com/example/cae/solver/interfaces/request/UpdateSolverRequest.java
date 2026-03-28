@@ -5,6 +5,7 @@ public class UpdateSolverRequest {
 	private String version;
 	private String execMode;
 	private String execPath;
+	private String description;
 	private String remark;
 
 	public String getSolverName() {
@@ -37,6 +38,14 @@ public class UpdateSolverRequest {
 
 	public void setExecPath(String execPath) {
 		this.execPath = execPath;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public String getRemark() {

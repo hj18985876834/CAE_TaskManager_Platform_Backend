@@ -17,20 +17,25 @@ public class ProfileAssembler {
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setCommandTemplate(request.getCommandTemplate());
-		profile.setParamsSchemaJson(request.getParamsSchemaJson());
+		profile.setParamsSchemaJson(resolveParamsSchema(request.getParamsSchema(), request.getParamsSchemaJson()));
 		profile.setParserName(request.getParserName());
 		profile.setTimeoutSeconds(request.getTimeoutSeconds());
 		profile.setDescription(request.getDescription());
+		if (request.getEnabled() != null) {
+			profile.setEnabled(request.getEnabled());
+		}
 		return profile;
 	}
 
 	public static ProfileListItemResponse toListItemResponse(SolverTaskProfile profile) {
 		ProfileListItemResponse response = new ProfileListItemResponse();
+		response.setId(profile.getId());
 		response.setProfileId(profile.getId());
 		response.setSolverId(profile.getSolverId());
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
+		response.setParamsSchema(profile.getParamsSchemaJson());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
 		response.setDescription(profile.getDescription());
 		response.setEnabled(profile.getEnabled());
@@ -39,18 +44,27 @@ public class ProfileAssembler {
 
 	public static ProfileDetailResponse toDetailResponse(SolverTaskProfile profile) {
 		ProfileDetailResponse response = new ProfileDetailResponse();
+		response.setId(profile.getId());
 		response.setProfileId(profile.getId());
 		response.setSolverId(profile.getSolverId());
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
 		response.setCommandTemplate(profile.getCommandTemplate());
+		response.setParamsSchema(profile.getParamsSchemaJson());
 		response.setParamsSchemaJson(profile.getParamsSchemaJson());
 		response.setParserName(profile.getParserName());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
 		response.setDescription(profile.getDescription());
 		response.setEnabled(profile.getEnabled());
 		return response;
+	}
+
+	private static String resolveParamsSchema(String paramsSchema, String paramsSchemaJson) {
+		if (paramsSchema != null && !paramsSchema.isBlank()) {
+			return paramsSchema;
+		}
+		return paramsSchemaJson;
 	}
 
 	public static SolverTaskProfile fromPO(SolverTaskProfilePO po) {

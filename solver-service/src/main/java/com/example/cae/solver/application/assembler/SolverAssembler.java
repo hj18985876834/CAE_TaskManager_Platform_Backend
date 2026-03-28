@@ -17,7 +17,10 @@ public class SolverAssembler {
 		solver.setVersion(request.getVersion());
 		solver.setExecMode(request.getExecMode());
 		solver.setExecPath(request.getExecPath());
-		solver.setRemark(request.getRemark());
+		solver.setRemark(resolveDescription(request.getDescription(), request.getRemark()));
+		if (request.getEnabled() != null) {
+			solver.setEnabled(request.getEnabled());
+		}
 		return solver;
 	}
 
@@ -29,6 +32,7 @@ public class SolverAssembler {
 		response.setSolverName(solver.getSolverName());
 		response.setVersion(solver.getVersion());
 		response.setExecMode(solver.getExecMode());
+		response.setExecPath(solver.getExecPath());
 		response.setEnabled(solver.getEnabled());
 		response.setDescription(solver.getRemark());
 		return response;
@@ -36,6 +40,7 @@ public class SolverAssembler {
 
 	public static SolverDetailResponse toDetailResponse(SolverDefinition solver) {
 		SolverDetailResponse response = new SolverDetailResponse();
+		response.setId(solver.getId());
 		response.setSolverId(solver.getId());
 		response.setSolverCode(solver.getSolverCode());
 		response.setSolverName(solver.getSolverName());
@@ -43,8 +48,16 @@ public class SolverAssembler {
 		response.setExecMode(solver.getExecMode());
 		response.setExecPath(solver.getExecPath());
 		response.setEnabled(solver.getEnabled());
+		response.setDescription(solver.getRemark());
 		response.setRemark(solver.getRemark());
 		return response;
+	}
+
+	private static String resolveDescription(String description, String remark) {
+		if (description != null && !description.isBlank()) {
+			return description;
+		}
+		return remark;
 	}
 
 	public static SolverDefinition fromPO(SolverDefinitionPO po) {

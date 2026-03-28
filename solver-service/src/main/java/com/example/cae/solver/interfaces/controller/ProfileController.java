@@ -58,6 +58,12 @@ public class ProfileController {
 		return Result.success();
 	}
 
+	@PostMapping("/{profileId}/status")
+	public Result<Void> updateProfileStatusPost(@PathVariable("profileId") Long profileId, @RequestBody UpdateProfileStatusRequest request) {
+		profileFacade.updateProfileStatus(profileId, request);
+		return Result.success();
+	}
+
 	@GetMapping("/{profileId}/upload-spec")
 	public Result<UploadSpecResponse> getUploadSpec(@PathVariable("profileId") Long profileId) {
 		return Result.success(profileFacade.buildUploadSpec(profileId));

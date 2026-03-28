@@ -1,14 +1,24 @@
 package com.example.cae.solver.interfaces.response;
 
 public class ProfileListItemResponse {
+	private Long id;
 	private Long profileId;
 	private Long solverId;
 	private String profileCode;
 	private String taskType;
 	private String profileName;
+	private String paramsSchema;
 	private Integer timeoutSeconds;
 	private String description;
 	private Integer enabled;
+
+	public Long getId() {
+		return id;
+	}
+
+	public void setId(Long id) {
+		this.id = id;
+	}
 
 	public Long getProfileId() {
 		return profileId;
@@ -48,6 +58,14 @@ public class ProfileListItemResponse {
 
 	public void setProfileName(String profileName) {
 		this.profileName = profileName;
+	}
+
+	public String getParamsSchema() {
+		return paramsSchema;
+	}
+
+	public void setParamsSchema(String paramsSchema) {
+		this.paramsSchema = paramsSchema;
 	}
 
 	public Integer getTimeoutSeconds() {

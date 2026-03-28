@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/profiles")
+@RequestMapping("/api")
 public class FileRuleController {
 	private final ProfileFacade profileFacade;
 
@@ -21,21 +21,21 @@ public class FileRuleController {
 		this.profileFacade = profileFacade;
 	}
 
-	@PostMapping("/{profileId}/file-rules")
+	@PostMapping("/profiles/{profileId}/file-rules")
 	public Result<Void> createFileRule(@PathVariable("profileId") Long profileId, @RequestBody CreateFileRuleRequest request) {
 		profileFacade.createFileRule(profileId, request);
 		return Result.success();
 	}
 
-	@PutMapping("/file-rules/{ruleId}")
-	public Result<Void> updateFileRule(@PathVariable("ruleId") Long ruleId, @RequestBody UpdateFileRuleRequest request) {
-		profileFacade.updateFileRule(ruleId, request);
+	@PutMapping("/file-rules/{id}")
+	public Result<Void> updateFileRule(@PathVariable("id") Long id, @RequestBody UpdateFileRuleRequest request) {
+		profileFacade.updateFileRule(id, request);
 		return Result.success();
 	}
 
-	@DeleteMapping("/file-rules/{ruleId}")
-	public Result<Void> deleteFileRule(@PathVariable("ruleId") Long ruleId) {
-		profileFacade.deleteFileRule(ruleId);
+	@DeleteMapping("/file-rules/{id}")
+	public Result<Void> deleteFileRule(@PathVariable("id") Long id) {
+		profileFacade.deleteFileRule(id);
 		return Result.success();
 	}
 }

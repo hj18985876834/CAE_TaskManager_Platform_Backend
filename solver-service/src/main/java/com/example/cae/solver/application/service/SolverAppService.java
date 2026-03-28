@@ -49,7 +49,11 @@ public class SolverAppService {
 	public void createSolver(CreateSolverRequest request) {
 		solverDomainService.checkSolverCodeUnique(request.getSolverCode());
 		SolverDefinition solver = SolverAssembler.toSolver(request);
-		solver.enable();
+		if (request.getEnabled() != null && request.getEnabled() == 0) {
+			solver.disable();
+		} else {
+			solver.enable();
+		}
 		solverRepository.save(solver);
 	}
 
@@ -59,7 +63,11 @@ public class SolverAppService {
 		solver.setVersion(request.getVersion());
 		solver.setExecMode(request.getExecMode());
 		solver.setExecPath(request.getExecPath());
-		solver.setRemark(request.getRemark());
+		if (request.getDescription() != null && !request.getDescription().isBlank()) {
+			solver.setRemark(request.getDescription());
+		} else {
+			solver.setRemark(request.getRemark());
+		}
 		solverRepository.update(solver);
 	}
 
@@ -74,6 +82,10 @@ public class SolverAppService {
 	}
 
 	public List<ProfileListItemResponse> getSolverTaskOptions(Long solverId) {
+		return getSolverProfiles(solverId);
+	}
+
+	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
 		return profileRepository.listEnabledBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
 	}
 }

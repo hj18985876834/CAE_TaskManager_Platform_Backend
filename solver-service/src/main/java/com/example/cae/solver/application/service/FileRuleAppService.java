@@ -40,7 +40,11 @@ public class FileRuleAppService {
 		rule.setFileType(request.getFileType());
 		rule.setRequiredFlag(request.getRequiredFlag());
 		rule.setSortOrder(request.getSortOrder());
-		rule.setRemark(request.getRemark());
+		if (request.getDescription() != null && !request.getDescription().isBlank()) {
+			rule.setRemark(request.getDescription());
+		} else {
+			rule.setRemark(request.getRemark());
+		}
 		fileRuleRepository.update(rule);
 	}
 

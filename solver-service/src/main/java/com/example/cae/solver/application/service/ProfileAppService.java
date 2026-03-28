@@ -57,7 +57,11 @@ public class ProfileAppService {
 		}
 		profileRuleDomainService.checkProfileCodeUnique(request.getSolverId(), request.getProfileCode());
 		SolverTaskProfile profile = ProfileAssembler.toProfile(request);
-		profile.enable();
+		if (request.getEnabled() != null && request.getEnabled() == 0) {
+			profile.disable();
+		} else {
+			profile.enable();
+		}
 		profileRepository.save(profile);
 	}
 
@@ -66,7 +70,11 @@ public class ProfileAppService {
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setCommandTemplate(request.getCommandTemplate());
-		profile.setParamsSchemaJson(request.getParamsSchemaJson());
+		if (request.getParamsSchema() != null && !request.getParamsSchema().isBlank()) {
+			profile.setParamsSchemaJson(request.getParamsSchema());
+		} else {
+			profile.setParamsSchemaJson(request.getParamsSchemaJson());
+		}
 		profile.setParserName(request.getParserName());
 		profile.changeTimeout(request.getTimeoutSeconds());
 		profile.setDescription(request.getDescription());

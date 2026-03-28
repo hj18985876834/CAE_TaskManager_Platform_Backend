@@ -6,6 +6,8 @@ public class CreateSolverRequest {
 	private String version;
 	private String execMode;
 	private String execPath;
+	private Integer enabled;
+	private String description;
 	private String remark;
 
 	public String getSolverCode() {
@@ -46,6 +48,22 @@ public class CreateSolverRequest {
 
 	public void setExecPath(String execPath) {
 		this.execPath = execPath;
+	}
+
+	public Integer getEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(Integer enabled) {
+		this.enabled = enabled;
+	}
+
+	public String getDescription() {
+		return description;
+	}
+
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public String getRemark() {

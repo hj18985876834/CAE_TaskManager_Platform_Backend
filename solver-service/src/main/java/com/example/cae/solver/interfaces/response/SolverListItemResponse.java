@@ -7,6 +7,7 @@ public class SolverListItemResponse {
 	private String solverName;
 	private String version;
 	private String execMode;
+	private String execPath;
 	private Integer enabled;
 	private String description;
 
@@ -56,6 +57,14 @@ public class SolverListItemResponse {
 
 	public void setExecMode(String execMode) {
 		this.execMode = execMode;
+	}
+
+	public String getExecPath() {
+		return execPath;
+	}
+
+	public void setExecPath(String execPath) {
+		this.execPath = execPath;
 	}
 
 	public Integer getEnabled() {

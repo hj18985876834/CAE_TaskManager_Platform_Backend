@@ -6,9 +6,11 @@ public class CreateProfileRequest {
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchema;
 	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
+	private Integer enabled;
 	private String description;
 
 	public Long getSolverId() {
@@ -51,6 +53,14 @@ public class CreateProfileRequest {
 		this.commandTemplate = commandTemplate;
 	}
 
+	public String getParamsSchema() {
+		return paramsSchema;
+	}
+
+	public void setParamsSchema(String paramsSchema) {
+		this.paramsSchema = paramsSchema;
+	}
+
 	public String getParserName() {
 		return parserName;
 	}
@@ -73,6 +83,14 @@ public class CreateProfileRequest {
 
 	public void setTimeoutSeconds(Integer timeoutSeconds) {
 		this.timeoutSeconds = timeoutSeconds;
+	}
+
+	public Integer getEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(Integer enabled) {
+		this.enabled = enabled;
 	}
 
 	public String getDescription() {

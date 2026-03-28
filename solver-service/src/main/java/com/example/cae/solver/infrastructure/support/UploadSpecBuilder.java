@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 
 @Component
 public class UploadSpecBuilder {
@@ -18,6 +19,7 @@ public class UploadSpecBuilder {
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
+		response.setParamsSchema(profile.getParamsSchemaJson());
 		response.setParamsSchemaJson(profile.getParamsSchemaJson());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
 		response.setDescription(profile.getDescription());
@@ -36,6 +38,7 @@ public class UploadSpecBuilder {
 
 		response.setRequiredFiles(requiredFiles);
 		response.setOptionalFiles(optionalFiles);
+		response.setFileRules(Stream.concat(requiredFiles.stream(), optionalFiles.stream()).toList());
 		return response;
 	}
 }
