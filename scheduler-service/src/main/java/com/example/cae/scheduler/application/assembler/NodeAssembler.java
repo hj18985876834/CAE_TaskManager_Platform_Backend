@@ -20,7 +20,7 @@ public final class NodeAssembler {
 
 	public static NodeDetailResponse toDetailResponse(ComputeNode node) {
 		NodeDetailResponse response = new NodeDetailResponse();
-		response.setNodeId(node.getId());
+		response.setId(node.getId());
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());

@@ -32,7 +32,7 @@ public class NodeAgentController {
 
 	@PostMapping("/heartbeat")
 	public Result<Void> heartbeat(@RequestBody NodeHeartbeatRequest request,
-								  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+								  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeFacade.heartbeat(request, nodeToken);
 		return Result.success();
 	}

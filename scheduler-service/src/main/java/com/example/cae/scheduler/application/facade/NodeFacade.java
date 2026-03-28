@@ -6,8 +6,9 @@ import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
-import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Component;
 
@@ -37,7 +38,7 @@ public class NodeFacade {
 		nodeManageManager.heartbeat(request, nodeToken);
 	}
 
-	public PageResult<NodeDetailResponse> pageNodes(NodePageQueryRequest request) {
+	public PageResult<NodeListItemResponse> pageNodes(NodePageQueryRequest request) {
 		return nodeManageManager.pageNodes(request);
 	}
 
@@ -45,7 +46,7 @@ public class NodeFacade {
 		return nodeManageManager.getNodeDetail(nodeId);
 	}
 
-	public void updateNodeStatus(Long nodeId, NodeStatusUpdateRequest request) {
+	public void updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request) {
 		nodeManageManager.updateNodeStatus(nodeId, request);
 	}
 

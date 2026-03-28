@@ -12,9 +12,10 @@ import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
-import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
 
@@ -103,13 +104,13 @@ public class NodeAppService {
 		computeNodeRepository.update(node);
 	}
 
-	public PageResult<NodeDetailResponse> pageNodes(NodePageQueryRequest request) {
+	public PageResult<NodeListItemResponse> pageNodes(NodePageQueryRequest request) {
 		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
 		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();
 		long offset = (long) (pageNum - 1) * pageSize;
 
 		PageResult<ComputeNode> page = computeNodeRepository.page(request, offset, pageSize);
-		List<NodeDetailResponse> records = page.getRecords().stream().map(this::toNodeDetail).toList();
+		List<NodeListItemResponse> records = page.getRecords().stream().map(this::toNodeListItem).toList();
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
 	}
 
@@ -118,7 +119,7 @@ public class NodeAppService {
 		return toNodeDetail(node);
 	}
 
-	public void updateNodeStatus(Long nodeId, NodeStatusUpdateRequest request) {
+	public void updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request) {
 		if (nodeId == null || request == null || request.getStatus() == null || request.getStatus().isBlank()) {
 			throw new BizException(400, "invalid node status request");
 		}
@@ -137,7 +138,6 @@ public class NodeAppService {
 		}
 		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
 		return nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
-				.filter(NodeSolverCapability::isEnabled)
 				.map(capability -> {
 					NodeSolverResponse response = new NodeSolverResponse();
 					response.setSolverId(capability.getSolverId());
@@ -207,7 +207,28 @@ public class NodeAppService {
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
-		response.setSolverIds(capabilities.stream().filter(NodeSolverCapability::isEnabled).map(NodeSolverCapability::getSolverId).toList());
+		response.setSolvers(capabilities.stream().map(capability -> {
+			NodeSolverResponse solver = new NodeSolverResponse();
+			solver.setSolverId(capability.getSolverId());
+			solver.setSolverVersion(capability.getSolverVersion());
+			solver.setEnabled(capability.getEnabled());
+			return solver;
+		}).toList());
+		return response;
+	}
+
+	private NodeListItemResponse toNodeListItem(ComputeNode node) {
+		NodeListItemResponse response = new NodeListItemResponse();
+		response.setId(node.getId());
+		response.setNodeCode(node.getNodeCode());
+		response.setNodeName(node.getNodeName());
+		response.setHost(node.getHost());
+		response.setStatus(node.getStatus());
+		response.setMaxConcurrency(node.getMaxConcurrency());
+		response.setRunningCount(node.getRunningCount());
+		response.setCpuUsage(node.getCpuUsage());
+		response.setMemoryUsage(node.getMemoryUsage());
+		response.setLastHeartbeatTime(node.getLastHeartbeatTime());
 		return response;
 	}
 
@@ -230,11 +251,7 @@ public class NodeAppService {
 	}
 
 	private ComputeNode resolveNode(NodeHeartbeatRequest request) {
-		if (request.getNodeId() != null) {
-			return computeNodeRepository.findById(request.getNodeId())
-					.orElseThrow(() -> new BizException(404, "node not found"));
-		}
-		return computeNodeRepository.findByNodeCode(request.getNodeCode())
+		return computeNodeRepository.findById(request.getNodeId())
 				.orElseThrow(() -> new BizException(404, "node not found"));
 	}
 

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 
 public class NodeHeartbeatRequest {
 	private Long nodeId;
-	private String nodeCode;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private Integer runningCount;
@@ -15,14 +14,6 @@ public class NodeHeartbeatRequest {
 
 	public void setNodeId(Long nodeId) {
 		this.nodeId = nodeId;
-	}
-
-	public String getNodeCode() {
-		return nodeCode;
-	}
-
-	public void setNodeCode(String nodeCode) {
-		this.nodeCode = nodeCode;
 	}
 
 	public BigDecimal getCpuUsage() {

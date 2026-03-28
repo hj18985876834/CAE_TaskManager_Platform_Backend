@@ -4,8 +4,9 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.facade.NodeFacade;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
-import com.example.cae.scheduler.interfaces.request.NodeStatusUpdateRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
+import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,23 +27,23 @@ public class NodeController {
 	}
 
 	@GetMapping
-	public Result<PageResult<NodeDetailResponse>> pageNodes(NodePageQueryRequest request) {
+	public Result<PageResult<NodeListItemResponse>> pageNodes(NodePageQueryRequest request) {
 		return Result.success(nodeFacade.pageNodes(request));
 	}
 
 	@GetMapping("/{nodeId}")
-	public Result<NodeDetailResponse> getNodeDetail(@PathVariable Long nodeId) {
+	public Result<NodeDetailResponse> getNodeDetail(@PathVariable("nodeId") Long nodeId) {
 		return Result.success(nodeFacade.getNodeDetail(nodeId));
 	}
 
 	@PostMapping("/{nodeId}/status")
-	public Result<Void> updateNodeStatus(@PathVariable Long nodeId, @RequestBody NodeStatusUpdateRequest request) {
+	public Result<Void> updateNodeStatus(@PathVariable("nodeId") Long nodeId, @RequestBody UpdateNodeStatusRequest request) {
 		nodeFacade.updateNodeStatus(nodeId, request);
 		return Result.success();
 	}
 
 	@GetMapping("/{nodeId}/solvers")
-	public Result<List<NodeSolverResponse>> listNodeSolvers(@PathVariable Long nodeId) {
+	public Result<List<NodeSolverResponse>> listNodeSolvers(@PathVariable("nodeId") Long nodeId) {
 		return Result.success(nodeFacade.listNodeSolvers(nodeId));
 	}
 }
