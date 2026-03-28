@@ -20,7 +20,7 @@ USE user_db;
 -- -----------------------------
 DROP TABLE IF EXISTS sys_role;
 CREATE TABLE sys_role (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     role_code VARCHAR(30) NOT NULL COMMENT '角色编码，如 ADMIN / USER',
     role_name VARCHAR(50) NOT NULL COMMENT '角色名称',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -33,7 +33,7 @@ CREATE TABLE sys_role (
 -- -----------------------------
 DROP TABLE IF EXISTS sys_user;
 CREATE TABLE sys_user (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     username VARCHAR(50) NOT NULL COMMENT '用户名，唯一',
     password VARCHAR(255) NOT NULL COMMENT '加密密码',
     real_name VARCHAR(50) NOT NULL COMMENT '真实姓名',
@@ -52,6 +52,12 @@ INSERT INTO sys_role (id, role_code, role_name, created_at) VALUES
 (1, 'ADMIN', '管理员', NOW()),
 (2, 'USER', '普通用户', NOW());
 
+-- 初始化用户数据
+-- admin 密码明文为 123456（SHA-256）
+INSERT INTO sys_user (id, username, password, real_name, role_id, status, created_at, updated_at) VALUES
+(1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', '系统管理员', 1, 1, NOW(), NOW()),
+(2, 'demo', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', '演示用户', 2, 1, NOW(), NOW());
+
 -- =========================================================
 -- 2. solver_db
 -- =========================================================
@@ -65,7 +71,7 @@ USE solver_db;
 -- -----------------------------
 DROP TABLE IF EXISTS solver_definition;
 CREATE TABLE solver_definition (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     solver_code VARCHAR(50) NOT NULL COMMENT '唯一编码，如 OPENFOAM / CALCULIX / MOCK',
     solver_name VARCHAR(100) NOT NULL COMMENT '显示名称',
     version VARCHAR(50) DEFAULT NULL COMMENT '版本',
@@ -85,7 +91,7 @@ CREATE TABLE solver_definition (
 -- -----------------------------
 DROP TABLE IF EXISTS solver_task_profile;
 CREATE TABLE solver_task_profile (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     solver_id BIGINT NOT NULL COMMENT '求解器ID',
     profile_code VARCHAR(50) NOT NULL COMMENT '模板编码',
     task_type VARCHAR(50) NOT NULL COMMENT '任务类型，如 STRUCT_STATIC / CFD_STEADY',
@@ -111,7 +117,7 @@ CREATE TABLE solver_task_profile (
 -- -----------------------------
 DROP TABLE IF EXISTS solver_profile_file_rule;
 CREATE TABLE solver_profile_file_rule (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     profile_id BIGINT NOT NULL COMMENT '模板ID',
     file_key VARCHAR(50) NOT NULL COMMENT '文件标识，如 main_inp / case_zip',
     file_name_pattern VARCHAR(100) DEFAULT NULL COMMENT '文件名或匹配规则',
@@ -124,6 +130,20 @@ CREATE TABLE solver_profile_file_rule (
     KEY idx_file_key (file_key),
     KEY idx_profile_sort (profile_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='模板文件规则表';
+
+-- 初始化求解器与模板数据
+INSERT INTO solver_definition (id, solver_code, solver_name, version, exec_mode, exec_path, enabled, description, created_at, updated_at) VALUES
+(1, 'OPENFOAM', 'OpenFOAM Solver', 'v10', 'LOCAL', '/opt/openfoam/bin/simpleFoam', 1, '稳态流场求解器', NOW(), NOW()),
+(2, 'CALCULIX', 'CalculiX Solver', '2.20', 'LOCAL', '/opt/calculix/bin/ccx', 1, '结构分析求解器', NOW(), NOW());
+
+INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
+(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'simpleFoam -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
+(2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ccx ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
+
+INSERT INTO solver_profile_file_rule (id, profile_id, file_key, file_name_pattern, file_type, required_flag, sort_order, description) VALUES
+(1, 1, 'case_zip', '*.zip', 'ZIP', 1, 1, 'OpenFOAM算例压缩包'),
+(2, 1, 'control_dict', 'controlDict', 'FILE', 0, 2, '可选控制参数文件'),
+(3, 2, 'main_inp', '*.inp', 'FILE', 1, 1, 'CalculiX主输入文件');
 
 -- =========================================================
 -- 3. task_db
@@ -138,7 +158,7 @@ USE task_db;
 -- -----------------------------
 DROP TABLE IF EXISTS sim_task;
 CREATE TABLE sim_task (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_no VARCHAR(50) NOT NULL COMMENT '任务编号，唯一',
     task_name VARCHAR(100) NOT NULL COMMENT '任务名称',
     user_id BIGINT NOT NULL COMMENT '提交用户ID',
@@ -174,7 +194,7 @@ CREATE TABLE sim_task (
 -- -----------------------------
 DROP TABLE IF EXISTS task_status_history;
 CREATE TABLE task_status_history (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     from_status VARCHAR(30) DEFAULT NULL COMMENT '原状态',
     to_status VARCHAR(30) NOT NULL COMMENT '新状态',
@@ -193,7 +213,7 @@ CREATE TABLE task_status_history (
 -- -----------------------------
 DROP TABLE IF EXISTS task_file;
 CREATE TABLE task_file (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     file_role VARCHAR(30) NOT NULL COMMENT '文件角色：INPUT / CONFIG / ARCHIVE',
     file_key VARCHAR(50) NOT NULL COMMENT '对应模板中的文件标识',
@@ -214,7 +234,7 @@ CREATE TABLE task_file (
 -- -----------------------------
 DROP TABLE IF EXISTS task_result_summary;
 CREATE TABLE task_result_summary (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     success_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否成功',
     duration_seconds INT DEFAULT NULL COMMENT '执行耗时（秒）',
@@ -231,7 +251,7 @@ CREATE TABLE task_result_summary (
 -- -----------------------------
 DROP TABLE IF EXISTS task_result_file;
 CREATE TABLE task_result_file (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     file_type VARCHAR(30) NOT NULL COMMENT 'RESULT / LOG / REPORT / IMAGE',
     file_name VARCHAR(255) NOT NULL COMMENT '文件名',
@@ -249,7 +269,7 @@ CREATE TABLE task_result_file (
 -- -----------------------------
 DROP TABLE IF EXISTS task_log_chunk;
 CREATE TABLE task_log_chunk (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     seq_no INT NOT NULL COMMENT '分片序号',
     log_content TEXT COMMENT '日志内容',
@@ -259,6 +279,39 @@ CREATE TABLE task_log_chunk (
     KEY idx_task_id_seq_no (task_id, seq_no),
     KEY idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务日志分片表';
+
+-- 初始化任务域数据
+INSERT INTO sim_task (id, task_no, task_name, user_id, solver_id, profile_id, task_type, status, priority, node_id, params_json, submit_time, start_time, end_time, fail_type, fail_message, deleted_flag, created_at, updated_at) VALUES
+(1, 'TASK202603280001', '烟测示例任务-成功', 1, 1, 1, 'SIMULATION', 'SUCCESS', 5, 1, '{"maxIter":500}', NOW(), NOW(), NOW(), NULL, NULL, 0, NOW(), NOW()),
+(2, 'TASK202603280002', '烟测示例任务-排队', 2, 2, 2, 'SIMULATION', 'QUEUED', 1, NULL, '{"steps":8}', NOW(), NULL, NULL, NULL, NULL, 0, NOW(), NOW());
+
+INSERT INTO task_status_history (id, task_id, from_status, to_status, change_reason, operator_type, operator_id, created_at) VALUES
+(1, 1, NULL, 'CREATED', 'task created', 'USER', 1, NOW()),
+(2, 1, 'CREATED', 'QUEUED', 'task submitted', 'USER', 1, NOW()),
+(3, 1, 'QUEUED', 'SCHEDULED', 'scheduler selected node', 'SYSTEM', NULL, NOW()),
+(4, 1, 'SCHEDULED', 'DISPATCHED', 'task dispatched', 'SYSTEM', NULL, NOW()),
+(5, 1, 'DISPATCHED', 'RUNNING', 'node started', 'NODE', 1, NOW()),
+(6, 1, 'RUNNING', 'SUCCESS', 'node finished', 'NODE', 1, NOW()),
+(7, 2, NULL, 'CREATED', 'task created', 'USER', 2, NOW()),
+(8, 2, 'CREATED', 'QUEUED', 'task submitted', 'USER', 2, NOW());
+
+INSERT INTO task_file (id, task_id, file_role, file_key, origin_name, storage_path, file_size, file_suffix, checksum, created_at) VALUES
+(1, 1, 'INPUT', 'case_zip', 'case-1.zip', '/data/tasks/1/input/case-1.zip', 102400, 'zip', 'md5-demo-001', NOW()),
+(2, 1, 'CONFIG', 'control_dict', 'controlDict', '/data/tasks/1/input/controlDict', 4096, NULL, 'md5-demo-002', NOW()),
+(3, 2, 'INPUT', 'main_inp', 'beam.inp', '/data/tasks/2/input/beam.inp', 8192, 'inp', 'md5-demo-003', NOW());
+
+INSERT INTO task_result_summary (id, task_id, success_flag, duration_seconds, summary_text, metrics_json, created_at, updated_at) VALUES
+(1, 1, 1, 128, '计算完成，残差收敛', '{"maxResidual":9.8e-7,"iteration":420}', NOW(), NOW());
+
+INSERT INTO task_result_file (id, task_id, file_type, file_name, storage_path, file_size, created_at) VALUES
+(1, 1, 'RESULT', 'pressure.vtk', '/data/tasks/1/output/pressure.vtk', 204800, NOW()),
+(2, 1, 'LOG', 'solver.log', '/data/tasks/1/output/solver.log', 65536, NOW()),
+(3, 1, 'REPORT', 'summary.json', '/data/tasks/1/output/summary.json', 2048, NOW());
+
+INSERT INTO task_log_chunk (id, task_id, seq_no, log_content, created_at) VALUES
+(1, 1, 1, 'Task accepted by node-agent.', NOW()),
+(2, 1, 2, 'Solver started, reading mesh.', NOW()),
+(3, 1, 3, 'Converged after 420 iterations.', NOW());
 
 -- =========================================================
 -- 4. scheduler_db
@@ -273,7 +326,7 @@ USE scheduler_db;
 -- -----------------------------
 DROP TABLE IF EXISTS compute_node;
 CREATE TABLE compute_node (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     node_code VARCHAR(50) NOT NULL COMMENT '节点编码，唯一',
     node_name VARCHAR(100) NOT NULL COMMENT '节点名称',
     node_token VARCHAR(255) NOT NULL COMMENT '节点凭证',
@@ -299,7 +352,7 @@ CREATE TABLE compute_node (
 -- -----------------------------
 DROP TABLE IF EXISTS node_solver_capability;
 CREATE TABLE node_solver_capability (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     node_id BIGINT NOT NULL COMMENT '节点ID',
     solver_id BIGINT NOT NULL COMMENT '求解器ID',
     solver_version VARCHAR(50) DEFAULT NULL COMMENT '节点安装版本',
@@ -316,7 +369,7 @@ CREATE TABLE node_solver_capability (
 -- -----------------------------
 DROP TABLE IF EXISTS schedule_record;
 CREATE TABLE schedule_record (
-    id BIGINT NOT NULL COMMENT '主键ID',
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
     node_id BIGINT NOT NULL COMMENT '目标节点ID',
     strategy_name VARCHAR(50) NOT NULL COMMENT '调度策略名',
@@ -329,5 +382,19 @@ CREATE TABLE schedule_record (
     KEY idx_created_at (created_at),
     KEY idx_task_node (task_id, node_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='调度记录表';
+
+-- 初始化调度域数据
+INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, max_concurrency, running_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
+(1, 'NODE-001', '计算节点-1', 'node-token-001', '127.0.0.1', 'ONLINE', 4, 1, 23.50, 41.20, NOW(), NOW(), NOW()),
+(2, 'NODE-002', '计算节点-2', 'node-token-002', '127.0.0.2', 'OFFLINE', 2, 0, 0.00, 0.00, NOW(), NOW(), NOW());
+
+INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enabled, created_at) VALUES
+(1, 1, 1, 'v10', 1, NOW()),
+(2, 1, 2, '2.20', 1, NOW()),
+(3, 2, 1, 'v10', 0, NOW());
+
+INSERT INTO schedule_record (id, task_id, node_id, strategy_name, schedule_status, schedule_message, created_at) VALUES
+(1, 1, 1, 'LEAST_RUNNING', 'SUCCESS', 'node selected by least-running strategy', NOW()),
+(2, 2, 1, 'LEAST_RUNNING', 'SUCCESS', 'queued task pre-scheduled', NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;
