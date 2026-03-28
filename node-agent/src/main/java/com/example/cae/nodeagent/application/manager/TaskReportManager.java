@@ -17,10 +17,6 @@ public class TaskReportManager {
 		this.taskReportAppService = taskReportAppService;
 	}
 
-	public void reportDispatched(Long taskId, Long nodeId) {
-		taskReportAppService.markDispatched(taskId, nodeId);
-	}
-
 	public void reportRunning(ExecutionContext context) {
 		taskReportAppService.reportStatus(context.getTaskId(), "RUNNING", "node-agent start execute");
 	}

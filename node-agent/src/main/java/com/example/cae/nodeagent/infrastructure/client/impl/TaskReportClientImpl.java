@@ -25,16 +25,6 @@ public class TaskReportClientImpl implements TaskReportClient {
 	}
 
 	@Override
-	public void markDispatched(Long taskId, Long nodeId) {
-		String url = UriComponentsBuilder
-				.fromHttpUrl(taskBaseUrl() + "/internal/tasks/{taskId}/mark-dispatched")
-				.queryParam("nodeId", nodeId)
-				.buildAndExpand(taskId)
-				.toUriString();
-		restTemplate.postForEntity(url, withToken(null), Object.class);
-	}
-
-	@Override
 	public void reportStatus(Long taskId, String status, String reason) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/status-report";
 		Map<String, Object> body = new HashMap<>();

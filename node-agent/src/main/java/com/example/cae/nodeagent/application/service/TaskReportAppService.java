@@ -14,10 +14,6 @@ public class TaskReportAppService {
 		this.taskReportClient = taskReportClient;
 	}
 
-	public void markDispatched(Long taskId, Long nodeId) {
-		taskReportClient.markDispatched(taskId, nodeId);
-	}
-
 	public void reportStatus(Long taskId, String status, String reason) {
 		taskReportClient.reportStatus(taskId, status, reason);
 	}
