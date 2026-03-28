@@ -34,7 +34,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/status-report")
-	public Result<Void> reportStatus(@PathVariable Long taskId,
+	public Result<Void> reportStatus(@PathVariable("taskId") Long taskId,
 								 @RequestBody StatusReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
@@ -43,7 +43,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/log-report")
-	public Result<Void> reportLog(@PathVariable Long taskId,
+	public Result<Void> reportLog(@PathVariable("taskId") Long taskId,
 							  @RequestBody LogReportRequest request,
 							  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
@@ -52,7 +52,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/result-summary-report")
-	public Result<Void> reportResultSummary(@PathVariable Long taskId,
+	public Result<Void> reportResultSummary(@PathVariable("taskId") Long taskId,
 									@RequestBody ResultSummaryReportRequest request,
 									@RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
@@ -61,7 +61,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/result-file-report")
-	public Result<Void> reportResultFile(@PathVariable Long taskId,
+	public Result<Void> reportResultFile(@PathVariable("taskId") Long taskId,
 								 @RequestBody ResultFileReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
@@ -70,7 +70,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/mark-finished")
-	public Result<Void> markFinished(@PathVariable Long taskId,
+	public Result<Void> markFinished(@PathVariable("taskId") Long taskId,
 								 @RequestBody MarkFinishedRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
@@ -79,7 +79,7 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/mark-failed")
-	public Result<Void> markFailed(@PathVariable Long taskId,
+	public Result<Void> markFailed(@PathVariable("taskId") Long taskId,
 							   @RequestBody MarkFailedRequest request,
 							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);

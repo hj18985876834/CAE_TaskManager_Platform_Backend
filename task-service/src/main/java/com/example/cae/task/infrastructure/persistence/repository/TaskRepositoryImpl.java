@@ -28,7 +28,9 @@ public class TaskRepositoryImpl implements TaskRepository {
 
 	@Override
 	public void save(Task task) {
-		taskMapper.insert(taskAssembler.toPO(task));
+		var po = taskAssembler.toPO(task);
+		taskMapper.insert(po);
+		task.setId(po.getId());
 	}
 
 	@Override

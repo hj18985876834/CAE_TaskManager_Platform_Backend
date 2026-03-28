@@ -36,17 +36,17 @@ public class TaskQueryController {
 	}
 
 	@GetMapping("/{taskId}")
-	public Result<TaskDetailResponse> getTaskDetail(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<TaskDetailResponse> getTaskDetail(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskDetail(taskId, userId, roleCode));
 	}
 
 	@GetMapping("/{taskId}/status-history")
-	public Result<List<TaskStatusHistoryResponse>> getTaskStatusHistory(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<List<TaskStatusHistoryResponse>> getTaskStatusHistory(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskStatusHistory(taskId, userId, roleCode));
 	}
 
 	@GetMapping("/{taskId}/files")
-	public Result<List<TaskFileResponse>> getTaskFiles(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<List<TaskFileResponse>> getTaskFiles(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskFiles(taskId, userId, roleCode));
 	}
 }

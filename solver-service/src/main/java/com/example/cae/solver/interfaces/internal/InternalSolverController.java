@@ -18,7 +18,7 @@ public class InternalSolverController {
 	}
 
 	@GetMapping("/{solverId}")
-	public Result<SolverDetailResponse> getSolverDetail(@PathVariable Long solverId) {
+	public Result<SolverDetailResponse> getSolverDetail(@PathVariable("solverId") Long solverId) {
 		return Result.success(solverFacade.getSolverDetail(solverId));
 	}
 }

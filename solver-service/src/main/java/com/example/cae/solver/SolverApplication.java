@@ -3,7 +3,7 @@ package com.example.cae.solver;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.example.cae")
 public class SolverApplication {
     public static void main(String[] args) {
         SpringApplication.run(SolverApplication.class, args);

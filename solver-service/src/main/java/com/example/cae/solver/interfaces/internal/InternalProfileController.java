@@ -19,7 +19,7 @@ public class InternalProfileController {
 	}
 
 	@GetMapping("/{profileId}")
-	public Result<InternalProfileDetailResponse> getProfileDetail(@PathVariable Long profileId) {
+	public Result<InternalProfileDetailResponse> getProfileDetail(@PathVariable("profileId") Long profileId) {
 		ProfileDetailResponse detail = profileFacade.getProfileDetail(profileId);
 		InternalProfileDetailResponse response = new InternalProfileDetailResponse();
 		response.setProfileId(detail.getProfileId());

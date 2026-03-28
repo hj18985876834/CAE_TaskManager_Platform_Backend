@@ -22,19 +22,19 @@ public class FileRuleController {
 	}
 
 	@PostMapping("/{profileId}/file-rules")
-	public Result<Void> createFileRule(@PathVariable Long profileId, @RequestBody CreateFileRuleRequest request) {
+	public Result<Void> createFileRule(@PathVariable("profileId") Long profileId, @RequestBody CreateFileRuleRequest request) {
 		profileFacade.createFileRule(profileId, request);
 		return Result.success();
 	}
 
 	@PutMapping("/file-rules/{ruleId}")
-	public Result<Void> updateFileRule(@PathVariable Long ruleId, @RequestBody UpdateFileRuleRequest request) {
+	public Result<Void> updateFileRule(@PathVariable("ruleId") Long ruleId, @RequestBody UpdateFileRuleRequest request) {
 		profileFacade.updateFileRule(ruleId, request);
 		return Result.success();
 	}
 
 	@DeleteMapping("/file-rules/{ruleId}")
-	public Result<Void> deleteFileRule(@PathVariable Long ruleId) {
+	public Result<Void> deleteFileRule(@PathVariable("ruleId") Long ruleId) {
 		profileFacade.deleteFileRule(ruleId);
 		return Result.success();
 	}

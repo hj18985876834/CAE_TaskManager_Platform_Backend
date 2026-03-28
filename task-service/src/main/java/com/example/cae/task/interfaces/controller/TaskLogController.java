@@ -23,7 +23,7 @@ public class TaskLogController {
 
 	@GetMapping("/{taskId}/logs")
 	public Result<List<TaskLogResponse>> getLogs(
-			@PathVariable Long taskId,
+			@PathVariable("taskId") Long taskId,
 			@RequestParam(defaultValue = "0") Integer fromSeq,
 			@RequestParam(defaultValue = "100") Integer pageSize,
 			@RequestHeader("X-User-Id") Long userId,

@@ -22,12 +22,12 @@ public class TaskResultController {
 	}
 
 	@GetMapping("/{taskId}/result-summary")
-	public Result<TaskResultSummaryResponse> getResultSummary(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<TaskResultSummaryResponse> getResultSummary(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskResultAppService.getResultSummary(taskId, userId, roleCode));
 	}
 
 	@GetMapping("/{taskId}/result-files")
-	public Result<List<TaskResultFileResponse>> getResultFiles(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<List<TaskResultFileResponse>> getResultFiles(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskResultAppService.getResultFiles(taskId, userId, roleCode));
 	}
 }

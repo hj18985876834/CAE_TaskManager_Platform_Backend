@@ -29,25 +29,25 @@ public class TaskController {
 	}
 
 	@PostMapping("/{taskId}/files")
-	public Result<Void> uploadTaskFiles(@PathVariable Long taskId, @RequestPart("files") MultipartFile[] files, @RequestHeader("X-User-Id") Long userId) {
+	public Result<Void> uploadTaskFiles(@PathVariable("taskId") Long taskId, @RequestPart("files") MultipartFile[] files, @RequestHeader("X-User-Id") Long userId) {
 		taskCommandAppService.uploadTaskFiles(taskId, files, userId);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/validate")
-	public Result<Void> validateTask(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId) {
+	public Result<Void> validateTask(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId) {
 		taskCommandAppService.validateTask(taskId, userId);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/submit")
-	public Result<Void> submitTask(@PathVariable Long taskId, @RequestHeader("X-User-Id") Long userId) {
+	public Result<Void> submitTask(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId) {
 		taskCommandAppService.submitTask(taskId, userId);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/cancel")
-	public Result<Void> cancelTask(@PathVariable Long taskId, @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") Long userId) {
+	public Result<Void> cancelTask(@PathVariable("taskId") Long taskId, @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") Long userId) {
 		taskCommandAppService.cancelTask(taskId, userId, request == null ? null : request.getReason());
 		return Result.success();
 	}
