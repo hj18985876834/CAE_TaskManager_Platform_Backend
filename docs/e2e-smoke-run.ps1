@@ -12,6 +12,22 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Assert-GatewayReachable {
+    param(
+        [Parameter(Mandatory = $true)][string]$BaseUrl
+    )
+    try {
+        $uri = [System.Uri]$BaseUrl
+    } catch {
+        throw "GatewayBaseUrl is invalid: $BaseUrl"
+    }
+    $port = if ($uri.IsDefaultPort) { if ($uri.Scheme -eq "https") { 443 } else { 80 } } else { $uri.Port }
+    $probe = Test-NetConnection -ComputerName $uri.Host -Port $port -WarningAction SilentlyContinue
+    if (-not $probe.TcpTestSucceeded) {
+        throw "Gateway is unreachable at $BaseUrl (host=$($uri.Host), port=$port). Start gateway-service and downstream services before running smoke."
+    }
+}
+
 function Invoke-JsonPost {
     param(
         [Parameter(Mandatory = $true)][string]$Url,
@@ -33,6 +49,7 @@ function Assert-Code0 {
 }
 
 Write-Host "[1/8] Login"
+Assert-GatewayReachable -BaseUrl $GatewayBaseUrl
 $loginResp = Invoke-JsonPost -Url "$GatewayBaseUrl/api/auth/login" -Body @{
     username = $Username
     password = $Password
