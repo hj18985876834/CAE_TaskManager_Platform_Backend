@@ -54,8 +54,13 @@ public class ProfileRepositoryImpl implements ProfileRepository {
 		return solverTaskProfileMapper.count(request);
 	}
 
-	@Override
-	public List<SolverTaskProfile> listEnabledBySolverId(Long solverId) {
-		return solverTaskProfileMapper.selectEnabledBySolverId(solverId).stream().map(ProfileAssembler::fromPO).toList();
-	}
+	       @Override
+	       public List<SolverTaskProfile> listEnabledBySolverId(Long solverId) {
+		       return solverTaskProfileMapper.selectEnabledBySolverId(solverId).stream().map(ProfileAssembler::fromPO).toList();
+	       }
+
+	       @Override
+	       public List<SolverTaskProfile> listBySolverId(Long solverId) {
+		       return solverTaskProfileMapper.selectBySolverId(solverId).stream().map(ProfileAssembler::fromPO).toList();
+	       }
 }

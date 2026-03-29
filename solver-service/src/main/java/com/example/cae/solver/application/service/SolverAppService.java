@@ -85,8 +85,8 @@ public class SolverAppService {
 		return getSolverProfiles(solverId);
 	}
 
-	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
-		return profileRepository.listEnabledBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
-	}
+	       public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
+		       return profileRepository.listBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
+	       }
 }
 

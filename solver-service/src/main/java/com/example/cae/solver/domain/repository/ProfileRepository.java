@@ -21,5 +21,6 @@ public interface ProfileRepository {
 	long count(ProfilePageQueryRequest request);
 
 	List<SolverTaskProfile> listEnabledBySolverId(Long solverId);
+	List<SolverTaskProfile> listBySolverId(Long solverId);
 }
 

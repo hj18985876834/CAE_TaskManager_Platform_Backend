@@ -8,9 +8,26 @@ public class ProfileListItemResponse {
 	private String taskType;
 	private String profileName;
 	private String paramsSchema;
+	private String commandTemplate;
+	private String parserName;
 	private Integer timeoutSeconds;
 	private String description;
 	private Integer enabled;
+       public String getCommandTemplate() {
+	       return commandTemplate;
+       }
+
+       public void setCommandTemplate(String commandTemplate) {
+	       this.commandTemplate = commandTemplate;
+       }
+
+       public String getParserName() {
+	       return parserName;
+       }
+
+       public void setParserName(String parserName) {
+	       this.parserName = parserName;
+       }
 
 	public Long getId() {
 		return id;

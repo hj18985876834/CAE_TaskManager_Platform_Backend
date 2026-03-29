@@ -28,18 +28,20 @@ public class ProfileAssembler {
 	}
 
 	public static ProfileListItemResponse toListItemResponse(SolverTaskProfile profile) {
-		ProfileListItemResponse response = new ProfileListItemResponse();
-		response.setId(profile.getId());
-		response.setProfileId(profile.getId());
-		response.setSolverId(profile.getSolverId());
-		response.setProfileCode(profile.getProfileCode());
-		response.setTaskType(profile.getTaskType());
-		response.setProfileName(profile.getProfileName());
-		response.setParamsSchema(profile.getParamsSchemaJson());
-		response.setTimeoutSeconds(profile.getTimeoutSeconds());
-		response.setDescription(profile.getDescription());
-		response.setEnabled(profile.getEnabled());
-		return response;
+			   ProfileListItemResponse response = new ProfileListItemResponse();
+			   response.setId(profile.getId());
+			   response.setProfileId(profile.getId());
+			   response.setSolverId(profile.getSolverId());
+			   response.setProfileCode(profile.getProfileCode());
+			   response.setTaskType(profile.getTaskType());
+			   response.setProfileName(profile.getProfileName());
+			   response.setParamsSchema(profile.getParamsSchemaJson());
+			   response.setCommandTemplate(profile.getCommandTemplate());
+			   response.setParserName(profile.getParserName());
+			   response.setTimeoutSeconds(profile.getTimeoutSeconds());
+			   response.setDescription(profile.getDescription());
+			   response.setEnabled(profile.getEnabled());
+			   return response;
 	}
 
 	public static ProfileDetailResponse toDetailResponse(SolverTaskProfile profile) {

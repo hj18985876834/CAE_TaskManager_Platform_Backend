@@ -53,4 +53,7 @@ public interface SolverTaskProfileMapper {
 
 	@Select("SELECT id, solver_id AS solverId, profile_code AS profileCode, task_type AS taskType, profile_name AS profileName, command_template AS commandTemplate, params_schema_json AS paramsSchemaJson, parser_name AS parserName, timeout_seconds AS timeoutSeconds, enabled, description, created_at AS createdAt, updated_at AS updatedAt FROM solver_task_profile WHERE solver_id = #{solverId} AND enabled = 1 ORDER BY id DESC")
 	List<SolverTaskProfilePO> selectEnabledBySolverId(Long solverId);
+
+	@Select("SELECT id, solver_id AS solverId, profile_code AS profileCode, task_type AS taskType, profile_name AS profileName, command_template AS commandTemplate, params_schema_json AS paramsSchemaJson, parser_name AS parserName, timeout_seconds AS timeoutSeconds, enabled, description, created_at AS createdAt, updated_at AS updatedAt FROM solver_task_profile WHERE solver_id = #{solverId} ORDER BY id DESC")
+	List<SolverTaskProfilePO> selectBySolverId(Long solverId);
 }
