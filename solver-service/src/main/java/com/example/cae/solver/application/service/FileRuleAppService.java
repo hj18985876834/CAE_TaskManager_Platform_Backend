@@ -9,6 +9,7 @@ import com.example.cae.solver.domain.service.ProfileRuleDomainService;
 import com.example.cae.solver.infrastructure.support.ProfileRuleValidator;
 import com.example.cae.solver.interfaces.request.CreateFileRuleRequest;
 import com.example.cae.solver.interfaces.request.UpdateFileRuleRequest;
+import com.example.cae.solver.interfaces.response.FileRuleCreateResponse;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,12 +26,13 @@ public class FileRuleAppService {
 		this.profileRuleValidator = profileRuleValidator;
 	}
 
-	public void createFileRule(Long profileId, CreateFileRuleRequest request) {
+	public FileRuleCreateResponse createFileRule(Long profileId, CreateFileRuleRequest request) {
 		profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
 		profileRuleValidator.validateCreateRule(request);
 		SolverProfileFileRule rule = FileRuleAssembler.toRule(profileId, request);
 		profileRuleDomainService.checkRuleConflict(profileId, rule);
 		fileRuleRepository.save(rule);
+		return FileRuleAssembler.toCreateResponse(rule);
 	}
 
 	public void updateFileRule(Long ruleId, UpdateFileRuleRequest request) {
@@ -52,4 +54,3 @@ public class FileRuleAppService {
 		fileRuleRepository.delete(ruleId);
 	}
 }
-

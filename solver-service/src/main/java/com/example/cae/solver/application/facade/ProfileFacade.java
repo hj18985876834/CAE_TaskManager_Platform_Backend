@@ -10,7 +10,9 @@ import com.example.cae.solver.interfaces.request.ProfilePageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateFileRuleRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileStatusRequest;
+import com.example.cae.solver.interfaces.response.FileRuleCreateResponse;
 import com.example.cae.solver.interfaces.response.FileRuleResponse;
+import com.example.cae.solver.interfaces.response.ProfileCreateResponse;
 import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
 import com.example.cae.solver.interfaces.response.UploadSpecResponse;
@@ -38,8 +40,8 @@ public class ProfileFacade {
 		return profileAppService.getProfileDetail(profileId);
 	}
 
-	public void createProfile(CreateProfileRequest request) {
-		profileAppService.createProfile(request);
+	public ProfileCreateResponse createProfile(CreateProfileRequest request) {
+		return profileAppService.createProfile(request);
 	}
 
 	public void updateProfile(Long profileId, UpdateProfileRequest request) {
@@ -58,8 +60,8 @@ public class ProfileFacade {
 		return uploadSpecAppService.buildUploadSpec(profileId);
 	}
 
-	public void createFileRule(Long profileId, CreateFileRuleRequest request) {
-		fileRuleAppService.createFileRule(profileId, request);
+	public FileRuleCreateResponse createFileRule(Long profileId, CreateFileRuleRequest request) {
+		return fileRuleAppService.createFileRule(profileId, request);
 	}
 
 	public void updateFileRule(Long ruleId, UpdateFileRuleRequest request) {

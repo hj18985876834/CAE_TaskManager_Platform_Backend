@@ -31,7 +31,9 @@ public class SolverRepositoryImpl implements SolverRepository {
 
 	@Override
 	public void save(SolverDefinition solver) {
-		solverDefinitionMapper.insert(SolverAssembler.toPO(solver));
+		var po = SolverAssembler.toPO(solver);
+		solverDefinitionMapper.insert(po);
+		solver.setId(po.getId());
 	}
 
 	@Override

@@ -24,7 +24,9 @@ public class FileRuleRepositoryImpl implements FileRuleRepository {
 
 	@Override
 	public void save(SolverProfileFileRule rule) {
-		solverProfileFileRuleMapper.insert(FileRuleAssembler.toPO(rule));
+		var po = FileRuleAssembler.toPO(rule);
+		solverProfileFileRuleMapper.insert(po);
+		rule.setId(po.getId());
 	}
 
 	@Override

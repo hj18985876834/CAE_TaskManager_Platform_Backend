@@ -3,8 +3,10 @@ package com.example.cae.solver.application.assembler;
 import com.example.cae.solver.domain.model.SolverTaskProfile;
 import com.example.cae.solver.infrastructure.persistence.entity.SolverTaskProfilePO;
 import com.example.cae.solver.interfaces.request.CreateProfileRequest;
+import com.example.cae.solver.interfaces.response.ProfileCreateResponse;
 import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 
 public class ProfileAssembler {
 	private ProfileAssembler() {
@@ -62,6 +64,24 @@ public class ProfileAssembler {
 		return response;
 	}
 
+	public static ProfileCreateResponse toCreateResponse(SolverTaskProfile profile) {
+		ProfileCreateResponse response = new ProfileCreateResponse();
+		response.setProfileId(profile.getId());
+		response.setSolverId(profile.getSolverId());
+		response.setProfileCode(profile.getProfileCode());
+		response.setProfileName(profile.getProfileName());
+		response.setEnabled(profile.getEnabled());
+		return response;
+	}
+
+	public static SolverTaskOptionResponse toTaskOptionResponse(SolverTaskProfile profile) {
+		SolverTaskOptionResponse response = new SolverTaskOptionResponse();
+		response.setProfileId(profile.getId());
+		response.setTaskType(profile.getTaskType());
+		response.setProfileName(profile.getProfileName());
+		return response;
+	}
+
 	private static String resolveParamsSchema(String paramsSchema, String paramsSchemaJson) {
 		if (paramsSchema != null && !paramsSchema.isBlank()) {
 			return paramsSchema;
@@ -103,4 +123,3 @@ public class ProfileAssembler {
 		return po;
 	}
 }
-

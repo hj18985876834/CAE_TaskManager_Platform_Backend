@@ -9,6 +9,7 @@ public class InternalProfileDetailResponse {
 	private String taskType;
 	private String profileName;
 	private String commandTemplate;
+	private String paramsSchema;
 	private String paramsSchemaJson;
 	private String parserName;
 	private Integer timeoutSeconds;
@@ -62,6 +63,14 @@ public class InternalProfileDetailResponse {
 
 	public void setCommandTemplate(String commandTemplate) {
 		this.commandTemplate = commandTemplate;
+	}
+
+	public String getParamsSchema() {
+		return paramsSchema;
+	}
+
+	public void setParamsSchema(String paramsSchema) {
+		this.paramsSchema = paramsSchema;
 	}
 
 	public String getParserName() {

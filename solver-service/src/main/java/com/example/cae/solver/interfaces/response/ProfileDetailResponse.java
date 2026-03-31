@@ -1,5 +1,7 @@
 package com.example.cae.solver.interfaces.response;
 
+import java.util.List;
+
 public class ProfileDetailResponse {
 	private Long id;
 	private Long profileId;
@@ -14,6 +16,7 @@ public class ProfileDetailResponse {
 	private Integer timeoutSeconds;
 	private String description;
 	private Integer enabled;
+	private List<FileRuleResponse> fileRules;
 
 	public Long getId() {
 		return id;
@@ -118,5 +121,12 @@ public class ProfileDetailResponse {
 	public void setDescription(String description) {
 		this.description = description;
 	}
-}
 
+	public List<FileRuleResponse> getFileRules() {
+		return fileRules;
+	}
+
+	public void setFileRules(List<FileRuleResponse> fileRules) {
+		this.fileRules = fileRules;
+	}
+}

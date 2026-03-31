@@ -13,8 +13,10 @@ import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverStatusRequest;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -46,7 +48,7 @@ public class SolverAppService {
 		return SolverAssembler.toDetailResponse(solver);
 	}
 
-	public void createSolver(CreateSolverRequest request) {
+	public SolverCreateResponse createSolver(CreateSolverRequest request) {
 		solverDomainService.checkSolverCodeUnique(request.getSolverCode());
 		SolverDefinition solver = SolverAssembler.toSolver(request);
 		if (request.getEnabled() != null && request.getEnabled() == 0) {
@@ -55,6 +57,7 @@ public class SolverAppService {
 			solver.enable();
 		}
 		solverRepository.save(solver);
+		return SolverAssembler.toCreateResponse(solver);
 	}
 
 	public void updateSolver(Long solverId, UpdateSolverRequest request) {
@@ -81,12 +84,11 @@ public class SolverAppService {
 		solverRepository.update(solver);
 	}
 
-	public List<ProfileListItemResponse> getSolverTaskOptions(Long solverId) {
-		return getSolverProfiles(solverId);
+	public List<SolverTaskOptionResponse> getSolverTaskOptions(Long solverId) {
+		return profileRepository.listEnabledBySolverId(solverId).stream().map(ProfileAssembler::toTaskOptionResponse).toList();
 	}
 
-	       public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
-		       return profileRepository.listBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
-	       }
+	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
+		return profileRepository.listBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
+	}
 }
-

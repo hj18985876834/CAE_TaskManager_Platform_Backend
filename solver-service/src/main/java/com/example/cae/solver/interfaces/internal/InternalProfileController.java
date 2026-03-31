@@ -28,6 +28,7 @@ public class InternalProfileController {
 		response.setTaskType(detail.getTaskType());
 		response.setProfileName(detail.getProfileName());
 		response.setCommandTemplate(detail.getCommandTemplate());
+		response.setParamsSchema(detail.getParamsSchema());
 		response.setParamsSchemaJson(detail.getParamsSchemaJson());
 		response.setParserName(detail.getParserName());
 		response.setTimeoutSeconds(detail.getTimeoutSeconds());

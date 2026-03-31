@@ -4,6 +4,7 @@ import com.example.cae.solver.infrastructure.persistence.entity.SolverTaskProfil
 import com.example.cae.solver.interfaces.request.ProfilePageQueryRequest;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -18,6 +19,7 @@ public interface SolverTaskProfileMapper {
 	@Select("SELECT id, solver_id AS solverId, profile_code AS profileCode, task_type AS taskType, profile_name AS profileName, command_template AS commandTemplate, params_schema_json AS paramsSchemaJson, parser_name AS parserName, timeout_seconds AS timeoutSeconds, enabled, description, created_at AS createdAt, updated_at AS updatedAt FROM solver_task_profile WHERE solver_id = #{solverId} AND profile_code = #{profileCode} LIMIT 1")
 	SolverTaskProfilePO selectBySolverIdAndProfileCode(@Param("solverId") Long solverId, @Param("profileCode") String profileCode);
 
+	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO solver_task_profile(solver_id, profile_code, task_type, profile_name, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description) VALUES(#{solverId}, #{profileCode}, #{taskType}, #{profileName}, #{commandTemplate}, #{paramsSchemaJson}, #{parserName}, #{timeoutSeconds}, #{enabled}, #{description})")
 	int insert(SolverTaskProfilePO po);
 

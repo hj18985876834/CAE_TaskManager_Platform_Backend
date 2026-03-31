@@ -31,7 +31,9 @@ public class ProfileRepositoryImpl implements ProfileRepository {
 
 	@Override
 	public void save(SolverTaskProfile profile) {
-		solverTaskProfileMapper.insert(ProfileAssembler.toPO(profile));
+		var po = ProfileAssembler.toPO(profile);
+		solverTaskProfileMapper.insert(po);
+		profile.setId(po.getId());
 	}
 
 	@Override

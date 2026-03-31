@@ -15,6 +15,7 @@ import com.example.cae.solver.interfaces.request.ProfilePageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileStatusRequest;
 import com.example.cae.solver.interfaces.response.FileRuleResponse;
+import com.example.cae.solver.interfaces.response.ProfileCreateResponse;
 import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
 import org.springframework.stereotype.Service;
@@ -47,10 +48,12 @@ public class ProfileAppService {
 
 	public ProfileDetailResponse getProfileDetail(Long profileId) {
 		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
-		return ProfileAssembler.toDetailResponse(profile);
+		ProfileDetailResponse response = ProfileAssembler.toDetailResponse(profile);
+		response.setFileRules(getFileRules(profileId));
+		return response;
 	}
 
-	public void createProfile(CreateProfileRequest request) {
+	public ProfileCreateResponse createProfile(CreateProfileRequest request) {
 		SolverDefinition solver = solverRepository.findById(request.getSolverId()).orElseThrow(() -> new BizException(400, "solver not found"));
 		if (!solver.isEnabled()) {
 			throw new BizException(400, "solver is disabled");
@@ -63,6 +66,7 @@ public class ProfileAppService {
 			profile.enable();
 		}
 		profileRepository.save(profile);
+		return ProfileAssembler.toCreateResponse(profile);
 	}
 
 	public void updateProfile(Long profileId, UpdateProfileRequest request) {
@@ -95,4 +99,3 @@ public class ProfileAppService {
 		return fileRuleRepository.listByProfileId(profileId).stream().map(FileRuleAssembler::toResponse).toList();
 	}
 }
-

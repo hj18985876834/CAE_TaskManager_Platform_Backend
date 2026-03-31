@@ -3,6 +3,7 @@ package com.example.cae.solver.application.assembler;
 import com.example.cae.solver.domain.model.SolverProfileFileRule;
 import com.example.cae.solver.infrastructure.persistence.entity.SolverProfileFileRulePO;
 import com.example.cae.solver.interfaces.request.CreateFileRuleRequest;
+import com.example.cae.solver.interfaces.response.FileRuleCreateResponse;
 import com.example.cae.solver.interfaces.response.FileRuleResponse;
 
 public class FileRuleAssembler {
@@ -33,6 +34,16 @@ public class FileRuleAssembler {
 		response.setSortOrder(rule.getSortOrder());
 		response.setDescription(rule.getRemark());
 		response.setRemark(rule.getRemark());
+		return response;
+	}
+
+	public static FileRuleCreateResponse toCreateResponse(SolverProfileFileRule rule) {
+		FileRuleCreateResponse response = new FileRuleCreateResponse();
+		response.setRuleId(rule.getId());
+		response.setProfileId(rule.getProfileId());
+		response.setFileKey(rule.getFileKey());
+		response.setFileNamePattern(rule.getFileNamePattern());
+		response.setRequiredFlag(rule.getRequiredFlag());
 		return response;
 	}
 
@@ -69,4 +80,3 @@ public class FileRuleAssembler {
 		return po;
 	}
 }
-

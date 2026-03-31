@@ -8,6 +8,7 @@ import com.example.cae.solver.interfaces.request.ProfilePageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileStatusRequest;
 import com.example.cae.solver.interfaces.response.FileRuleResponse;
+import com.example.cae.solver.interfaces.response.ProfileCreateResponse;
 import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
 import com.example.cae.solver.interfaces.response.UploadSpecResponse;
@@ -41,9 +42,8 @@ public class ProfileController {
 	}
 
 	@PostMapping
-	public Result<Void> createProfile(@RequestBody CreateProfileRequest request) {
-		profileFacade.createProfile(request);
-		return Result.success();
+	public Result<ProfileCreateResponse> createProfile(@RequestBody CreateProfileRequest request) {
+		return Result.success(profileFacade.createProfile(request));
 	}
 
 	@PutMapping("/{profileId}")
@@ -74,4 +74,3 @@ public class ProfileController {
 		return Result.success(profileFacade.getFileRules(profileId));
 	}
 }
-

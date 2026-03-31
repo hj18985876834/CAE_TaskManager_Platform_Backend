@@ -15,4 +15,15 @@ gateway:
     white-list:
       - /api/auth/login
       - /api/auth/logout
+      - /api/node-agent/register
+      - /api/node-agent/heartbeat
       - /actuator/health
+    admin-only-paths:
+      - /api/admin/**
+      - /api/users/**
+      - /api/nodes/**
+      - /api/schedules/**
+    admin-write-paths:
+      - /api/solvers/**
+      - /api/profiles/**
+      - /api/file-rules/**

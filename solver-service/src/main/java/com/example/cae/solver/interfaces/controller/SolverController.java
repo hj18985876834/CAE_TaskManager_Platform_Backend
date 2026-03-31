@@ -8,8 +8,10 @@ import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverStatusRequest;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,9 +42,8 @@ public class SolverController {
 	}
 
 	@PostMapping
-	public Result<Void> createSolver(@RequestBody CreateSolverRequest request) {
-		solverFacade.createSolver(request);
-		return Result.success();
+	public Result<SolverCreateResponse> createSolver(@RequestBody CreateSolverRequest request) {
+		return Result.success(solverFacade.createSolver(request));
 	}
 
 	@PutMapping("/{solverId}")
@@ -69,8 +70,7 @@ public class SolverController {
 	}
 
 	@GetMapping("/{solverId}/task-options")
-	public Result<List<ProfileListItemResponse>> getSolverTaskOptions(@PathVariable("solverId") Long solverId) {
+	public Result<List<SolverTaskOptionResponse>> getSolverTaskOptions(@PathVariable("solverId") Long solverId) {
 		return Result.success(solverFacade.getSolverTaskOptions(solverId));
 	}
 }
-

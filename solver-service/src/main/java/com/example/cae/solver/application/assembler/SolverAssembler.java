@@ -3,6 +3,7 @@ package com.example.cae.solver.application.assembler;
 import com.example.cae.solver.domain.model.SolverDefinition;
 import com.example.cae.solver.infrastructure.persistence.entity.SolverDefinitionPO;
 import com.example.cae.solver.interfaces.request.CreateSolverRequest;
+import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
 
@@ -50,6 +51,15 @@ public class SolverAssembler {
 		response.setEnabled(solver.getEnabled());
 		response.setDescription(solver.getRemark());
 		response.setRemark(solver.getRemark());
+		return response;
+	}
+
+	public static SolverCreateResponse toCreateResponse(SolverDefinition solver) {
+		SolverCreateResponse response = new SolverCreateResponse();
+		response.setSolverId(solver.getId());
+		response.setSolverCode(solver.getSolverCode());
+		response.setSolverName(solver.getSolverName());
+		response.setEnabled(solver.getEnabled());
 		return response;
 	}
 

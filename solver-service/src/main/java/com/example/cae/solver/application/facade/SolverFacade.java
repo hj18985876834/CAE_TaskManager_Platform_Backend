@@ -7,8 +7,10 @@ import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverStatusRequest;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -29,8 +31,8 @@ public class SolverFacade {
 		return solverAppService.getSolverDetail(solverId);
 	}
 
-	public void createSolver(CreateSolverRequest request) {
-		solverAppService.createSolver(request);
+	public SolverCreateResponse createSolver(CreateSolverRequest request) {
+		return solverAppService.createSolver(request);
 	}
 
 	public void updateSolver(Long solverId, UpdateSolverRequest request) {
@@ -41,7 +43,7 @@ public class SolverFacade {
 		solverAppService.updateSolverStatus(solverId, request);
 	}
 
-	public List<ProfileListItemResponse> getSolverTaskOptions(Long solverId) {
+	public List<SolverTaskOptionResponse> getSolverTaskOptions(Long solverId) {
 		return solverAppService.getSolverTaskOptions(solverId);
 	}
 

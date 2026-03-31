@@ -4,6 +4,7 @@ import com.example.cae.common.response.Result;
 import com.example.cae.solver.application.facade.ProfileFacade;
 import com.example.cae.solver.interfaces.request.CreateFileRuleRequest;
 import com.example.cae.solver.interfaces.request.UpdateFileRuleRequest;
+import com.example.cae.solver.interfaces.response.FileRuleCreateResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,9 +23,8 @@ public class FileRuleController {
 	}
 
 	@PostMapping("/profiles/{profileId}/file-rules")
-	public Result<Void> createFileRule(@PathVariable("profileId") Long profileId, @RequestBody CreateFileRuleRequest request) {
-		profileFacade.createFileRule(profileId, request);
-		return Result.success();
+	public Result<FileRuleCreateResponse> createFileRule(@PathVariable("profileId") Long profileId, @RequestBody CreateFileRuleRequest request) {
+		return Result.success(profileFacade.createFileRule(profileId, request));
 	}
 
 	@PutMapping("/file-rules/{id}")
@@ -39,4 +39,3 @@ public class FileRuleController {
 		return Result.success();
 	}
 }
-

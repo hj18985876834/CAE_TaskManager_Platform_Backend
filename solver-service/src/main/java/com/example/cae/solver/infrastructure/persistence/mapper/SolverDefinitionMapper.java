@@ -4,6 +4,7 @@ import com.example.cae.solver.infrastructure.persistence.entity.SolverDefinition
 import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -18,6 +19,7 @@ public interface SolverDefinitionMapper {
 	@Select("SELECT id, solver_code AS solverCode, solver_name AS solverName, version, exec_mode AS execMode, exec_path AS execPath, enabled, description AS remark, created_at AS createdAt, updated_at AS updatedAt FROM solver_definition WHERE solver_code = #{solverCode} LIMIT 1")
 	SolverDefinitionPO selectBySolverCode(String solverCode);
 
+	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO solver_definition(solver_code, solver_name, version, exec_mode, exec_path, enabled, description) VALUES(#{solverCode}, #{solverName}, #{version}, #{execMode}, #{execPath}, #{enabled}, #{remark})")
 	int insert(SolverDefinitionPO po);
 
