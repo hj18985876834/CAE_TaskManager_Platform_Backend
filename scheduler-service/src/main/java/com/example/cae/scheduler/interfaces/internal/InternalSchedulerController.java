@@ -4,6 +4,7 @@ import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
+import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateRunningCountRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +42,12 @@ public class InternalSchedulerController {
 	@PostMapping("/nodes/{nodeId}/running-count")
 	public Result<Void> updateRunningCount(@PathVariable Long nodeId, @RequestBody UpdateRunningCountRequest request) {
 		nodeAppService.updateRunningCount(nodeId, request == null ? null : request.getDelta());
+		return Result.success();
+	}
+
+	@PostMapping("/nodes/{nodeId}/cancel-task")
+	public Result<Void> cancelTask(@PathVariable Long nodeId, @RequestBody NodeTaskCancelRequest request) {
+		scheduleAppService.cancelTaskOnNode(nodeId, request == null ? null : request.getTaskId(), request == null ? null : request.getReason());
 		return Result.success();
 	}
 

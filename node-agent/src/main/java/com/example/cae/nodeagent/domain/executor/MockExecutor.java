@@ -36,8 +36,7 @@ public class MockExecutor extends AbstractSolverExecutor {
 			return ExecutionResult.success(duration, "mock solver execute success", Map.of("iterations", 5), Collections.emptyList());
 		} catch (InterruptedException ex) {
 			Thread.currentThread().interrupt();
-			return ExecutionResult.fail((int) ((System.currentTimeMillis() - start) / 1000), "mock execute interrupted");
+			throw new RuntimeException("mock execute interrupted", ex);
 		}
 	}
 }
-

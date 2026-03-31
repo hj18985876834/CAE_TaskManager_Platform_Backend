@@ -11,6 +11,7 @@ import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepositor
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
+import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
@@ -25,17 +26,20 @@ public class ScheduleAppService {
 	private final ScheduleRecordRepository scheduleRecordRepository;
 	private final ScheduleDomainService scheduleDomainService;
 	private final ScheduleStrategy scheduleStrategy;
+	private final NodeAgentClient nodeAgentClient;
 
 	public ScheduleAppService(ComputeNodeRepository computeNodeRepository,
 							NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
 							ScheduleRecordRepository scheduleRecordRepository,
 							ScheduleDomainService scheduleDomainService,
-							ScheduleStrategy scheduleStrategy) {
+							ScheduleStrategy scheduleStrategy,
+							NodeAgentClient nodeAgentClient) {
 		this.computeNodeRepository = computeNodeRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.scheduleRecordRepository = scheduleRecordRepository;
 		this.scheduleDomainService = scheduleDomainService;
 		this.scheduleStrategy = scheduleStrategy;
+		this.nodeAgentClient = nodeAgentClient;
 	}
 
 	public Long scheduleTask(TaskDTO task) {
@@ -93,6 +97,13 @@ public class ScheduleAppService {
 		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
 		node.setRunningCount(Math.max(0, current - 1));
 		computeNodeRepository.update(node);
+	}
+
+	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
+		if (nodeId == null || taskId == null) {
+			throw new BizException(400, "nodeId and taskId are required");
+		}
+		nodeAgentClient.cancelTask(nodeId, taskId, reason);
 	}
 
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {

@@ -33,6 +33,10 @@ public class TaskScheduleManager {
 		scheduleAppService.releaseNodeReservation(nodeId);
 	}
 
+	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
+		scheduleAppService.cancelTaskOnNode(nodeId, taskId, reason);
+	}
+
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
 		return scheduleAppService.pageRecords(request);
 	}

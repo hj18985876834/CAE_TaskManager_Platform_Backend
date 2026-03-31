@@ -24,6 +24,14 @@ public class SchedulerClient {
 		// reserved for async dispatch integration
 	}
 
+	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
+		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/cancel-task";
+		Map<String, Object> body = new java.util.HashMap<>();
+		body.put("taskId", taskId);
+		body.put("reason", reason);
+		restTemplate.postForEntity(url, body, Result.class);
+	}
+
 	@SuppressWarnings("unchecked")
 	public String getNodeName(Long nodeId) {
 		if (nodeId == null) {

@@ -88,6 +88,13 @@ public class TaskLifecycleManager {
 		if (!taskDomainService.canCancel(task)) {
 			throw new BizException(400, "task cannot be canceled in current status");
 		}
+		if (TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			if (task.getNodeId() == null) {
+				throw new BizException(409, "running task is not bound to node");
+			}
+			schedulerClient.cancelTaskOnNode(task.getNodeId(), taskId, reason);
+			return;
+		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.CANCELED.name(), reason, OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 	}

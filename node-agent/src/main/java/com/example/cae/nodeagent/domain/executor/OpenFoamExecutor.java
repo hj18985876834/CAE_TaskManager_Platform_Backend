@@ -40,6 +40,7 @@ public class OpenFoamExecutor extends AbstractSolverExecutor {
 		long start = System.currentTimeMillis();
 		List<String> command = commandBuilder.buildCommand(context);
 		int exitCode = processRunner.run(
+				context.getTaskId(),
 				command,
 				new File(context.getWorkDir()),
 				context.getTimeoutSeconds(),

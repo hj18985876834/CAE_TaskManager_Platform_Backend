@@ -31,11 +31,10 @@ public class DispatchController {
 
 	@PostMapping("/cancel-task")
 	public Result<CancelTaskResponse> cancel(@RequestBody CancelTaskRequest request) {
-		taskDispatchManager.cancelTask(request);
 		CancelTaskResponse response = new CancelTaskResponse();
-		response.setAccepted(true);
-		response.setMessage("cancel signal sent");
+		boolean accepted = taskDispatchManager.cancelTask(request);
+		response.setAccepted(accepted);
+		response.setMessage(accepted ? "cancel signal sent" : "task not running");
 		return Result.success(response);
 	}
 }
-

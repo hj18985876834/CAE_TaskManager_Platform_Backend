@@ -54,8 +54,11 @@ public class TaskDispatchManager {
 		}
 	}
 
-	public void cancelTask(CancelTaskRequest request) {
-		// reserved for future: find process by taskId and interrupt it
+	public boolean cancelTask(CancelTaskRequest request) {
+		if (request == null || request.getTaskId() == null) {
+			throw new BizException(400, "taskId is required");
+		}
+		return taskRuntimeRegistry.cancel(request.getTaskId(), request.getReason());
 	}
 
 	private int maxConcurrency() {

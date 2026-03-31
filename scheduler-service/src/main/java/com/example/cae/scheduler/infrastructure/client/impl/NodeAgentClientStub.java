@@ -54,4 +54,28 @@ public class NodeAgentClientStub implements NodeAgentClient {
 			throw new BizException(409, message == null ? "node-agent rejected task" : String.valueOf(message));
 		}
 	}
+
+	@Override
+	public void cancelTask(Long nodeId, Long taskId, String reason) {
+		ComputeNode node = computeNodeRepository.findById(nodeId)
+				.orElseThrow(() -> new BizException(404, "node not found: " + nodeId));
+		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
+				? node.getHost()
+				: "http://" + node.getHost();
+		String url = baseUrl + "/internal/cancel-task";
+
+		Map<String, Object> request = new HashMap<>();
+		request.put("taskId", taskId);
+		request.put("reason", reason);
+
+		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
+			throw new BizException(502, "node-agent cancel response is empty");
+		}
+		Object accepted = dataMap.get("accepted");
+		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
+			Object message = dataMap.get("message");
+			throw new BizException(409, message == null ? "node-agent rejected cancel" : String.valueOf(message));
+		}
+	}
 }

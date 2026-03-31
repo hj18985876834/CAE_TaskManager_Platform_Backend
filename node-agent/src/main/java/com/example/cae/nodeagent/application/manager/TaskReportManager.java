@@ -57,6 +57,11 @@ public class TaskReportManager {
 		taskReportAppService.markFailed(context.getTaskId(), failType, ex.getMessage());
 	}
 
+	public void reportCanceled(ExecutionContext context, String reason) {
+		String message = reason == null || reason.isBlank() ? "task canceled" : reason;
+		taskReportAppService.reportStatus(context.getTaskId(), "CANCELED", message);
+	}
+
 	public void completeTask(Long taskId) {
 		logSeqMap.remove(taskId);
 		taskRuntimeRegistry.finish(taskId);
