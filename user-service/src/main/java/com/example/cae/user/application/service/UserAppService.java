@@ -15,6 +15,7 @@ import com.example.cae.user.interfaces.request.UpdateUserRequest;
 import com.example.cae.user.interfaces.request.UpdateUserStatusRequest;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
 import com.example.cae.user.interfaces.response.InternalUserBasicResponse;
+import com.example.cae.user.interfaces.response.UserCreateResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 import org.springframework.stereotype.Service;
@@ -57,20 +58,20 @@ public class UserAppService {
 		return PageResult.of(total, pageNum, pageSize, records);
 	}
 
-	public void createUser(CreateUserRequest request) {
+	public UserCreateResponse createUser(CreateUserRequest request) {
 		if (request == null) {
 			throw new BizException(400, "request is empty");
 		}
 		userDomainService.checkUsernameUnique(request.getUsername());
 
-		if (request.getRoleId() == null || roleRepository.findById(request.getRoleId()).isEmpty()) {
-			throw new BizException(400, "role not found");
-		}
+		Role role = roleRepository.findById(request.getRoleId())
+				.orElseThrow(() -> new BizException(400, "role not found"));
 
 		User user = UserAssembler.toDomain(request);
 		user.setPassword(passwordDomainService.encode(request.getPassword()));
 		user.enable();
 		userRepository.save(user);
+		return UserAssembler.toUserCreateResponse(user, role);
 	}
 
 	public UserDetailResponse getById(Long id) {
@@ -151,4 +152,3 @@ public class UserAppService {
 		userRepository.update(user);
 	}
 }
-

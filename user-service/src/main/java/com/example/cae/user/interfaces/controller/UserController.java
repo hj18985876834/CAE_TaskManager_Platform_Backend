@@ -8,6 +8,7 @@ import com.example.cae.user.interfaces.request.ResetPasswordRequest;
 import com.example.cae.user.interfaces.request.UpdateUserRequest;
 import com.example.cae.user.interfaces.request.UpdateUserStatusRequest;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
+import com.example.cae.user.interfaces.response.UserCreateResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,9 +34,8 @@ public class UserController {
 	}
 
 	@PostMapping
-	public Result<Void> createUser(@RequestBody CreateUserRequest request) {
-		userFacade.createUser(request);
-		return Result.success();
+	public Result<UserCreateResponse> createUser(@RequestBody CreateUserRequest request) {
+		return Result.success(userFacade.createUser(request));
 	}
 
 	@GetMapping("/{id}")
@@ -67,4 +67,3 @@ public class UserController {
 		return Result.success();
 	}
 }
-

@@ -6,6 +6,7 @@ import java.util.List;
 
 public class NodeDetailResponse {
 	private Long id;
+	private Long nodeId;
 	private String nodeCode;
 	private String nodeName;
 	private String host;
@@ -23,6 +24,14 @@ public class NodeDetailResponse {
 
 	public void setId(Long id) {
 		this.id = id;
+	}
+
+	public Long getNodeId() {
+		return nodeId;
+	}
+
+	public void setNodeId(Long nodeId) {
+		this.nodeId = nodeId;
 	}
 
 	public String getNodeCode() {
@@ -105,4 +114,3 @@ public class NodeDetailResponse {
 		this.solvers = solvers;
 	}
 }
-

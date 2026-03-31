@@ -220,6 +220,7 @@ public class NodeAppService {
 	private NodeListItemResponse toNodeListItem(ComputeNode node) {
 		NodeListItemResponse response = new NodeListItemResponse();
 		response.setId(node.getId());
+		response.setNodeId(node.getId());
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
@@ -287,4 +288,3 @@ public class NodeAppService {
 				.toList();
 	}
 }
-

@@ -4,6 +4,7 @@ import com.example.cae.user.infrastructure.persistence.entity.UserPO;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -18,6 +19,7 @@ public interface UserMapper {
 	@Select("SELECT id, username, password, real_name AS realName, role_id AS roleId, status, created_at AS createdAt, updated_at AS updatedAt FROM sys_user WHERE id = #{id} LIMIT 1")
 	UserPO selectById(Long id);
 
+	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO sys_user(username, password, real_name, role_id, status) VALUES(#{username}, #{password}, #{realName}, #{roleId}, #{status})")
 	int insert(UserPO po);
 
@@ -51,4 +53,3 @@ public interface UserMapper {
 	})
 	long count(@Param("request") UserPageQueryRequest request);
 }
-

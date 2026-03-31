@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 public class ScheduleRecordResponse {
 	private Long id;
+	private Long scheduleId;
 	private Long taskId;
 	private Long nodeId;
 	private String strategyName;
@@ -17,6 +18,14 @@ public class ScheduleRecordResponse {
 
 	public void setId(Long id) {
 		this.id = id;
+	}
+
+	public Long getScheduleId() {
+		return scheduleId;
+	}
+
+	public void setScheduleId(Long scheduleId) {
+		this.scheduleId = scheduleId;
 	}
 
 	public Long getTaskId() {
@@ -67,4 +76,3 @@ public class ScheduleRecordResponse {
 		this.createdAt = createdAt;
 	}
 }
-

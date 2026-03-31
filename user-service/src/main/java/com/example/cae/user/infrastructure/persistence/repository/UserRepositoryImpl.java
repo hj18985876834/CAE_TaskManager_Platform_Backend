@@ -31,7 +31,9 @@ public class UserRepositoryImpl implements UserRepository {
 
 	@Override
 	public void save(User user) {
-		userMapper.insert(toPO(user));
+		UserPO po = toPO(user);
+		userMapper.insert(po);
+		user.setId(po.getId());
 	}
 
 	@Override
@@ -73,4 +75,3 @@ public class UserRepositoryImpl implements UserRepository {
 		return po;
 	}
 }
-

@@ -4,6 +4,7 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.assembler.NodeAssembler;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
+import com.example.cae.scheduler.infrastructure.persistence.entity.ComputeNodePO;
 import com.example.cae.scheduler.infrastructure.persistence.mapper.ComputeNodeMapper;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import org.springframework.stereotype.Repository;
@@ -36,9 +37,9 @@ public class ComputeNodeRepositoryImpl implements ComputeNodeRepository {
 
 	@Override
 	public void save(ComputeNode node) {
-		computeNodeMapper.insert(NodeAssembler.toPO(node));
-		computeNodeMapper.selectByNodeCode(node.getNodeCode());
-		findByNodeCode(node.getNodeCode()).ifPresent(saved -> node.setId(saved.getId()));
+		ComputeNodePO po = NodeAssembler.toPO(node);
+		computeNodeMapper.insert(po);
+		node.setId(po.getId());
 	}
 
 	@Override

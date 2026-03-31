@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 public class NodeListItemResponse {
 	private Long id;
+	private Long nodeId;
 	private String nodeCode;
 	private String nodeName;
 	private String host;
@@ -21,6 +22,14 @@ public class NodeListItemResponse {
 
 	public void setId(Long id) {
 		this.id = id;
+	}
+
+	public Long getNodeId() {
+		return nodeId;
+	}
+
+	public void setNodeId(Long nodeId) {
+		this.nodeId = nodeId;
 	}
 
 	public String getNodeCode() {

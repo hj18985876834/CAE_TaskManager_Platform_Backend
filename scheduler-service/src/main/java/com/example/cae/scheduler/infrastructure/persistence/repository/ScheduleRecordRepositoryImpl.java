@@ -4,6 +4,7 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.assembler.ScheduleAssembler;
 import com.example.cae.scheduler.domain.model.ScheduleRecord;
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
+import com.example.cae.scheduler.infrastructure.persistence.entity.ScheduleRecordPO;
 import com.example.cae.scheduler.infrastructure.persistence.mapper.ScheduleRecordMapper;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import org.springframework.stereotype.Repository;
@@ -20,7 +21,9 @@ public class ScheduleRecordRepositoryImpl implements ScheduleRecordRepository {
 
 	@Override
 	public void save(ScheduleRecord record) {
-		scheduleRecordMapper.insert(ScheduleAssembler.toPO(record));
+		ScheduleRecordPO po = ScheduleAssembler.toPO(record);
+		scheduleRecordMapper.insert(po);
+		record.setId(po.getId());
 	}
 
 	@Override

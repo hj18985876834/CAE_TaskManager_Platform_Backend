@@ -4,6 +4,7 @@ import com.example.cae.scheduler.infrastructure.persistence.entity.ScheduleRecor
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
@@ -11,6 +12,7 @@ import java.util.List;
 
 @Mapper
 public interface ScheduleRecordMapper {
+	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO schedule_record(task_id, node_id, strategy_name, schedule_status, schedule_message) VALUES(#{taskId}, #{nodeId}, #{strategyName}, #{scheduleStatus}, #{scheduleMessage})")
 	int insert(ScheduleRecordPO po);
 

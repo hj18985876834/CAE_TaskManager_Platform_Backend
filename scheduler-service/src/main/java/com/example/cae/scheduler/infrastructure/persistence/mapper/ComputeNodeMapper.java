@@ -4,6 +4,7 @@ import com.example.cae.scheduler.infrastructure.persistence.entity.ComputeNodePO
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
@@ -21,6 +22,7 @@ public interface ComputeNodeMapper {
 	@Select("SELECT id, node_code AS nodeCode, node_name AS nodeName, host, node_token AS nodeToken, status, max_concurrency AS maxConcurrency, running_count AS runningCount, cpu_usage AS cpuUsage, memory_usage AS memoryUsage, last_heartbeat_time AS lastHeartbeatTime, created_at AS createdAt, updated_at AS updatedAt FROM compute_node WHERE node_token = #{nodeToken} LIMIT 1")
 	ComputeNodePO selectByNodeToken(String nodeToken);
 
+	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO compute_node(node_code, node_name, host, node_token, status, max_concurrency, running_count, cpu_usage, memory_usage, last_heartbeat_time) VALUES(#{nodeCode}, #{nodeName}, #{host}, #{nodeToken}, #{status}, #{maxConcurrency}, #{runningCount}, #{cpuUsage}, #{memoryUsage}, #{lastHeartbeatTime})")
 	int insert(ComputeNodePO po);
 

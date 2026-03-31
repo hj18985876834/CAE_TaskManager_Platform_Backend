@@ -8,6 +8,7 @@ import com.example.cae.user.interfaces.request.UpdateUserRequest;
 import com.example.cae.user.interfaces.request.UpdateUserStatusRequest;
 import com.example.cae.user.interfaces.request.UserPageQueryRequest;
 import com.example.cae.user.interfaces.response.InternalUserBasicResponse;
+import com.example.cae.user.interfaces.response.UserCreateResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 import org.springframework.stereotype.Component;
@@ -24,8 +25,8 @@ public class UserFacade {
 		return userAppService.pageUsers(request);
 	}
 
-	public void createUser(CreateUserRequest request) {
-		userAppService.createUser(request);
+	public UserCreateResponse createUser(CreateUserRequest request) {
+		return userAppService.createUser(request);
 	}
 
 	public UserDetailResponse getById(Long userId) {
@@ -48,4 +49,3 @@ public class UserFacade {
 		return userAppService.getInternalById(userId);
 	}
 }
-

@@ -11,6 +11,7 @@ public final class ScheduleAssembler {
 	public static ScheduleRecordResponse toResponse(ScheduleRecord record) {
 		ScheduleRecordResponse response = new ScheduleRecordResponse();
 		response.setId(record.getId());
+		response.setScheduleId(record.getId());
 		response.setTaskId(record.getTaskId());
 		response.setNodeId(record.getNodeId());
 		response.setStrategyName(record.getStrategyName());

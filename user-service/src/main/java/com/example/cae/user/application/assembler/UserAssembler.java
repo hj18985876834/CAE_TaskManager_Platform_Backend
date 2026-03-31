@@ -5,6 +5,7 @@ import com.example.cae.user.domain.model.User;
 import com.example.cae.user.interfaces.request.CreateUserRequest;
 import com.example.cae.user.interfaces.response.CurrentUserResponse;
 import com.example.cae.user.interfaces.response.LoginResponse;
+import com.example.cae.user.interfaces.response.UserCreateResponse;
 import com.example.cae.user.interfaces.response.UserDetailResponse;
 import com.example.cae.user.interfaces.response.UserListItemResponse;
 
@@ -52,6 +53,19 @@ public class UserAssembler {
 		return response;
 	}
 
+	public static UserCreateResponse toUserCreateResponse(User user, Role role) {
+		UserCreateResponse response = new UserCreateResponse();
+		response.setId(user.getId());
+		response.setUserId(user.getId());
+		response.setUsername(user.getUsername());
+		response.setRealName(user.getRealName());
+		response.setRoleId(user.getRoleId());
+		response.setRoleCode(role.getRoleCode());
+		response.setRoleName(role.getRoleName());
+		response.setStatus(user.getStatus());
+		return response;
+	}
+
 	public static UserListItemResponse toUserListItem(User user, Role role) {
 		UserListItemResponse response = new UserListItemResponse();
 		response.setId(user.getId());
@@ -74,4 +88,3 @@ public class UserAssembler {
 		return user;
 	}
 }
-
