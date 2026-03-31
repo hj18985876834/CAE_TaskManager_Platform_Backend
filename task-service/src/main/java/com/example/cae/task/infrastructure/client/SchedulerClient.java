@@ -1,9 +1,14 @@
 package com.example.cae.task.infrastructure.client;
 
 import com.example.cae.common.response.Result;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class SchedulerClient {
@@ -33,6 +38,46 @@ public class SchedulerClient {
 	}
 
 	@SuppressWarnings("unchecked")
+	public NodeSummary getOnlineNodeSummary() {
+		String url = UriComponentsBuilder
+				.fromHttpUrl(schedulerServiceBaseUrl + "/api/nodes")
+				.queryParam("status", "ONLINE")
+				.queryParam("pageNum", 1)
+				.queryParam("pageSize", 1000)
+				.toUriString();
+		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
+			return NodeSummary.empty();
+		}
+		Object recordsObj = pageMap.get("records");
+		if (!(recordsObj instanceof List<?> records)) {
+			return NodeSummary.empty();
+		}
+		int onlineCount = 0;
+		BigDecimal totalLoad = BigDecimal.ZERO;
+		int loadSamples = 0;
+		for (Object item : records) {
+			if (!(item instanceof Map<?, ?> nodeMap)) {
+				continue;
+			}
+			onlineCount++;
+			Integer runningCount = toInteger(nodeMap.get("runningCount"));
+			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
+			if (runningCount != null && maxConcurrency != null && maxConcurrency > 0) {
+				totalLoad = totalLoad.add(BigDecimal.valueOf(runningCount)
+						.divide(BigDecimal.valueOf(maxConcurrency), 4, RoundingMode.HALF_UP));
+				loadSamples++;
+			}
+		}
+		NodeSummary summary = new NodeSummary();
+		summary.setOnlineNodeCount(onlineCount);
+		summary.setAvgNodeLoad(loadSamples == 0
+				? BigDecimal.ZERO
+				: totalLoad.divide(BigDecimal.valueOf(loadSamples), 4, RoundingMode.HALF_UP));
+		return summary;
+	}
+
+	@SuppressWarnings("unchecked")
 	public boolean verifyNodeToken(Long nodeId, String nodeToken) {
 		String url = UriComponentsBuilder
 				.fromHttpUrl(schedulerServiceBaseUrl + "/internal/nodes/{nodeId}/token/verify")
@@ -48,5 +93,43 @@ public class SchedulerClient {
 			return bool;
 		}
 		return Boolean.parseBoolean(String.valueOf(data));
+	}
+
+	private Integer toInteger(Object value) {
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof Number number) {
+			return number.intValue();
+		}
+		return Integer.parseInt(String.valueOf(value));
+	}
+
+	public static class NodeSummary {
+		private Integer onlineNodeCount;
+		private BigDecimal avgNodeLoad;
+
+		public static NodeSummary empty() {
+			NodeSummary summary = new NodeSummary();
+			summary.setOnlineNodeCount(0);
+			summary.setAvgNodeLoad(BigDecimal.ZERO);
+			return summary;
+		}
+
+		public Integer getOnlineNodeCount() {
+			return onlineNodeCount;
+		}
+
+		public void setOnlineNodeCount(Integer onlineNodeCount) {
+			this.onlineNodeCount = onlineNodeCount;
+		}
+
+		public BigDecimal getAvgNodeLoad() {
+			return avgNodeLoad;
+		}
+
+		public void setAvgNodeLoad(BigDecimal avgNodeLoad) {
+			this.avgNodeLoad = avgNodeLoad;
+		}
 	}
 }

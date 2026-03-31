@@ -1,6 +1,7 @@
 package com.example.cae.task.application.service;
 
 import com.example.cae.common.exception.BizException;
+import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.task.application.assembler.TaskAssembler;
 import com.example.cae.task.domain.model.Task;
@@ -18,8 +19,11 @@ import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
+import com.example.cae.task.interfaces.response.TaskDashboardSummaryResponse;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
@@ -81,6 +85,33 @@ public class TaskQueryAppService {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskFileResponse).toList();
+	}
+
+	public TaskDashboardSummaryResponse getDashboardSummary() {
+		long totalTaskCount = taskRepository.countAll();
+		long runningTaskCount = taskRepository.countByStatus(TaskStatusEnum.RUNNING.name());
+		long queuedTaskCount = taskRepository.countByStatus(TaskStatusEnum.QUEUED.name());
+		long successTaskCount = taskRepository.countByStatus(TaskStatusEnum.SUCCESS.name());
+		long finishedTaskCount = taskRepository.countFinished();
+
+		SchedulerClient.NodeSummary nodeSummary;
+		try {
+			nodeSummary = schedulerClient.getOnlineNodeSummary();
+		} catch (Exception ignored) {
+			nodeSummary = SchedulerClient.NodeSummary.empty();
+		}
+
+		TaskDashboardSummaryResponse response = new TaskDashboardSummaryResponse();
+		response.setTotalTaskCount(totalTaskCount);
+		response.setRunningTaskCount(runningTaskCount);
+		response.setQueuedTaskCount(queuedTaskCount);
+		response.setSuccessRate(finishedTaskCount == 0
+				? BigDecimal.ZERO
+				: BigDecimal.valueOf(successTaskCount)
+						.divide(BigDecimal.valueOf(finishedTaskCount), 4, RoundingMode.HALF_UP));
+		response.setOnlineNodeCount(nodeSummary.getOnlineNodeCount());
+		response.setAvgNodeLoad(nodeSummary.getAvgNodeLoad());
+		return response;
 	}
 
 	private TaskStatusHistoryResponse toStatusHistoryResponse(TaskStatusHistory history) {

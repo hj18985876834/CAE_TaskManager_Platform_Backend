@@ -19,5 +19,10 @@ public interface TaskRepository {
 	PageResult<Task> pageAdminTasks(TaskListQueryRequest request);
 
 	List<Task> listByStatus(String status);
-}
 
+	long countAll();
+
+	long countByStatus(String status);
+
+	long countFinished();
+}

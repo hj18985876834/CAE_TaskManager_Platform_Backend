@@ -62,5 +62,19 @@ public class TaskRepositoryImpl implements TaskRepository {
 	public List<Task> listByStatus(String status) {
 		return taskMapper.selectByStatus(status).stream().map(taskAssembler::fromPO).toList();
 	}
-}
 
+	@Override
+	public long countAll() {
+		return taskMapper.countAll();
+	}
+
+	@Override
+	public long countByStatus(String status) {
+		return taskMapper.countByStatus(status);
+	}
+
+	@Override
+	public long countFinished() {
+		return taskMapper.countFinished();
+	}
+}

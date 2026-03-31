@@ -24,8 +24,8 @@ public class InternalTaskDispatchController {
 	}
 
 	@GetMapping("/queued")
-	public Result<List<TaskDTO>> listQueuedTasks() {
-		return Result.success(taskDispatchManager.listQueuedTasks());
+	public Result<List<TaskDTO>> listQueuedTasks(@RequestParam(value = "limit", required = false) Integer limit) {
+		return Result.success(taskDispatchManager.listQueuedTasks(limit));
 	}
 
 	@PostMapping("/{taskId}/mark-scheduled")
@@ -46,4 +46,3 @@ public class InternalTaskDispatchController {
 		return Result.success();
 	}
 }
-

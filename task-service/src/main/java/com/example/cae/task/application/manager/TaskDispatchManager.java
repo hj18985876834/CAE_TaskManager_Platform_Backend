@@ -38,6 +38,13 @@ public class TaskDispatchManager {
 		return taskRepository.listByStatus(TaskStatusEnum.QUEUED.name()).stream().map(this::toTaskDTO).toList();
 	}
 
+	public List<TaskDTO> listQueuedTasks(Integer limit) {
+		return taskRepository.listByStatus(TaskStatusEnum.QUEUED.name()).stream()
+				.limit(limit == null || limit < 1 ? Long.MAX_VALUE : limit.longValue())
+				.map(this::toTaskDTO)
+				.toList();
+	}
+
 	public void markScheduled(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(400, "nodeId is required");
@@ -135,4 +142,3 @@ public class TaskDispatchManager {
 		return Map.of();
 	}
 }
-
