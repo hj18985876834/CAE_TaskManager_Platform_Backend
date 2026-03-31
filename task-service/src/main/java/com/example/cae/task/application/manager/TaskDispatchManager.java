@@ -1,5 +1,6 @@
 package com.example.cae.task.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskFileDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.enums.OperatorTypeEnum;
@@ -47,9 +48,9 @@ public class TaskDispatchManager {
 
 	public void markScheduled(Long taskId, Long nodeId) {
 		if (nodeId == null) {
-			throw new BizException(400, "nodeId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
@@ -57,9 +58,9 @@ public class TaskDispatchManager {
 
 	public void markDispatched(Long taskId, Long nodeId) {
 		if (nodeId == null) {
-			throw new BizException(400, "nodeId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);

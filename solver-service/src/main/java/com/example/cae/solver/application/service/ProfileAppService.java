@@ -1,5 +1,6 @@
 package com.example.cae.solver.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.solver.application.assembler.FileRuleAssembler;
@@ -47,16 +48,16 @@ public class ProfileAppService {
 	}
 
 	public ProfileDetailResponse getProfileDetail(Long profileId) {
-		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
+		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		ProfileDetailResponse response = ProfileAssembler.toDetailResponse(profile);
 		response.setFileRules(getFileRules(profileId));
 		return response;
 	}
 
 	public ProfileCreateResponse createProfile(CreateProfileRequest request) {
-		SolverDefinition solver = solverRepository.findById(request.getSolverId()).orElseThrow(() -> new BizException(400, "solver not found"));
+		SolverDefinition solver = solverRepository.findById(request.getSolverId()).orElseThrow(() -> new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found"));
 		if (!solver.isEnabled()) {
-			throw new BizException(400, "solver is disabled");
+			throw new BizException(ErrorCodeConstants.SOLVER_DISABLED, "solver is disabled");
 		}
 		profileRuleDomainService.checkProfileCodeUnique(request.getSolverId(), request.getProfileCode());
 		SolverTaskProfile profile = ProfileAssembler.toProfile(request);
@@ -70,7 +71,7 @@ public class ProfileAppService {
 	}
 
 	public void updateProfile(Long profileId, UpdateProfileRequest request) {
-		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
+		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setCommandTemplate(request.getCommandTemplate());
@@ -86,7 +87,7 @@ public class ProfileAppService {
 	}
 
 	public void updateProfileStatus(Long profileId, UpdateProfileStatusRequest request) {
-		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
+		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		if (request != null && request.getEnabled() != null && request.getEnabled() == 1) {
 			profile.enable();
 		} else {

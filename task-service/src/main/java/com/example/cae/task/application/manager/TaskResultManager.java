@@ -1,5 +1,6 @@
 package com.example.cae.task.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
@@ -66,14 +67,14 @@ public class TaskResultManager {
 	}
 
 	public void finishTask(Long taskId, String finalStatus) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = finalStatus == null || finalStatus.isBlank() ? TaskStatusEnum.SUCCESS.name() : finalStatus;
 		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 	}
 
 	public void failTask(Long taskId, String failType, String failMessage) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		task.setFailType(failType);
 		task.setFailMessage(failMessage);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), failMessage, OperatorTypeEnum.NODE.name(), null);

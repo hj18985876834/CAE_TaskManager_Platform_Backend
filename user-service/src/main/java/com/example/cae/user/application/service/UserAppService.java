@@ -1,5 +1,6 @@
 package com.example.cae.user.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.user.application.assembler.UserAssembler;
@@ -60,12 +61,12 @@ public class UserAppService {
 
 	public UserCreateResponse createUser(CreateUserRequest request) {
 		if (request == null) {
-			throw new BizException(400, "request is empty");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "request is empty");
 		}
 		userDomainService.checkUsernameUnique(request.getUsername());
 
 		Role role = roleRepository.findById(request.getRoleId())
-				.orElseThrow(() -> new BizException(400, "role not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.ROLE_NOT_FOUND, "role not found"));
 
 		User user = UserAssembler.toDomain(request);
 		user.setPassword(passwordDomainService.encode(request.getPassword()));
@@ -76,7 +77,7 @@ public class UserAppService {
 
 	public UserDetailResponse getById(Long id) {
 		User user = userRepository.findById(id)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 
 		Role role = roleRepository.findById(user.getRoleId())
 				.orElseGet(() -> fallbackRole(user.getRoleId()));
@@ -86,7 +87,7 @@ public class UserAppService {
 
 	public User findUserById(Long id) {
 		return userRepository.findById(id)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 	}
 
 	public InternalUserBasicResponse getInternalById(Long id) {
@@ -109,13 +110,13 @@ public class UserAppService {
 
 	public void updateUser(Long userId, UpdateUserRequest request) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 
 		if (request == null) {
-			throw new BizException(400, "request is empty");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "request is empty");
 		}
 		if (request.getRoleId() != null && roleRepository.findById(request.getRoleId()).isEmpty()) {
-			throw new BizException(400, "role not found");
+			throw new BizException(ErrorCodeConstants.ROLE_NOT_FOUND, "role not found");
 		}
 
 		if (request.getRealName() != null) {
@@ -129,9 +130,9 @@ public class UserAppService {
 
 	public void updateStatus(Long userId, UpdateUserStatusRequest request) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 		if (request == null || request.getStatus() == null) {
-			throw new BizException(400, "status is empty");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status is empty");
 		}
 
 		if (request.getStatus() == 1) {
@@ -144,9 +145,9 @@ public class UserAppService {
 
 	public void resetPassword(Long userId, ResetPasswordRequest request) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 		if (request == null || request.getNewPassword() == null || request.getNewPassword().trim().isEmpty()) {
-			throw new BizException(400, "new password is empty");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "new password is empty");
 		}
 		user.resetPassword(passwordDomainService.encode(request.getNewPassword()));
 		userRepository.update(user);

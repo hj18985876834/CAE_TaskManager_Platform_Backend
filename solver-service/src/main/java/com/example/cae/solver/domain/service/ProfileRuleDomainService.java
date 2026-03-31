@@ -1,5 +1,6 @@
 package com.example.cae.solver.domain.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.solver.domain.model.SolverProfileFileRule;
 import com.example.cae.solver.domain.model.SolverTaskProfile;
@@ -32,13 +33,13 @@ public class ProfileRuleDomainService {
 
 	public void checkProfileCodeUnique(Long solverId, String profileCode) {
 		if (profileRepository.findBySolverIdAndProfileCode(solverId, profileCode).isPresent()) {
-			throw new BizException(400, "profileCode already exists");
+			throw new BizException(ErrorCodeConstants.PROFILE_CODE_ALREADY_EXISTS, "profileCode already exists");
 		}
 	}
 
 	public void checkProfileEnabled(SolverTaskProfile profile) {
 		if (profile == null || !profile.isEnabled()) {
-			throw new BizException(400, "profile is not enabled");
+			throw new BizException(ErrorCodeConstants.PROFILE_DISABLED, "profile is not enabled");
 		}
 	}
 
@@ -47,8 +48,7 @@ public class ProfileRuleDomainService {
 				.stream()
 				.anyMatch(item -> item.getFileKey() != null && item.getFileKey().equals(rule.getFileKey()));
 		if (duplicated) {
-			throw new BizException(400, "fileKey conflict");
+			throw new BizException(ErrorCodeConstants.FILE_RULE_CONFLICT, "fileKey conflict");
 		}
 	}
 }
-

@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
-    public Result<Void> handleBizException(BizException ex) {
-        return Result.fail(ex.getCode(), ex.getMessage());
+    public Result<Object> handleBizException(BizException ex) {
+        return Result.fail(ex.getCode(), ex.getMessage(), ex.getData());
     }
 
     @ExceptionHandler(UnauthorizedException.class)

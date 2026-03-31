@@ -1,5 +1,6 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.application.assembler.TaskResultAssembler;
 import com.example.cae.task.domain.model.Task;
@@ -40,20 +41,20 @@ public class TaskResultAppService {
 	}
 
 	public TaskResultSummaryResponse getResultSummary(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return taskResultSummaryRepository.findByTaskId(taskId).map(taskResultAssembler::toSummaryResponse).orElse(null);
 	}
 
 	public List<TaskResultFileResponse> getResultFiles(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return taskResultFileRepository.listByTaskId(taskId).stream().map(taskResultAssembler::toFileResponse).toList();
 	}
 
 	public TaskResultFile getResultFile(Long fileId, Long userId, String roleCode) {
-		TaskResultFile file = taskResultFileRepository.findById(fileId).orElseThrow(() -> new BizException(404, "result file not found"));
-		Task task = taskRepository.findById(file.getTaskId()).orElseThrow(() -> new BizException(404, "task not found"));
+		TaskResultFile file = taskResultFileRepository.findById(fileId).orElseThrow(() -> new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found"));
+		Task task = taskRepository.findById(file.getTaskId()).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return file;
 	}

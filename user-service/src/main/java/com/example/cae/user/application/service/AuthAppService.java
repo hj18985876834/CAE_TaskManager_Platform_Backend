@@ -1,5 +1,6 @@
 package com.example.cae.user.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.user.application.assembler.UserAssembler;
 import com.example.cae.user.domain.model.Role;
@@ -34,18 +35,18 @@ public class AuthAppService {
 
 	public LoginResponse login(LoginRequest request) {
 		if (request == null || isBlank(request.getUsername()) || isBlank(request.getPassword())) {
-			throw new BizException(400, "username or password is empty");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "username or password is empty");
 		}
 
 		User user = userRepository.findByUsername(request.getUsername())
-				.orElseThrow(() -> new BizException(401, "username or password is invalid"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.INVALID_LOGIN_CREDENTIALS, "username or password is invalid"));
 
 		if (user.getStatus() == null || user.getStatus() != 1) {
-			throw new BizException(403, "user is disabled");
+			throw new BizException(ErrorCodeConstants.USER_DISABLED, "user is disabled");
 		}
 
 		if (!passwordEncoderService.matches(request.getPassword(), user.getPassword())) {
-			throw new BizException(401, "username or password is invalid");
+			throw new BizException(ErrorCodeConstants.INVALID_LOGIN_CREDENTIALS, "username or password is invalid");
 		}
 
 		Role role = roleRepository.findById(user.getRoleId())
@@ -63,7 +64,7 @@ public class AuthAppService {
 
 	public CurrentUserResponse getCurrentUser(Long userId) {
 		User user = userRepository.findById(userId)
-				.orElseThrow(() -> new BizException(404, "user not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.USER_NOT_FOUND, "user not found"));
 
 		Role role = roleRepository.findById(user.getRoleId())
 				.orElseGet(() -> {
@@ -85,4 +86,3 @@ public class AuthAppService {
 		return value == null || value.trim().isEmpty();
 	}
 }
-

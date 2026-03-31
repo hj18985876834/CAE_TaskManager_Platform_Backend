@@ -1,5 +1,6 @@
 package com.example.cae.solver.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.solver.domain.model.SolverProfileFileRule;
 import com.example.cae.solver.domain.model.SolverTaskProfile;
@@ -27,10 +28,9 @@ public class UploadSpecAppService {
 	}
 
 	public UploadSpecResponse buildUploadSpec(Long profileId) {
-		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
+		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		profileRuleDomainService.checkProfileEnabled(profile);
 		List<SolverProfileFileRule> rules = fileRuleRepository.listByProfileId(profileId);
 		return uploadSpecBuilder.build(profile, rules);
 	}
 }
-

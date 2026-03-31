@@ -1,5 +1,6 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.repository.TaskRepository;
@@ -22,21 +23,21 @@ public class NodeAgentAuthService {
 
 	public void validateTaskNodeToken(Long taskId, Long reportedNodeId, String nodeToken) {
 		if (taskId == null) {
-			throw new BizException(400, "taskId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
 		if (nodeToken == null || nodeToken.isBlank()) {
-			throw new BizException(401, "node token required");
+			throw new BizException(ErrorCodeConstants.NODE_TOKEN_REQUIRED, "node token required");
 		}
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (task.getNodeId() == null) {
-			throw new BizException(409, "task not bound to node");
+			throw new BizException(ErrorCodeConstants.TASK_NOT_BOUND_TO_NODE, "task not bound to node");
 		}
 		if (reportedNodeId != null && !reportedNodeId.equals(task.getNodeId())) {
-			throw new BizException(403, "reported node mismatch");
+			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "reported node mismatch");
 		}
 		boolean valid = schedulerClient.verifyNodeToken(task.getNodeId(), nodeToken);
 		if (!valid) {
-			throw new BizException(401, "invalid node token");
+			throw new BizException(ErrorCodeConstants.INVALID_NODE_TOKEN, "invalid node token");
 		}
 	}
 }

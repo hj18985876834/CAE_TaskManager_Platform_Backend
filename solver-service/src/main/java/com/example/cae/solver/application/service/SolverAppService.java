@@ -1,5 +1,6 @@
 package com.example.cae.solver.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.solver.application.assembler.ProfileAssembler;
@@ -44,7 +45,7 @@ public class SolverAppService {
 	}
 
 	public SolverDetailResponse getSolverDetail(Long solverId) {
-		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(404, "solver not found"));
+		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found"));
 		return SolverAssembler.toDetailResponse(solver);
 	}
 
@@ -61,7 +62,7 @@ public class SolverAppService {
 	}
 
 	public void updateSolver(Long solverId, UpdateSolverRequest request) {
-		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(404, "solver not found"));
+		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found"));
 		solver.setSolverName(request.getSolverName());
 		solver.setVersion(request.getVersion());
 		solver.setExecMode(request.getExecMode());
@@ -75,7 +76,7 @@ public class SolverAppService {
 	}
 
 	public void updateSolverStatus(Long solverId, UpdateSolverStatusRequest request) {
-		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(404, "solver not found"));
+		SolverDefinition solver = solverRepository.findById(solverId).orElseThrow(() -> new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found"));
 		if (request != null && request.getEnabled() != null && request.getEnabled() == 1) {
 			solver.enable();
 		} else {

@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
@@ -25,7 +26,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 	@Override
 	public void notifyDispatch(Long nodeId, TaskDTO task) {
 		ComputeNode node = computeNodeRepository.findById(nodeId)
-				.orElseThrow(() -> new BizException(404, "node not found: " + nodeId));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found: " + nodeId));
 		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
 				? node.getHost()
 				: "http://" + node.getHost();
@@ -46,19 +47,19 @@ public class NodeAgentClientStub implements NodeAgentClient {
 
 		Result<?> result = restTemplate.postForObject(url, request, Result.class);
 		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
-			throw new BizException(502, "node-agent dispatch response is empty");
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent dispatch response is empty");
 		}
 		Object accepted = dataMap.get("accepted");
 		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
 			Object message = dataMap.get("message");
-			throw new BizException(409, message == null ? "node-agent rejected task" : String.valueOf(message));
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected task" : String.valueOf(message));
 		}
 	}
 
 	@Override
 	public void cancelTask(Long nodeId, Long taskId, String reason) {
 		ComputeNode node = computeNodeRepository.findById(nodeId)
-				.orElseThrow(() -> new BizException(404, "node not found: " + nodeId));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found: " + nodeId));
 		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
 				? node.getHost()
 				: "http://" + node.getHost();
@@ -70,12 +71,12 @@ public class NodeAgentClientStub implements NodeAgentClient {
 
 		Result<?> result = restTemplate.postForObject(url, request, Result.class);
 		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
-			throw new BizException(502, "node-agent cancel response is empty");
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent cancel response is empty");
 		}
 		Object accepted = dataMap.get("accepted");
 		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
 			Object message = dataMap.get("message");
-			throw new BizException(409, message == null ? "node-agent rejected cancel" : String.valueOf(message));
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected cancel" : String.valueOf(message));
 		}
 	}
 }

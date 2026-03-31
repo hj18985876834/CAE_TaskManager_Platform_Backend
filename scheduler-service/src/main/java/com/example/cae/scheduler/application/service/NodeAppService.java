@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.assembler.NodeAssembler;
@@ -93,10 +94,10 @@ public class NodeAppService {
 		ComputeNode node = resolveNode(request);
 		if (nodeToken != null) {
 			if (nodeToken.isBlank()) {
-				throw new BizException(401, "node token required");
+				throw new BizException(ErrorCodeConstants.NODE_TOKEN_REQUIRED, "node token required");
 			}
 			if (node.getNodeToken() == null || !nodeToken.equals(node.getNodeToken())) {
-				throw new BizException(401, "invalid node token");
+				throw new BizException(ErrorCodeConstants.INVALID_NODE_TOKEN, "invalid node token");
 			}
 		}
 		node.refreshHeartbeat(request.getCpuUsage(), request.getMemoryUsage(), request.getRunningCount(), LocalDateTime.now());
@@ -115,28 +116,28 @@ public class NodeAppService {
 	}
 
 	public NodeDetailResponse getNodeDetail(Long nodeId) {
-		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
+		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		return toNodeDetail(node);
 	}
 
 	public void updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request) {
 		if (nodeId == null || request == null || request.getStatus() == null || request.getStatus().isBlank()) {
-			throw new BizException(400, "invalid node status request");
+			throw new BizException(ErrorCodeConstants.INVALID_NODE_STATUS_REQUEST, "invalid node status request");
 		}
 		String status = request.getStatus().trim().toUpperCase();
 		if (!Set.of("ONLINE", "OFFLINE", "DISABLED").contains(status)) {
-			throw new BizException(400, "unsupported node status");
+			throw new BizException(ErrorCodeConstants.UNSUPPORTED_NODE_STATUS, "unsupported node status");
 		}
-		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
+		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		node.setStatus(status);
 		computeNodeRepository.update(node);
 	}
 
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
 		if (nodeId == null) {
-			throw new BizException(400, "nodeId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
-		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(404, "node not found"));
+		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		return nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
 				.map(capability -> {
 					NodeSolverResponse response = new NodeSolverResponse();
@@ -180,7 +181,7 @@ public class NodeAppService {
 			return;
 		}
 		ComputeNode node = computeNodeRepository.findById(nodeId)
-				.orElseThrow(() -> new BizException(404, "node not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
 		node.setRunningCount(Math.max(0, current + delta));
 		computeNodeRepository.update(node);
@@ -188,11 +189,11 @@ public class NodeAppService {
 
 	public String getNodeToken(Long nodeId) {
 		if (nodeId == null) {
-			throw new BizException(400, "nodeId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
 		return computeNodeRepository.findById(nodeId)
 				.map(ComputeNode::getNodeToken)
-				.orElseThrow(() -> new BizException(404, "node not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 	}
 
 	public boolean validateNodeToken(Long nodeId, String nodeToken) {
@@ -253,7 +254,7 @@ public class NodeAppService {
 
 	private ComputeNode resolveNode(NodeHeartbeatRequest request) {
 		return computeNodeRepository.findById(request.getNodeId())
-				.orElseThrow(() -> new BizException(404, "node not found"));
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 	}
 
 	private String generateNodeToken(String nodeCode) {

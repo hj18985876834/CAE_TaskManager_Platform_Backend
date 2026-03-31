@@ -1,5 +1,6 @@
 package com.example.cae.task.domain.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskStatusHistory;
@@ -21,7 +22,7 @@ public class TaskStatusDomainService {
 		String fromStatus = task.getStatus();
 		String normalizedTargetStatus = targetStatus == null ? null : targetStatus.trim().toUpperCase();
 		if (!taskStatusRule.canTransfer(fromStatus, normalizedTargetStatus)) {
-			throw new BizException(400, "illegal status transfer: " + fromStatus + " -> " + targetStatus);
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status transfer: " + fromStatus + " -> " + targetStatus);
 		}
 
 		switch (normalizedTargetStatus) {
@@ -34,7 +35,7 @@ public class TaskStatusDomainService {
 			case "CANCELED" -> task.cancel();
 			case "FAILED" -> task.markFailed(task.getFailType(), reason);
 			case "TIMEOUT" -> task.markTimeout(reason);
-			default -> throw new BizException(400, "unsupported status: " + targetStatus);
+			default -> throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED, "unsupported status: " + targetStatus);
 		}
 
 		TaskStatusHistory history = new TaskStatusHistory();

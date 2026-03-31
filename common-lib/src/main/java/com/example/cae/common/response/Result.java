@@ -26,6 +26,10 @@ public class Result<T> {
         return new Result<>(code, message, null);
     }
 
+    public static <T> Result<T> fail(Integer code, String message, T data) {
+        return new Result<>(code, message, data);
+    }
+
     public Integer getCode() {
         return code;
     }

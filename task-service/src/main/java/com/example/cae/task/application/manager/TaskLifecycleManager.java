@@ -1,5 +1,6 @@
 package com.example.cae.task.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
@@ -86,11 +87,11 @@ public class TaskLifecycleManager {
 	public void cancelTask(Long taskId, Long userId, String reason) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		if (!taskDomainService.canCancel(task)) {
-			throw new BizException(400, "task cannot be canceled in current status");
+			throw new BizException(ErrorCodeConstants.TASK_CANCEL_NOT_ALLOWED, "task cannot be canceled in current status");
 		}
 		if (TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
 			if (task.getNodeId() == null) {
-				throw new BizException(409, "running task is not bound to node");
+				throw new BizException(ErrorCodeConstants.TASK_NOT_BOUND_TO_NODE, "running task is not bound to node");
 			}
 			schedulerClient.cancelTaskOnNode(task.getNodeId(), taskId, reason);
 			return;
@@ -100,23 +101,23 @@ public class TaskLifecycleManager {
 	}
 
 	public void markScheduled(Long taskId, Long nodeId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
 	public void markDispatched(Long taskId, Long nodeId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
 	public void reportStatus(Long taskId, StatusReportRequest request) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (request != null && request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
-			throw new BizException(409, "task status mismatch");
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
 		}
 		String targetStatus = pickStatus(request);
 		String reason = pickReason(request);
@@ -129,7 +130,7 @@ public class TaskLifecycleManager {
 
 	private String pickStatus(StatusReportRequest request) {
 		if (request == null) {
-			throw new BizException(400, "status report request is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status report request is required");
 		}
 		if (request.getToStatus() != null && !request.getToStatus().isBlank()) {
 			return request.getToStatus();
@@ -137,7 +138,7 @@ public class TaskLifecycleManager {
 		if (request.getStatus() != null && !request.getStatus().isBlank()) {
 			return request.getStatus();
 		}
-		throw new BizException(400, "status is required");
+		throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status is required");
 	}
 
 	private String pickReason(StatusReportRequest request) {
@@ -166,9 +167,9 @@ public class TaskLifecycleManager {
 	}
 
 	private Task loadAndCheckOwner(Long taskId, Long userId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (!task.isOwner(userId)) {
-			throw new BizException(403, "no permission");
+			throw new BizException(ErrorCodeConstants.FORBIDDEN, "no permission");
 		}
 		return task;
 	}

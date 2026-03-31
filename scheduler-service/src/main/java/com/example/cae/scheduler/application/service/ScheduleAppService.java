@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
@@ -44,7 +45,7 @@ public class ScheduleAppService {
 
 	public Long scheduleTask(TaskDTO task) {
 		if (task == null || task.getTaskId() == null || task.getSolverId() == null) {
-			throw new BizException(400, "invalid task for scheduling");
+			throw new BizException(ErrorCodeConstants.INVALID_SCHEDULE_TASK, "invalid task for scheduling");
 		}
 
 		List<ComputeNode> onlineNodes = computeNodeRepository.listByStatus("ONLINE");
@@ -56,7 +57,7 @@ public class ScheduleAppService {
 
 		ComputeNode selected = scheduleStrategy.selectNode(task, availableNodes);
 		if (selected == null) {
-			throw new BizException(409, "no available node");
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 		}
 
 		selected.setRunningCount((selected.getRunningCount() == null ? 0 : selected.getRunningCount()) + 1);
@@ -101,7 +102,7 @@ public class ScheduleAppService {
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
 		if (nodeId == null || taskId == null) {
-			throw new BizException(400, "nodeId and taskId are required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId and taskId are required");
 		}
 		nodeAgentClient.cancelTask(nodeId, taskId, reason);
 	}
@@ -118,7 +119,7 @@ public class ScheduleAppService {
 
 	public void recordSchedule(InternalScheduleRecordRequest request) {
 		if (request == null || request.getTaskId() == null) {
-			throw new BizException(400, "invalid schedule record request");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid schedule record request");
 		}
 		ScheduleRecord record = ScheduleAssembler.newRecord(
 				request.getTaskId(),
@@ -132,7 +133,7 @@ public class ScheduleAppService {
 
 	public List<ScheduleRecordResponse> listByTaskId(Long taskId) {
 		if (taskId == null) {
-			throw new BizException(400, "taskId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
 		return scheduleRecordRepository.listByTaskId(taskId).stream().map(ScheduleAssembler::toResponse).toList();
 	}

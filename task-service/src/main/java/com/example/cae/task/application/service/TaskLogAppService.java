@@ -1,5 +1,6 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.application.assembler.TaskLogAssembler;
 import com.example.cae.task.domain.model.Task;
@@ -28,7 +29,7 @@ public class TaskLogAppService {
 	}
 
 	public TaskLogPageResponse getLogs(Long taskId, Integer fromSeq, Integer pageSize, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		List<TaskLogResponse> records = taskLogRepository.listByTaskIdAndSeq(taskId, fromSeq, pageSize).stream().map(taskLogAssembler::toResponse).toList();
 		TaskLogPageResponse response = new TaskLogPageResponse();
@@ -39,7 +40,7 @@ public class TaskLogAppService {
 	}
 
 	public String getFullLogContent(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		List<TaskLogChunk> records = taskLogRepository.listByTaskIdAndSeq(taskId, 0, Integer.MAX_VALUE);
 		StringBuilder builder = new StringBuilder();

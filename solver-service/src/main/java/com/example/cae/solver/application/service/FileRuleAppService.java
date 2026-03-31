@@ -1,5 +1,6 @@
 package com.example.cae.solver.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.solver.application.assembler.FileRuleAssembler;
 import com.example.cae.solver.domain.model.SolverProfileFileRule;
@@ -27,7 +28,7 @@ public class FileRuleAppService {
 	}
 
 	public FileRuleCreateResponse createFileRule(Long profileId, CreateFileRuleRequest request) {
-		profileRepository.findById(profileId).orElseThrow(() -> new BizException(404, "profile not found"));
+		profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		profileRuleValidator.validateCreateRule(request);
 		SolverProfileFileRule rule = FileRuleAssembler.toRule(profileId, request);
 		profileRuleDomainService.checkRuleConflict(profileId, rule);
@@ -37,7 +38,7 @@ public class FileRuleAppService {
 
 	public void updateFileRule(Long ruleId, UpdateFileRuleRequest request) {
 		profileRuleValidator.validateUpdateRule(request);
-		SolverProfileFileRule rule = fileRuleRepository.findById(ruleId).orElseThrow(() -> new BizException(404, "rule not found"));
+		SolverProfileFileRule rule = fileRuleRepository.findById(ruleId).orElseThrow(() -> new BizException(ErrorCodeConstants.FILE_RULE_NOT_FOUND, "rule not found"));
 		rule.setFileNamePattern(request.getFileNamePattern());
 		rule.setFileType(request.getFileType());
 		rule.setRequiredFlag(request.getRequiredFlag());

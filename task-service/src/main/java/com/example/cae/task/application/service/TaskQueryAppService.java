@@ -1,5 +1,6 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.response.PageResult;
@@ -70,19 +71,19 @@ public class TaskQueryAppService {
 	}
 
 	public TaskDetailResponse getTaskDetail(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return enrichTaskDetail(taskAssembler.toDetailResponse(task));
 	}
 
 	public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return taskStatusHistoryRepository.listByTaskId(taskId).stream().map(this::toStatusHistoryResponse).toList();
 	}
 
 	public List<TaskFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
 		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskFileResponse).toList();
 	}

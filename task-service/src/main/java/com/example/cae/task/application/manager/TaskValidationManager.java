@@ -1,5 +1,6 @@
 package com.example.cae.task.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.FileRuleDTO;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
@@ -39,17 +40,24 @@ public class TaskValidationManager {
 		String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
 		List<FileRuleDTO> rules = solverClient.getFileRules(task.getProfileId());
 
-		taskValidationDomainService.checkTaskEditable(task);
-		if (profileSolverId == null) {
-			throw new BizException(404, "profile not found");
+		try {
+			taskValidationDomainService.checkTaskEditable(task);
+			if (profileSolverId == null) {
+				throw new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found");
+			}
+			if (!profileSolverId.equals(task.getSolverId())) {
+				throw new BizException(ErrorCodeConstants.TASK_PROFILE_MISMATCH, "solver and profile do not match");
+			}
+			if (profileTaskType != null && !profileTaskType.isBlank() && !profileTaskType.equals(task.getTaskType())) {
+				throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
+			}
+			taskValidationDomainService.checkFilesMatchRules(files, rules);
+		} catch (BizException ex) {
+			if (shouldAttachValidationData(ex)) {
+				throw new BizException(ex.getCode(), ex.getMessage(), buildInvalidResponse(taskId));
+			}
+			throw ex;
 		}
-		if (!profileSolverId.equals(task.getSolverId())) {
-			throw new BizException(400, "solver and profile do not match");
-		}
-		if (profileTaskType != null && !profileTaskType.isBlank() && !profileTaskType.equals(task.getTaskType())) {
-			throw new BizException(400, "task type and profile do not match");
-		}
-		taskValidationDomainService.checkFilesMatchRules(files, rules);
 
 		taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
@@ -61,10 +69,28 @@ public class TaskValidationManager {
 	}
 
 	private Task loadAndCheckOwner(Long taskId, Long userId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (!task.isOwner(userId)) {
-			throw new BizException(403, "no permission");
+			throw new BizException(ErrorCodeConstants.FORBIDDEN, "no permission");
 		}
 		return task;
+	}
+
+	private boolean shouldAttachValidationData(BizException ex) {
+		return ex.getCode() != null && switch (ex.getCode()) {
+			case ErrorCodeConstants.TASK_VALIDATION_FAILED,
+					ErrorCodeConstants.TASK_STATUS_NOT_EDITABLE,
+					ErrorCodeConstants.PROFILE_NOT_FOUND,
+					ErrorCodeConstants.TASK_PROFILE_MISMATCH,
+					ErrorCodeConstants.TASK_TYPE_MISMATCH -> true;
+			default -> false;
+		};
+	}
+
+	private TaskValidateResponse buildInvalidResponse(Long taskId) {
+		TaskValidateResponse response = new TaskValidateResponse();
+		response.setTaskId(taskId);
+		response.setValid(Boolean.FALSE);
+		return response;
 	}
 }
