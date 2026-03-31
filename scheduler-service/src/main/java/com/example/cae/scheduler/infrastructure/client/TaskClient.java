@@ -5,10 +5,9 @@ import com.example.cae.common.dto.TaskDTO;
 import java.util.List;
 
 public interface TaskClient {
-	List<TaskDTO> listPendingTasks();
+	List<TaskDTO> listPendingTasks(Integer limit);
 
 	void markTaskScheduled(Long taskId, Long nodeId);
 
 	void markTaskDispatched(Long taskId, Long nodeId);
 }
-

@@ -65,6 +65,17 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Object.class);
 	}
 
+	@Override
+	public void updateRunningCount(Integer delta) {
+		if (delta == null || delta == 0 || nodeAgentConfig.getNodeId() == null) {
+			return;
+		}
+		String url = nodeAgentConfig.getSchedulerBaseUrl() + "/internal/nodes/" + nodeAgentConfig.getNodeId() + "/running-count";
+		Map<String, Object> body = new HashMap<>();
+		body.put("delta", delta);
+		restTemplate.postForEntity(url, body, Object.class);
+	}
+
 	private java.util.List<Map<String, Object>> toSolverItems(java.util.List<Long> solverIds) {
 		if (solverIds == null || solverIds.isEmpty()) {
 			return java.util.List.of();

@@ -42,6 +42,7 @@ public class CalculixExecutor extends AbstractSolverExecutor {
 		int exitCode = processRunner.run(
 				command,
 				new File(context.getWorkDir()),
+				context.getTimeoutSeconds(),
 				line -> taskReportManager.pushLog(context.getTaskId(), null, line),
 				line -> taskReportManager.pushLog(context.getTaskId(), null, line)
 		);
@@ -53,4 +54,3 @@ public class CalculixExecutor extends AbstractSolverExecutor {
 		return ExecutionResult.success(duration, "calculix execute success", Map.of("exitCode", exitCode), resultFiles);
 	}
 }
-

@@ -36,6 +36,8 @@ public class TaskExecuteManager {
 			taskReportManager.reportSuccess(context, result, start);
 		} catch (Exception ex) {
 			taskReportManager.reportFail(context, ex);
+		} finally {
+			taskReportManager.completeTask(context.getTaskId());
 		}
 	}
 
@@ -51,4 +53,3 @@ public class TaskExecuteManager {
 		return executorSelectDomainService.selectExecutor(context);
 	}
 }
-

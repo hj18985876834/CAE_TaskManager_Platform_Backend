@@ -1,6 +1,7 @@
 package com.example.cae.nodeagent.infrastructure.support;
 
 import com.example.cae.nodeagent.config.NodeAgentConfig;
+import com.example.cae.nodeagent.application.manager.TaskRuntimeRegistry;
 import com.example.cae.nodeagent.domain.model.NodeInfo;
 import org.springframework.stereotype.Component;
 
@@ -11,9 +12,11 @@ import java.util.List;
 @Component
 public class NodeInfoCollector {
 	private final NodeAgentConfig nodeAgentConfig;
+	private final TaskRuntimeRegistry taskRuntimeRegistry;
 
-	public NodeInfoCollector(NodeAgentConfig nodeAgentConfig) {
+	public NodeInfoCollector(NodeAgentConfig nodeAgentConfig, TaskRuntimeRegistry taskRuntimeRegistry) {
 		this.nodeAgentConfig = nodeAgentConfig;
+		this.taskRuntimeRegistry = taskRuntimeRegistry;
 	}
 
 	public NodeInfo collectNodeInfo() {
@@ -24,7 +27,7 @@ public class NodeInfoCollector {
 		info.setMaxConcurrency(nodeAgentConfig.getMaxConcurrency());
 		info.setCpuUsage(BigDecimal.ZERO);
 		info.setMemoryUsage(BigDecimal.ZERO);
-		info.setRunningCount(0);
+		info.setRunningCount(taskRuntimeRegistry.runningCount());
 		info.setSolverIds(nodeAgentConfig.getSolverIds() == null ? List.of(0L) : nodeAgentConfig.getSolverIds());
 		return info;
 	}
@@ -39,4 +42,3 @@ public class NodeInfoCollector {
 		return host + ":" + nodeAgentConfig.getNodePort();
 	}
 }
-

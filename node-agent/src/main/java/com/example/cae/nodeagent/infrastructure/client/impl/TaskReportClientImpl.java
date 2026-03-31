@@ -98,14 +98,24 @@ public class TaskReportClientImpl implements TaskReportClient {
 
 	private String getFileType(File file) {
 		if (file == null) {
-			return "unknown";
+			return "RESULT";
 		}
-		String name = file.getName();
+		String name = file.getName().toLowerCase();
 		int dotIndex = name.lastIndexOf('.');
 		if (dotIndex < 0 || dotIndex == name.length() - 1) {
-			return "unknown";
+			return "RESULT";
 		}
-		return name.substring(dotIndex + 1).toLowerCase();
+		String suffix = name.substring(dotIndex + 1);
+		if ("log".equals(suffix) || "txt".equals(suffix)) {
+			return "LOG";
+		}
+		if ("html".equals(suffix) || "pdf".equals(suffix) || "doc".equals(suffix) || "docx".equals(suffix)) {
+			return "REPORT";
+		}
+		if ("png".equals(suffix) || "jpg".equals(suffix) || "jpeg".equals(suffix) || "bmp".equals(suffix)) {
+			return "IMAGE";
+		}
+		return "RESULT";
 	}
 
 	private HttpEntity<?> withToken(Object body) {

@@ -42,6 +42,7 @@ public class OpenFoamExecutor extends AbstractSolverExecutor {
 		int exitCode = processRunner.run(
 				command,
 				new File(context.getWorkDir()),
+				context.getTimeoutSeconds(),
 				line -> taskReportManager.pushLog(context.getTaskId(), null, line),
 				line -> taskReportManager.pushLog(context.getTaskId(), null, line)
 		);
@@ -53,4 +54,3 @@ public class OpenFoamExecutor extends AbstractSolverExecutor {
 		return ExecutionResult.success(duration, "openfoam execute success", Map.of("exitCode", exitCode), resultFiles);
 	}
 }
-

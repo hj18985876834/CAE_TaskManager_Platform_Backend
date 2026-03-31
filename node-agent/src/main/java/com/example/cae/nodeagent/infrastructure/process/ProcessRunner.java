@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 @Component
@@ -16,7 +17,7 @@ public class ProcessRunner {
 		this.processExitHandler = processExitHandler;
 	}
 
-	public int run(List<String> command, File workDir, Consumer<String> stdoutConsumer, Consumer<String> stderrConsumer) {
+	public int run(List<String> command, File workDir, Integer timeoutSeconds, Consumer<String> stdoutConsumer, Consumer<String> stderrConsumer) {
 		try {
 			ProcessBuilder builder = new ProcessBuilder(command);
 			builder.directory(workDir);
@@ -27,7 +28,18 @@ public class ProcessRunner {
 			outThread.start();
 			errThread.start();
 
-			int exitCode = process.waitFor();
+			boolean finished;
+			if (timeoutSeconds != null && timeoutSeconds > 0) {
+				finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+			} else {
+				process.waitFor();
+				finished = true;
+			}
+			if (!finished) {
+				process.destroyForcibly();
+				throw new ProcessTimeoutException("solver process timeout after " + timeoutSeconds + " seconds");
+			}
+			int exitCode = process.exitValue();
 			outThread.join();
 			errThread.join();
 			processExitHandler.checkExitCode(exitCode);
@@ -40,4 +52,3 @@ public class ProcessRunner {
 		}
 	}
 }
-

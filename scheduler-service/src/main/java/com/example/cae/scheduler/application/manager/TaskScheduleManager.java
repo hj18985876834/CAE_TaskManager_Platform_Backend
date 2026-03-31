@@ -21,6 +21,18 @@ public class TaskScheduleManager {
 		return scheduleAppService.scheduleTask(task);
 	}
 
+	public void confirmScheduleSuccess(Long taskId, Long nodeId, String message) {
+		scheduleAppService.confirmScheduleSuccess(taskId, nodeId, message);
+	}
+
+	public void recordScheduleFailure(Long taskId, Long nodeId, String message) {
+		scheduleAppService.recordScheduleFailure(taskId, nodeId, message);
+	}
+
+	public void releaseNodeReservation(Long nodeId) {
+		scheduleAppService.releaseNodeReservation(nodeId);
+	}
+
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
 		return scheduleAppService.pageRecords(request);
 	}
@@ -29,4 +41,3 @@ public class TaskScheduleManager {
 		return scheduleAppService.listByTaskId(taskId);
 	}
 }
-

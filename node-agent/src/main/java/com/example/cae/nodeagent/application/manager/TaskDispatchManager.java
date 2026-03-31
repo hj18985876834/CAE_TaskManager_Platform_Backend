@@ -1,6 +1,8 @@
 package com.example.cae.nodeagent.application.manager;
 
 import com.example.cae.nodeagent.application.assembler.ExecutionContextAssembler;
+import com.example.cae.nodeagent.config.NodeAgentConfig;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
 import com.example.cae.nodeagent.interfaces.request.DispatchTaskRequest;
@@ -14,25 +16,51 @@ public class TaskDispatchManager {
 	private final ExecutionContextAssembler executionContextAssembler;
 	private final TaskExecuteManager taskExecuteManager;
 	private final TaskReportManager taskReportManager;
+	private final TaskRuntimeRegistry taskRuntimeRegistry;
+	private final NodeAgentConfig nodeAgentConfig;
 	private final Executor taskExecutor;
 
 	public TaskDispatchManager(ExecutionContextAssembler executionContextAssembler,
 						   TaskExecuteManager taskExecuteManager,
 						   TaskReportManager taskReportManager,
+						   TaskRuntimeRegistry taskRuntimeRegistry,
+						   NodeAgentConfig nodeAgentConfig,
 						   @Qualifier("taskExecutor") Executor taskExecutor) {
 		this.executionContextAssembler = executionContextAssembler;
 		this.taskExecuteManager = taskExecuteManager;
 		this.taskReportManager = taskReportManager;
+		this.taskRuntimeRegistry = taskRuntimeRegistry;
+		this.nodeAgentConfig = nodeAgentConfig;
 		this.taskExecutor = taskExecutor;
 	}
 
 	public void acceptTask(DispatchTaskRequest request) {
+		if (request == null || request.getTaskId() == null) {
+			throw new BizException(400, "taskId is required");
+		}
+		if (taskRuntimeRegistry.runningCount() >= maxConcurrency()) {
+			throw new BizException(409, "node is busy");
+		}
+		if (!taskRuntimeRegistry.register(request.getTaskId())) {
+			throw new BizException(409, "task already running");
+		}
 		ExecutionContext context = executionContextAssembler.fromDispatchRequest(request);
-		taskExecutor.execute(() -> taskExecuteManager.execute(context));
+		taskReportManager.onTaskAccepted(request.getTaskId());
+		try {
+			taskExecutor.execute(() -> taskExecuteManager.execute(context));
+		} catch (RuntimeException ex) {
+			taskRuntimeRegistry.finish(request.getTaskId());
+			throw ex;
+		}
 	}
 
 	public void cancelTask(CancelTaskRequest request) {
 		// reserved for future: find process by taskId and interrupt it
 	}
-}
 
+	private int maxConcurrency() {
+		return nodeAgentConfig.getMaxConcurrency() == null || nodeAgentConfig.getMaxConcurrency() <= 0
+				? 1
+				: nodeAgentConfig.getMaxConcurrency();
+	}
+}

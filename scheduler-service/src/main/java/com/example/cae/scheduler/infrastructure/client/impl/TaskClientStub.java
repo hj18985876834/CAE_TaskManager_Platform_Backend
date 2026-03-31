@@ -22,8 +22,11 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public List<TaskDTO> listPendingTasks() {
+	public List<TaskDTO> listPendingTasks(Integer limit) {
 		String url = taskServiceBaseUrl + "/internal/tasks/queued";
+		if (limit != null && limit > 0) {
+			url = url + "?limit=" + limit;
+		}
 		ResponseEntity<Result<List<TaskDTO>>> response = restTemplate.exchange(
 				url,
 				HttpMethod.GET,

@@ -2,6 +2,7 @@ package com.example.cae.scheduler.infrastructure.client.impl;
 
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
+import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
@@ -43,6 +44,14 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("inputFiles", task.getInputFiles() == null ? java.util.List.of() : task.getInputFiles());
 		request.put("params", task.getParams() == null ? java.util.Map.of() : task.getParams());
 
-		restTemplate.postForEntity(url, request, Map.class);
+		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
+			throw new BizException(502, "node-agent dispatch response is empty");
+		}
+		Object accepted = dataMap.get("accepted");
+		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
+			Object message = dataMap.get("message");
+			throw new BizException(409, message == null ? "node-agent rejected task" : String.valueOf(message));
+		}
 	}
 }

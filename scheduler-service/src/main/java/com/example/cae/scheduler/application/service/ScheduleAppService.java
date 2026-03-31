@@ -52,17 +52,47 @@ public class ScheduleAppService {
 
 		ComputeNode selected = scheduleStrategy.selectNode(task, availableNodes);
 		if (selected == null) {
-			ScheduleRecord failure = ScheduleAssembler.newRecord(task.getTaskId(), null, "FCFS_LEAST_LOAD", "FAILED", "no available node");
-			scheduleRecordRepository.save(failure);
 			throw new BizException(409, "no available node");
 		}
 
 		selected.setRunningCount((selected.getRunningCount() == null ? 0 : selected.getRunningCount()) + 1);
 		computeNodeRepository.update(selected);
-
-		ScheduleRecord success = ScheduleAssembler.newRecord(task.getTaskId(), selected.getId(), "FCFS_LEAST_LOAD", "SUCCESS", "node selected");
-		scheduleRecordRepository.save(success);
 		return selected.getId();
+	}
+
+	public void confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage) {
+		ScheduleRecord success = ScheduleAssembler.newRecord(
+				taskId,
+				nodeId,
+				"FCFS_LEAST_LOAD",
+				"SUCCESS",
+				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch success" : scheduleMessage
+		);
+		scheduleRecordRepository.save(success);
+	}
+
+	public void recordScheduleFailure(Long taskId, Long nodeId, String scheduleMessage) {
+		ScheduleRecord failure = ScheduleAssembler.newRecord(
+				taskId,
+				nodeId,
+				"FCFS_LEAST_LOAD",
+				"FAILED",
+				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch failed" : scheduleMessage
+		);
+		scheduleRecordRepository.save(failure);
+	}
+
+	public void releaseNodeReservation(Long nodeId) {
+		if (nodeId == null) {
+			return;
+		}
+		ComputeNode node = computeNodeRepository.findById(nodeId).orElse(null);
+		if (node == null) {
+			return;
+		}
+		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
+		node.setRunningCount(Math.max(0, current - 1));
+		computeNodeRepository.update(node);
 	}
 
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
@@ -96,4 +126,3 @@ public class ScheduleAppService {
 		return scheduleRecordRepository.listByTaskId(taskId).stream().map(ScheduleAssembler::toResponse).toList();
 	}
 }
-

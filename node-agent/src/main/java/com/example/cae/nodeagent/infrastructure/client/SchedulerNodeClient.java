@@ -6,5 +6,6 @@ public interface SchedulerNodeClient {
 	void register(NodeInfo nodeInfo);
 
 	void heartbeat(NodeInfo nodeInfo);
-}
 
+	void updateRunningCount(Integer delta);
+}

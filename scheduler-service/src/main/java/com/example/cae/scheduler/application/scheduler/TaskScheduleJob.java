@@ -23,17 +23,21 @@ public class TaskScheduleJob {
 
 	@Scheduled(fixedDelayString = "${scheduler.task-schedule-interval-ms:5000}")
 	public void run() {
-		List<TaskDTO> pendingTasks = taskClient.listPendingTasks();
+		List<TaskDTO> pendingTasks = taskClient.listPendingTasks(20);
 		for (TaskDTO task : pendingTasks) {
+			Long nodeId = null;
 			try {
-				Long nodeId = taskScheduleManager.schedule(task);
+				nodeId = taskScheduleManager.schedule(task);
 				taskClient.markTaskScheduled(task.getTaskId(), nodeId);
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				taskClient.markTaskDispatched(task.getTaskId(), nodeId);
-			} catch (Exception ignored) {
-				// keep scheduling loop resilient; failures are persisted as schedule records
+				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
+			} catch (Exception ex) {
+				if (nodeId != null) {
+					taskScheduleManager.releaseNodeReservation(nodeId);
+				}
+				taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
 			}
 		}
 	}
 }
-

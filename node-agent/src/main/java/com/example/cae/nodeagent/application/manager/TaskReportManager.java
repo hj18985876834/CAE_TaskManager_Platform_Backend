@@ -1,20 +1,30 @@
 package com.example.cae.nodeagent.application.manager;
 
+import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.nodeagent.application.service.TaskReportAppService;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
+import com.example.cae.nodeagent.infrastructure.process.ProcessTimeoutException;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class TaskReportManager {
 	private final TaskReportAppService taskReportAppService;
-	private final AtomicInteger logSeq = new AtomicInteger(1);
+	private final TaskRuntimeRegistry taskRuntimeRegistry;
+	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
 
-	public TaskReportManager(TaskReportAppService taskReportAppService) {
+	public TaskReportManager(TaskReportAppService taskReportAppService, TaskRuntimeRegistry taskRuntimeRegistry) {
 		this.taskReportAppService = taskReportAppService;
+		this.taskRuntimeRegistry = taskRuntimeRegistry;
+	}
+
+	public void onTaskAccepted(Long taskId) {
+		logSeqMap.put(taskId, new AtomicInteger(1));
 	}
 
 	public void reportRunning(ExecutionContext context) {
@@ -22,7 +32,9 @@ public class TaskReportManager {
 	}
 
 	public void pushLog(Long taskId, Integer seqNo, String line) {
-		int actualSeqNo = seqNo == null ? logSeq.getAndIncrement() : seqNo;
+		int actualSeqNo = seqNo == null
+				? logSeqMap.computeIfAbsent(taskId, key -> new AtomicInteger(1)).getAndIncrement()
+				: seqNo;
 		taskReportAppService.reportLog(taskId, actualSeqNo, line);
 	}
 
@@ -41,7 +53,13 @@ public class TaskReportManager {
 	}
 
 	public void reportFail(ExecutionContext context, Exception ex) {
-		taskReportAppService.markFailed(context.getTaskId(), "RUNTIME_ERROR", ex.getMessage());
+		String failType = ex instanceof ProcessTimeoutException ? FailTypeEnum.TIMEOUT.name() : FailTypeEnum.RUNTIME_ERROR.name();
+		taskReportAppService.markFailed(context.getTaskId(), failType, ex.getMessage());
+	}
+
+	public void completeTask(Long taskId) {
+		logSeqMap.remove(taskId);
+		taskRuntimeRegistry.finish(taskId);
+		taskReportAppService.updateRunningCount(-1);
 	}
 }
-
