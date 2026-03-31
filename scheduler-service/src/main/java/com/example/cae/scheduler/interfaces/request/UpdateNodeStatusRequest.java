@@ -1,6 +1,9 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class UpdateNodeStatusRequest {
+	@NotBlank(message = "status不能为空")
 	private String status;
 
 	public String getStatus() {

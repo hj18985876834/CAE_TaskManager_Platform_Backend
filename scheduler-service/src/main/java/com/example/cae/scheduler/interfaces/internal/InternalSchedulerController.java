@@ -7,6 +7,10 @@ import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordReques
 import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateRunningCountRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+@Validated
 @RestController
 @RequestMapping("/internal")
 public class InternalSchedulerController {
@@ -29,30 +34,30 @@ public class InternalSchedulerController {
 	}
 
 	@GetMapping("/nodes/available")
-	public Result<List<AvailableNodeResponse>> listAvailableNodes(@RequestParam Long solverId) {
+	public Result<List<AvailableNodeResponse>> listAvailableNodes(@RequestParam @Positive(message = "solverId必须大于0") Long solverId) {
 		return Result.success(nodeAppService.listAvailableNodes(solverId));
 	}
 
 	@PostMapping("/schedules")
-	public Result<Void> createScheduleRecord(@RequestBody InternalScheduleRecordRequest request) {
+	public Result<Void> createScheduleRecord(@Valid @RequestBody InternalScheduleRecordRequest request) {
 		scheduleAppService.recordSchedule(request);
 		return Result.success();
 	}
 
 	@PostMapping("/nodes/{nodeId}/running-count")
-	public Result<Void> updateRunningCount(@PathVariable Long nodeId, @RequestBody UpdateRunningCountRequest request) {
-		nodeAppService.updateRunningCount(nodeId, request == null ? null : request.getDelta());
+	public Result<Void> updateRunningCount(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @Valid @RequestBody UpdateRunningCountRequest request) {
+		nodeAppService.updateRunningCount(nodeId, request.getDelta());
 		return Result.success();
 	}
 
 	@PostMapping("/nodes/{nodeId}/cancel-task")
-	public Result<Void> cancelTask(@PathVariable Long nodeId, @RequestBody NodeTaskCancelRequest request) {
-		scheduleAppService.cancelTaskOnNode(nodeId, request == null ? null : request.getTaskId(), request == null ? null : request.getReason());
+	public Result<Void> cancelTask(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @Valid @RequestBody NodeTaskCancelRequest request) {
+		scheduleAppService.cancelTaskOnNode(nodeId, request.getTaskId(), request.getReason());
 		return Result.success();
 	}
 
 	@GetMapping("/nodes/{nodeId}/token/verify")
-	public Result<Boolean> verifyNodeToken(@PathVariable Long nodeId, @RequestParam String nodeToken) {
+	public Result<Boolean> verifyNodeToken(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @RequestParam @NotBlank(message = "nodeToken不能为空") String nodeToken) {
 		return Result.success(nodeAppService.validateNodeToken(nodeId, nodeToken));
 	}
 }

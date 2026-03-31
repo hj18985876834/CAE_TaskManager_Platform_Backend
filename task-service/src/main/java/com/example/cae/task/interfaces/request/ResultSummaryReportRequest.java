@@ -1,12 +1,21 @@
 package com.example.cae.task.interfaces.request;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 import java.util.Map;
 
 public class ResultSummaryReportRequest {
+	@NotNull(message = "nodeId不能为空")
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
 	private Integer successFlag;
 	private Boolean success;
+	@Min(value = 0, message = "durationSeconds不能小于0")
 	private Integer durationSeconds;
+	@Size(max = 2000, message = "summaryText长度不能超过2000")
 	private String summaryText;
 	private Map<String, Object> metrics;
 
@@ -60,4 +69,3 @@ public class ResultSummaryReportRequest {
 		this.metrics = metrics;
 	}
 }
-

@@ -1,6 +1,13 @@
 package com.example.cae.user.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
 public class UpdateUserStatusRequest {
+	@NotNull(message = "status不能为空")
+	@Min(value = 0, message = "status只能为0或1")
+	@Max(value = 1, message = "status只能为0或1")
 	private Integer status;
 
 	public Integer getStatus() {
@@ -11,4 +18,3 @@ public class UpdateUserStatusRequest {
 		this.status = status;
 	}
 }
-

@@ -1,10 +1,20 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 public class InternalScheduleRecordRequest {
+	@NotNull(message = "taskId不能为空")
+	@Positive(message = "taskId必须大于0")
 	private Long taskId;
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@Size(max = 64, message = "strategyName长度不能超过64")
 	private String strategyName;
+	@Size(max = 32, message = "scheduleStatus长度不能超过32")
 	private String scheduleStatus;
+	@Size(max = 255, message = "scheduleMessage长度不能超过255")
 	private String scheduleMessage;
 
 	public Long getTaskId() {

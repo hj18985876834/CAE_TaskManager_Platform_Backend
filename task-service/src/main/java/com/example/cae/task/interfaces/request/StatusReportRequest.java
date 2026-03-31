@@ -1,12 +1,25 @@
 package com.example.cae.task.interfaces.request;
 
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 public class StatusReportRequest {
+	@NotNull(message = "nodeId不能为空")
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@Size(max = 32, message = "fromStatus长度不能超过32")
 	private String fromStatus;
+	@Size(max = 32, message = "toStatus长度不能超过32")
 	private String toStatus;
+	@Size(max = 255, message = "changeReason长度不能超过255")
 	private String changeReason;
+	@Size(max = 32, message = "operatorType长度不能超过32")
 	private String operatorType;
+	@Size(max = 32, message = "status长度不能超过32")
 	private String status;
+	@Size(max = 255, message = "reason长度不能超过255")
 	private String reason;
 
 	public Long getNodeId() {
@@ -70,5 +83,9 @@ public class StatusReportRequest {
 			this.changeReason = reason;
 		}
 	}
-}
 
+	@AssertTrue(message = "toStatus或status至少提供一个")
+	public boolean isTargetStatusPresent() {
+		return (toStatus != null && !toStatus.isBlank()) || (status != null && !status.isBlank());
+	}
+}

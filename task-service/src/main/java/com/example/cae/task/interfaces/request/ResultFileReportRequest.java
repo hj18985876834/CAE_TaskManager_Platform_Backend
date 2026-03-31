@@ -1,10 +1,26 @@
 package com.example.cae.task.interfaces.request;
 
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 public class ResultFileReportRequest {
+	@NotNull(message = "nodeId不能为空")
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@NotBlank(message = "fileType不能为空")
+	@Size(max = 32, message = "fileType长度不能超过32")
 	private String fileType;
+	@NotBlank(message = "fileName不能为空")
+	@Size(max = 255, message = "fileName长度不能超过255")
 	private String fileName;
+	@NotBlank(message = "storagePath不能为空")
+	@Size(max = 512, message = "storagePath长度不能超过512")
 	private String storagePath;
+	@NotNull(message = "fileSize不能为空")
+	@Min(value = 0, message = "fileSize不能小于0")
 	private Long fileSize;
 
 	public Long getNodeId() {
@@ -47,4 +63,3 @@ public class ResultFileReportRequest {
 		this.fileSize = fileSize;
 	}
 }
-

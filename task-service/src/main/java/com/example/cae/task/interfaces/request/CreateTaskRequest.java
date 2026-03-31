@@ -1,13 +1,25 @@
 package com.example.cae.task.interfaces.request;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 import java.util.Map;
 
 public class CreateTaskRequest {
+	@NotBlank(message = "taskName不能为空")
+	@Size(max = 128, message = "taskName长度不能超过128")
 	private String taskName;
+	@NotNull(message = "solverId不能为空")
+	@Positive(message = "solverId必须大于0")
 	private Long solverId;
+	@NotNull(message = "profileId不能为空")
+	@Positive(message = "profileId必须大于0")
 	private Long profileId;
+	@NotBlank(message = "taskType不能为空")
+	@Size(max = 64, message = "taskType长度不能超过64")
 	private String taskType;
 	@JsonAlias("paramsJson")
 	private Map<String, Object> params;

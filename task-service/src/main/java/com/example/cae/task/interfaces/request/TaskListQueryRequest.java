@@ -1,16 +1,27 @@
 package com.example.cae.task.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+
 import java.time.LocalDateTime;
 
 public class TaskListQueryRequest {
+	@Min(value = 1, message = "pageNum必须大于等于1")
 	private Integer pageNum;
+	@Min(value = 1, message = "pageSize必须大于等于1")
+	@Max(value = 200, message = "pageSize不能超过200")
 	private Integer pageSize;
 	private String taskName;
 	private String taskNo;
 	private String status;
+	@Positive(message = "solverId必须大于0")
 	private Long solverId;
+	@Positive(message = "profileId必须大于0")
 	private Long profileId;
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@Positive(message = "userId必须大于0")
 	private Long userId;
 	private String taskType;
 	private String failType;

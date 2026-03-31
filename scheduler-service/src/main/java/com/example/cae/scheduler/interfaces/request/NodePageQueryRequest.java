@@ -1,7 +1,13 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+
 public class NodePageQueryRequest {
+	@Min(value = 1, message = "pageNum必须大于等于1")
 	private Integer pageNum;
+	@Min(value = 1, message = "pageSize必须大于等于1")
+	@Max(value = 200, message = "pageSize不能超过200")
 	private Integer pageSize;
 	private String nodeName;
 	private String status;
@@ -62,4 +68,3 @@ public class NodePageQueryRequest {
 		}
 	}
 }
-

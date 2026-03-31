@@ -11,6 +11,9 @@ import com.example.cae.task.interfaces.request.MarkFinishedRequest;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import com.example.cae.task.interfaces.request.StatusReportRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Validated
 @RestController
 @RequestMapping("/internal/tasks")
 public class InternalTaskReportController {
@@ -34,57 +38,56 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/status-report")
-	public Result<Void> reportStatus(@PathVariable("taskId") Long taskId,
-								 @RequestBody StatusReportRequest request,
+	public Result<Void> reportStatus(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+								 @Valid @RequestBody StatusReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskLifecycleManager.reportStatus(taskId, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/log-report")
-	public Result<Void> reportLog(@PathVariable("taskId") Long taskId,
-							  @RequestBody LogReportRequest request,
+	public Result<Void> reportLog(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+							  @Valid @RequestBody LogReportRequest request,
 							  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.appendLog(taskId, request.getSeqNo(), request.getLogContent());
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/result-summary-report")
-	public Result<Void> reportResultSummary(@PathVariable("taskId") Long taskId,
-									@RequestBody ResultSummaryReportRequest request,
+	public Result<Void> reportResultSummary(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+									@Valid @RequestBody ResultSummaryReportRequest request,
 									@RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.saveResultSummary(taskId, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/result-file-report")
-	public Result<Void> reportResultFile(@PathVariable("taskId") Long taskId,
-								 @RequestBody ResultFileReportRequest request,
+	public Result<Void> reportResultFile(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+								 @Valid @RequestBody ResultFileReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.saveResultFile(taskId, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/mark-finished")
-	public Result<Void> markFinished(@PathVariable("taskId") Long taskId,
-								 @RequestBody MarkFinishedRequest request,
+	public Result<Void> markFinished(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+								 @Valid @RequestBody MarkFinishedRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
-		taskResultManager.finishTask(taskId, request == null ? null : request.getFinalStatus());
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
+		taskResultManager.finishTask(taskId, request.getFinalStatus());
 		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/mark-failed")
-	public Result<Void> markFailed(@PathVariable("taskId") Long taskId,
-							   @RequestBody MarkFailedRequest request,
+	public Result<Void> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+							   @Valid @RequestBody MarkFailedRequest request,
 							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
-		nodeAgentAuthService.validateTaskNodeToken(taskId, request == null ? null : request.getNodeId(), nodeToken);
-		taskResultManager.failTask(taskId, request == null ? null : request.getFailType(), request == null ? null : request.getFailMessage());
+		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
+		taskResultManager.failTask(taskId, request.getFailType(), request.getFailMessage());
 		return Result.success();
 	}
 }
-

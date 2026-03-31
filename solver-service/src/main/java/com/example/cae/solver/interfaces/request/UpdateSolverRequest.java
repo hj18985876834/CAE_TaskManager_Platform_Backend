@@ -1,11 +1,23 @@
 package com.example.cae.solver.interfaces.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 public class UpdateSolverRequest {
+	@NotBlank(message = "solverName不能为空")
+	@Size(max = 128, message = "solverName长度不能超过128")
 	private String solverName;
+	@NotBlank(message = "version不能为空")
+	@Size(max = 64, message = "version长度不能超过64")
 	private String version;
+	@NotBlank(message = "execMode不能为空")
 	private String execMode;
+	@NotBlank(message = "execPath不能为空")
+	@Size(max = 255, message = "execPath长度不能超过255")
 	private String execPath;
+	@Size(max = 255, message = "description长度不能超过255")
 	private String description;
+	@Size(max = 255, message = "remark长度不能超过255")
 	private String remark;
 
 	public String getSolverName() {
@@ -56,4 +68,3 @@ public class UpdateSolverRequest {
 		this.remark = remark;
 	}
 }
-

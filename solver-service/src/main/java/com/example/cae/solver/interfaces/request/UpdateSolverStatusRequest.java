@@ -1,6 +1,13 @@
 package com.example.cae.solver.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
 public class UpdateSolverStatusRequest {
+	@NotNull(message = "enabled不能为空")
+	@Min(value = 0, message = "enabled只能为0或1")
+	@Max(value = 1, message = "enabled只能为0或1")
 	private Integer enabled;
 
 	public Integer getEnabled() {

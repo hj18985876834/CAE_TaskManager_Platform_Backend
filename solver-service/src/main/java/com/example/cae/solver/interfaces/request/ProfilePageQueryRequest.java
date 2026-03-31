@@ -1,8 +1,16 @@
 package com.example.cae.solver.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+
 public class ProfilePageQueryRequest {
+	@Min(value = 1, message = "pageNum必须大于等于1")
 	private Integer pageNum;
+	@Min(value = 1, message = "pageSize必须大于等于1")
+	@Max(value = 200, message = "pageSize不能超过200")
 	private Integer pageSize;
+	@Positive(message = "solverId必须大于0")
 	private Long solverId;
 	private String taskType;
 	private String profileCode;

@@ -1,7 +1,12 @@
 package com.example.cae.user.interfaces.request;
 
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 public class UpdateUserRequest {
+	@Size(max = 64, message = "realName长度不能超过64")
 	private String realName;
+	@Positive(message = "roleId必须大于0")
 	private Long roleId;
 
 	public String getRealName() {
@@ -20,4 +25,3 @@ public class UpdateUserRequest {
 		this.roleId = roleId;
 	}
 }
-

@@ -1,9 +1,18 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+
 public class SchedulePageQueryRequest {
+	@Min(value = 1, message = "pageNum必须大于等于1")
 	private Integer pageNum;
+	@Min(value = 1, message = "pageSize必须大于等于1")
+	@Max(value = 200, message = "pageSize不能超过200")
 	private Integer pageSize;
+	@Positive(message = "taskId必须大于0")
 	private Long taskId;
+	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
 	private String scheduleStatus;
 	private String strategyName;
@@ -74,4 +83,3 @@ public class SchedulePageQueryRequest {
 		this.endTime = endTime;
 	}
 }
-

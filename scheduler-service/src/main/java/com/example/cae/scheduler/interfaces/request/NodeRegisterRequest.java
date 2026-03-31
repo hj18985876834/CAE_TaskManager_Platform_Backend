@@ -1,12 +1,27 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+
 import java.util.List;
 
 public class NodeRegisterRequest {
+	@NotBlank(message = "nodeCode不能为空")
+	@Size(max = 64, message = "nodeCode长度不能超过64")
 	private String nodeCode;
+	@NotBlank(message = "nodeName不能为空")
+	@Size(max = 128, message = "nodeName长度不能超过128")
 	private String nodeName;
+	@NotBlank(message = "host不能为空")
+	@Size(max = 128, message = "host长度不能超过128")
 	private String host;
+	@NotNull(message = "maxConcurrency不能为空")
+	@Positive(message = "maxConcurrency必须大于0")
 	private Integer maxConcurrency;
+	@NotEmpty(message = "solverIds不能为空")
 	private List<Long> solverIds;
 
 	public String getNodeCode() {
@@ -49,4 +64,3 @@ public class NodeRegisterRequest {
 		this.solverIds = solverIds;
 	}
 }
-

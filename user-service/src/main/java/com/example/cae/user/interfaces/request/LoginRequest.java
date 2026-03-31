@@ -1,7 +1,14 @@
 package com.example.cae.user.interfaces.request;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 public class LoginRequest {
+	@NotBlank(message = "username不能为空")
+	@Size(max = 64, message = "username长度不能超过64")
 	private String username;
+	@NotBlank(message = "password不能为空")
+	@Size(max = 64, message = "password长度不能超过64")
 	private String password;
 
 	public String getUsername() {
@@ -20,4 +27,3 @@ public class LoginRequest {
 		this.password = password;
 	}
 }
-

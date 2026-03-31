@@ -8,6 +8,9 @@ import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskValidateResponse;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+@Validated
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
@@ -28,31 +32,31 @@ public class TaskController {
 	}
 
 	@PostMapping
-	public Result<TaskCreateResponse> createTask(@RequestBody CreateTaskRequest request, @RequestHeader("X-User-Id") Long userId) {
+	public Result<TaskCreateResponse> createTask(@Valid @RequestBody CreateTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.createTask(request, userId));
 	}
 
 	@PostMapping("/{taskId}/files")
-	public Result<TaskFileResponse> uploadTaskFile(@PathVariable("taskId") Long taskId,
+	public Result<TaskFileResponse> uploadTaskFile(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 											 @RequestPart("file") MultipartFile file,
 											 @RequestParam(value = "fileKey", required = false) String fileKey,
 											 @RequestParam(value = "fileRole", required = false) String fileRole,
-											 @RequestHeader("X-User-Id") Long userId) {
+											 @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.uploadTaskFile(taskId, file, fileKey, fileRole, userId));
 	}
 
 	@PostMapping("/{taskId}/validate")
-	public Result<TaskValidateResponse> validateTask(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId) {
+	public Result<TaskValidateResponse> validateTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.validateTask(taskId, userId));
 	}
 
 	@PostMapping("/{taskId}/submit")
-	public Result<TaskSubmitResponse> submitTask(@PathVariable("taskId") Long taskId, @RequestHeader("X-User-Id") Long userId) {
+	public Result<TaskSubmitResponse> submitTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.submitTask(taskId, userId));
 	}
 
 	@PostMapping("/{taskId}/cancel")
-	public Result<Void> cancelTask(@PathVariable("taskId") Long taskId, @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") Long userId) {
+	public Result<Void> cancelTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		taskCommandAppService.cancelTask(taskId, userId, request == null ? null : request.getReason());
 		return Result.success();
 	}
