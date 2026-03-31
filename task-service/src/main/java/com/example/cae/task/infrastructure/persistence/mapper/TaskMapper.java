@@ -34,7 +34,10 @@ public interface TaskMapper {
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
 		"  <if test='request.solverId != null'>AND solver_id = #{request.solverId}</if>",
 		"  <if test='request.profileId != null'>AND profile_id = #{request.profileId}</if>",
+		"  <if test='request.taskType != null and request.taskType != \"\"'>AND task_type = #{request.taskType}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
+		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
 		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
@@ -52,7 +55,10 @@ public interface TaskMapper {
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
 		"  <if test='request.solverId != null'>AND solver_id = #{request.solverId}</if>",
 		"  <if test='request.profileId != null'>AND profile_id = #{request.profileId}</if>",
+		"  <if test='request.taskType != null and request.taskType != \"\"'>AND task_type = #{request.taskType}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
+		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
 		"</script>"
 	})
@@ -69,7 +75,11 @@ public interface TaskMapper {
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
 		"  <if test='request.solverId != null'>AND solver_id = #{request.solverId}</if>",
 		"  <if test='request.profileId != null'>AND profile_id = #{request.profileId}</if>",
+		"  <if test='request.taskType != null and request.taskType != \"\"'>AND task_type = #{request.taskType}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
+		"  <if test='request.failType != null and request.failType != \"\"'>AND fail_type = #{request.failType}</if>",
+		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
 		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
@@ -87,7 +97,11 @@ public interface TaskMapper {
 		"  <if test='request.status != null and request.status != \"\"'>AND status = #{request.status}</if>",
 		"  <if test='request.solverId != null'>AND solver_id = #{request.solverId}</if>",
 		"  <if test='request.profileId != null'>AND profile_id = #{request.profileId}</if>",
+		"  <if test='request.taskType != null and request.taskType != \"\"'>AND task_type = #{request.taskType}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
+		"  <if test='request.failType != null and request.failType != \"\"'>AND fail_type = #{request.failType}</if>",
+		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
 		"</script>"
 	})
@@ -96,4 +110,3 @@ public interface TaskMapper {
 	@Select("SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt FROM sim_task WHERE status = #{status} AND deleted_flag = 0 ORDER BY id ASC")
 	List<TaskPO> selectByStatus(String status);
 }
-

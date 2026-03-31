@@ -9,6 +9,9 @@ import com.example.cae.task.domain.model.TaskStatusHistory;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
+import com.example.cae.task.infrastructure.client.SchedulerClient;
+import com.example.cae.task.infrastructure.client.SolverClient;
+import com.example.cae.task.infrastructure.support.TaskQueryBuilder;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
@@ -26,31 +29,46 @@ public class TaskQueryAppService {
 	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
 	private final TaskAssembler taskAssembler;
 	private final TaskPermissionChecker taskPermissionChecker;
+	private final TaskQueryBuilder taskQueryBuilder;
+	private final SolverClient solverClient;
+	private final SchedulerClient schedulerClient;
 
-	public TaskQueryAppService(TaskRepository taskRepository, TaskFileRepository taskFileRepository, TaskStatusHistoryRepository taskStatusHistoryRepository, TaskAssembler taskAssembler, TaskPermissionChecker taskPermissionChecker) {
+	public TaskQueryAppService(TaskRepository taskRepository,
+							   TaskFileRepository taskFileRepository,
+							   TaskStatusHistoryRepository taskStatusHistoryRepository,
+							   TaskAssembler taskAssembler,
+							   TaskPermissionChecker taskPermissionChecker,
+							   TaskQueryBuilder taskQueryBuilder,
+							   SolverClient solverClient,
+							   SchedulerClient schedulerClient) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
 		this.taskAssembler = taskAssembler;
 		this.taskPermissionChecker = taskPermissionChecker;
+		this.taskQueryBuilder = taskQueryBuilder;
+		this.solverClient = solverClient;
+		this.schedulerClient = schedulerClient;
 	}
 
 	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
+		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageMyTasks(request, userId);
-		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).toList();
+		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).map(this::enrichTaskListItem).toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
 	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
+		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageAdminTasks(request);
-		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).toList();
+		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).map(this::enrichTaskListItem).toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
 	public TaskDetailResponse getTaskDetail(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
-		return taskAssembler.toDetailResponse(task);
+		return enrichTaskDetail(taskAssembler.toDetailResponse(task));
 	}
 
 	public List<TaskStatusHistoryResponse> getTaskStatusHistory(Long taskId, Long userId, String roleCode) {
@@ -92,5 +110,36 @@ public class TaskQueryAppService {
 		response.setCreatedAt(file.getCreatedAt());
 		return response;
 	}
-}
 
+	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response) {
+		try {
+			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
+		} catch (Exception ignored) {
+		}
+		try {
+			response.setProfileName(solverClient.getProfileName(response.getProfileId()));
+		} catch (Exception ignored) {
+		}
+		try {
+			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
+		} catch (Exception ignored) {
+		}
+		return response;
+	}
+
+	private TaskDetailResponse enrichTaskDetail(TaskDetailResponse response) {
+		try {
+			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
+		} catch (Exception ignored) {
+		}
+		try {
+			response.setProfileName(solverClient.getProfileName(response.getProfileId()));
+		} catch (Exception ignored) {
+		}
+		try {
+			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
+		} catch (Exception ignored) {
+		}
+		return response;
+	}
+}

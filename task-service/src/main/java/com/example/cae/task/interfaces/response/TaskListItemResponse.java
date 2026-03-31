@@ -7,10 +7,13 @@ public class TaskListItemResponse {
 	private String taskNo;
 	private String taskName;
 	private Long solverId;
+	private String solverName;
 	private Long profileId;
+	private String profileName;
 	private String taskType;
 	private String status;
 	private Long nodeId;
+	private String nodeName;
 	private LocalDateTime submitTime;
 	private LocalDateTime startTime;
 	private LocalDateTime endTime;
@@ -47,12 +50,28 @@ public class TaskListItemResponse {
 		this.solverId = solverId;
 	}
 
+	public String getSolverName() {
+		return solverName;
+	}
+
+	public void setSolverName(String solverName) {
+		this.solverName = solverName;
+	}
+
 	public Long getProfileId() {
 		return profileId;
 	}
 
 	public void setProfileId(Long profileId) {
 		this.profileId = profileId;
+	}
+
+	public String getProfileName() {
+		return profileName;
+	}
+
+	public void setProfileName(String profileName) {
+		this.profileName = profileName;
 	}
 
 	public String getTaskType() {
@@ -79,6 +98,14 @@ public class TaskListItemResponse {
 		this.nodeId = nodeId;
 	}
 
+	public String getNodeName() {
+		return nodeName;
+	}
+
+	public void setNodeName(String nodeName) {
+		this.nodeName = nodeName;
+	}
+
 	public LocalDateTime getSubmitTime() {
 		return submitTime;
 	}
@@ -103,4 +130,3 @@ public class TaskListItemResponse {
 		this.endTime = endTime;
 	}
 }
-

@@ -1,8 +1,7 @@
 package com.example.cae.task.interfaces.response;
 
-public class TaskCreateResponse {
+public class TaskSubmitResponse {
 	private Long taskId;
-	private String taskNo;
 	private String status;
 
 	public Long getTaskId() {
@@ -11,14 +10,6 @@ public class TaskCreateResponse {
 
 	public void setTaskId(Long taskId) {
 		this.taskId = taskId;
-	}
-
-	public String getTaskNo() {
-		return taskNo;
-	}
-
-	public void setTaskNo(String taskNo) {
-		this.taskNo = taskNo;
 	}
 
 	public String getStatus() {

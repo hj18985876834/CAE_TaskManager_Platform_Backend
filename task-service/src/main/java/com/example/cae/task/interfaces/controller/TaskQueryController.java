@@ -50,4 +50,3 @@ public class TaskQueryController {
 		return Result.success(taskQueryAppService.getTaskFiles(taskId, userId, roleCode));
 	}
 }
-

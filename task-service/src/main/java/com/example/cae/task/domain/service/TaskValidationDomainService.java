@@ -27,7 +27,10 @@ public class TaskValidationDomainService {
 	public void checkFilesMatchRules(List<TaskFile> files, List<FileRuleDTO> rules) {
 		for (FileRuleDTO rule : rules) {
 			if (rule.getRequiredFlag() != null && rule.getRequiredFlag() == 1) {
-				boolean matched = files.stream().anyMatch(file -> file.matchFileKey(rule.getFileKey()));
+				boolean matched = files.stream().anyMatch(file ->
+						file.matchFileKey(rule.getFileKey())
+								|| file.matchOriginName(rule.getFileNamePattern())
+				);
 				if (!matched) {
 					throw new BizException(400, "required file missing: " + rule.getFileKey());
 				}
@@ -35,4 +38,3 @@ public class TaskValidationDomainService {
 		}
 	}
 }
-

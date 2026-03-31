@@ -23,6 +23,21 @@ public class SolverClient {
 		return getInternalProfileMap(profileId);
 	}
 
+	public Long getProfileSolverId(Long profileId) {
+		Map<String, Object> profileMap = getInternalProfileMap(profileId);
+		return profileMap == null ? null : toLong(profileMap.get("solverId"));
+	}
+
+	public String getProfileTaskType(Long profileId) {
+		Map<String, Object> profileMap = getInternalProfileMap(profileId);
+		return profileMap == null ? null : toString(profileMap.get("taskType"));
+	}
+
+	public String getProfileName(Long profileId) {
+		Map<String, Object> profileMap = getInternalProfileMap(profileId);
+		return profileMap == null ? null : toString(profileMap.get("profileName"));
+	}
+
 	public List<FileRuleDTO> getFileRules(Long profileId) {
 		Map<String, Object> profileMap = getInternalProfileMap(profileId);
 		if (profileMap == null || !(profileMap.get("fileRules") instanceof List<?> rows)) {
@@ -60,6 +75,15 @@ public class SolverClient {
 			return null;
 		}
 		return toString(map.get("solverCode"));
+	}
+
+	public String getSolverName(Long solverId) {
+		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
+		Result<?> result = restTemplate.getForObject(url, Result.class);
+		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
+			return null;
+		}
+		return toString(map.get("solverName"));
 	}
 
 	public ProfileExecutionMeta getProfileExecutionMeta(Long profileId) {
@@ -138,4 +162,3 @@ public class SolverClient {
 		}
 	}
 }
-

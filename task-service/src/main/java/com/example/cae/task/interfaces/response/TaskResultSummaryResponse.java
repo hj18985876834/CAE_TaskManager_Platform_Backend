@@ -1,6 +1,7 @@
 package com.example.cae.task.interfaces.response;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public class TaskResultSummaryResponse {
 	private Long id;
@@ -8,7 +9,7 @@ public class TaskResultSummaryResponse {
 	private Integer successFlag;
 	private Integer durationSeconds;
 	private String summaryText;
-	private String metricsJson;
+	private Map<String, Object> metrics;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 
@@ -52,12 +53,12 @@ public class TaskResultSummaryResponse {
 		this.summaryText = summaryText;
 	}
 
-	public String getMetricsJson() {
-		return metricsJson;
+	public Map<String, Object> getMetrics() {
+		return metrics;
 	}
 
-	public void setMetricsJson(String metricsJson) {
-		this.metricsJson = metricsJson;
+	public void setMetrics(Map<String, Object> metrics) {
+		this.metrics = metrics;
 	}
 
 	public LocalDateTime getCreatedAt() {
@@ -76,4 +77,3 @@ public class TaskResultSummaryResponse {
 		this.updatedAt = updatedAt;
 	}
 }
-

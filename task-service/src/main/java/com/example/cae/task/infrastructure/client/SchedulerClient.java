@@ -20,6 +20,19 @@ public class SchedulerClient {
 	}
 
 	@SuppressWarnings("unchecked")
+	public String getNodeName(Long nodeId) {
+		if (nodeId == null) {
+			return null;
+		}
+		String url = schedulerServiceBaseUrl + "/api/nodes/" + nodeId;
+		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		if (result == null || !(result.getData() instanceof java.util.Map<?, ?> map)) {
+			return null;
+		}
+		return String.valueOf(map.get("nodeName"));
+	}
+
+	@SuppressWarnings("unchecked")
 	public boolean verifyNodeToken(Long nodeId, String nodeToken) {
 		String url = UriComponentsBuilder
 				.fromHttpUrl(schedulerServiceBaseUrl + "/internal/nodes/{nodeId}/token/verify")
@@ -37,4 +50,3 @@ public class SchedulerClient {
 		return Boolean.parseBoolean(String.valueOf(data));
 	}
 }
-

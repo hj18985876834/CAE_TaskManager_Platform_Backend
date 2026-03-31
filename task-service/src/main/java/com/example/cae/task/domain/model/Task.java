@@ -68,6 +68,13 @@ public class Task {
 		this.endTime = LocalDateTime.now();
 	}
 
+	public void markTimeout(String failMessage) {
+		this.status = TaskStatusEnum.TIMEOUT.name();
+		this.failType = TaskStatusEnum.TIMEOUT.name();
+		this.failMessage = failMessage;
+		this.endTime = LocalDateTime.now();
+	}
+
 	public boolean isOwner(Long userId) {
 		return this.userId != null && this.userId.equals(userId);
 	}
@@ -235,4 +242,3 @@ public class Task {
 		this.updatedAt = updatedAt;
 	}
 }
-

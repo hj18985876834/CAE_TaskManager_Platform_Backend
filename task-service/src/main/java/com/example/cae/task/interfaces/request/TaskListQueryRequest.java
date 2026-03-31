@@ -1,5 +1,7 @@
 package com.example.cae.task.interfaces.request;
 
+import java.time.LocalDateTime;
+
 public class TaskListQueryRequest {
 	private Integer pageNum;
 	private Integer pageSize;
@@ -10,6 +12,10 @@ public class TaskListQueryRequest {
 	private Long profileId;
 	private Long nodeId;
 	private Long userId;
+	private String taskType;
+	private String failType;
+	private LocalDateTime startTime;
+	private LocalDateTime endTime;
 
 	public Integer getPageNum() {
 		return pageNum;
@@ -82,5 +88,36 @@ public class TaskListQueryRequest {
 	public void setUserId(Long userId) {
 		this.userId = userId;
 	}
-}
 
+	public String getTaskType() {
+		return taskType;
+	}
+
+	public void setTaskType(String taskType) {
+		this.taskType = taskType;
+	}
+
+	public String getFailType() {
+		return failType;
+	}
+
+	public void setFailType(String failType) {
+		this.failType = failType;
+	}
+
+	public LocalDateTime getStartTime() {
+		return startTime;
+	}
+
+	public void setStartTime(LocalDateTime startTime) {
+		this.startTime = startTime;
+	}
+
+	public LocalDateTime getEndTime() {
+		return endTime;
+	}
+
+	public void setEndTime(LocalDateTime endTime) {
+		this.endTime = endTime;
+	}
+}

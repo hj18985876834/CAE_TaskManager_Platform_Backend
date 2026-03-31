@@ -8,6 +8,7 @@ import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskLogPageResponse;
 import com.example.cae.task.interfaces.response.TaskLogResponse;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
 import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
@@ -48,7 +49,7 @@ public class TaskQueryFacade {
 		return taskQueryAppService.getTaskFiles(taskId, userId, roleCode);
 	}
 
-	public List<TaskLogResponse> getLogs(Long taskId, Integer fromSeq, Integer pageSize, Long userId, String roleCode) {
+	public TaskLogPageResponse getLogs(Long taskId, Integer fromSeq, Integer pageSize, Long userId, String roleCode) {
 		return taskLogAppService.getLogs(taskId, fromSeq, pageSize, userId, roleCode);
 	}
 

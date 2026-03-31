@@ -1,6 +1,7 @@
 package com.example.cae.task.infrastructure.storage;
 
 import com.example.cae.common.enums.FileRoleEnum;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -20,10 +22,20 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 	}
 
 	@Override
-	public TaskFile saveInputFile(Long taskId, MultipartFile file) {
-		String dir = taskPathResolver.resolveInputDir(taskId);
+	public TaskFile saveInputFile(Long taskId, MultipartFile file, String fileKey, String fileRole) {
+		if (file == null || file.isEmpty()) {
+			throw new BizException(400, "file is required");
+		}
+		String normalizedFileRole = normalizeFileRole(fileRole);
 		String fileName = file.getOriginalFilename() == null ? "unknown.bin" : file.getOriginalFilename();
-		Path path = Path.of(dir, fileName);
+		String normalizedFileKey = normalizeFileKey(fileKey, fileName);
+		String dir = taskPathResolver.resolveInputRoleDir(taskId, normalizedFileRole);
+		Path path;
+		try {
+			path = Path.of(dir, fileName);
+		} catch (InvalidPathException ex) {
+			throw new BizException(400, "invalid file name");
+		}
 		try {
 			Files.createDirectories(path.getParent());
 			file.transferTo(path);
@@ -33,7 +45,8 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 
 		TaskFile taskFile = new TaskFile();
 		taskFile.setTaskId(taskId);
-		taskFile.setFileRole(FileRoleEnum.INPUT.name());
+		taskFile.setFileRole(normalizedFileRole);
+		taskFile.setFileKey(normalizedFileKey);
 		taskFile.setOriginName(fileName);
 		taskFile.setStoragePath(path.toString().replace("\\", "/"));
 		taskFile.setFileSize(file.getSize());
@@ -63,5 +76,23 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
 	}
-}
 
+	private String normalizeFileRole(String fileRole) {
+		if (fileRole == null || fileRole.isBlank()) {
+			return FileRoleEnum.INPUT.name();
+		}
+		try {
+			return FileRoleEnum.valueOf(fileRole.trim().toUpperCase()).name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(400, "unsupported fileRole: " + fileRole);
+		}
+	}
+
+	private String normalizeFileKey(String fileKey, String fileName) {
+		if (fileKey != null && !fileKey.isBlank()) {
+			return fileKey.trim();
+		}
+		int idx = fileName.lastIndexOf('.');
+		return idx > 0 ? fileName.substring(0, idx) : fileName;
+	}
+}

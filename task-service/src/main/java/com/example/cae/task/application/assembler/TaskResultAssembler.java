@@ -1,10 +1,13 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.TaskResultFile;
 import com.example.cae.task.domain.model.TaskResultSummary;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
 import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
 import org.springframework.stereotype.Component;
+
+import java.util.Map;
 
 @Component
 public class TaskResultAssembler {
@@ -15,7 +18,7 @@ public class TaskResultAssembler {
 		response.setSuccessFlag(summary.getSuccessFlag());
 		response.setDurationSeconds(summary.getDurationSeconds());
 		response.setSummaryText(summary.getSummaryText());
-		response.setMetricsJson(summary.getMetricsJson());
+		response.setMetrics(parseMetrics(summary.getMetricsJson()));
 		response.setCreatedAt(summary.getCreatedAt());
 		response.setUpdatedAt(summary.getUpdatedAt());
 		return response;
@@ -32,5 +35,20 @@ public class TaskResultAssembler {
 		response.setCreatedAt(file.getCreatedAt());
 		return response;
 	}
-}
 
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> parseMetrics(String metricsJson) {
+		if (metricsJson == null || metricsJson.isBlank()) {
+			return Map.of();
+		}
+		try {
+			Object parsed = JsonUtil.fromJson(metricsJson, Map.class);
+			if (parsed instanceof Map<?, ?> map) {
+				return (Map<String, Object>) map;
+			}
+		} catch (Exception ignored) {
+			// keep result query resilient even if stored metrics are malformed.
+		}
+		return Map.of();
+	}
+}

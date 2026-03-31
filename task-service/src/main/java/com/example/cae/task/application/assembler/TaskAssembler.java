@@ -1,5 +1,6 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.infrastructure.persistence.entity.TaskPO;
@@ -10,6 +11,7 @@ import com.example.cae.task.interfaces.response.TaskListItemResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Component
 public class TaskAssembler {
@@ -20,7 +22,7 @@ public class TaskAssembler {
 		task.setSolverId(request.getSolverId());
 		task.setProfileId(request.getProfileId());
 		task.setTaskType(request.getTaskType());
-		task.setParamsJson(String.valueOf(request.getParamsJson()));
+		task.setParamsJson(request.getParams() == null ? null : JsonUtil.toJson(request.getParams()));
 		task.setStatus(TaskStatusEnum.CREATED.name());
 		task.setPriority(0);
 		task.setDeletedFlag(0);
@@ -32,6 +34,7 @@ public class TaskAssembler {
 	public TaskCreateResponse toCreateResponse(Task task) {
 		TaskCreateResponse response = new TaskCreateResponse();
 		response.setTaskId(task.getId());
+		response.setTaskNo(task.getTaskNo());
 		response.setStatus(task.getStatus());
 		return response;
 	}
@@ -47,7 +50,7 @@ public class TaskAssembler {
 		response.setTaskType(task.getTaskType());
 		response.setStatus(task.getStatus());
 		response.setNodeId(task.getNodeId());
-		response.setParamsJson(task.getParamsJson());
+		response.setParams(parseJsonMap(task.getParamsJson()));
 		response.setFailType(task.getFailType());
 		response.setFailMessage(task.getFailMessage());
 		response.setSubmitTime(task.getSubmitTime());
@@ -70,6 +73,22 @@ public class TaskAssembler {
 		response.setStartTime(task.getStartTime());
 		response.setEndTime(task.getEndTime());
 		return response;
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> parseJsonMap(String json) {
+		if (json == null || json.isBlank()) {
+			return Map.of();
+		}
+		try {
+			Object parsed = JsonUtil.fromJson(json, Map.class);
+			if (parsed instanceof Map<?, ?> map) {
+				return (Map<String, Object>) map;
+			}
+		} catch (Exception ignored) {
+			// keep query responses resilient even if stored params are malformed.
+		}
+		return Map.of();
 	}
 
 	public TaskPO toPO(Task task) {
@@ -118,4 +137,3 @@ public class TaskAssembler {
 		return task;
 	}
 }
-

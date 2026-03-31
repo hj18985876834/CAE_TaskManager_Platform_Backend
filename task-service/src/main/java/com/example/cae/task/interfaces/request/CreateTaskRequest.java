@@ -1,5 +1,7 @@
 package com.example.cae.task.interfaces.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 import java.util.Map;
 
 public class CreateTaskRequest {
@@ -7,7 +9,8 @@ public class CreateTaskRequest {
 	private Long solverId;
 	private Long profileId;
 	private String taskType;
-	private Map<String, Object> paramsJson;
+	@JsonAlias("paramsJson")
+	private Map<String, Object> params;
 
 	public String getTaskName() {
 		return taskName;
@@ -41,12 +44,11 @@ public class CreateTaskRequest {
 		this.taskType = taskType;
 	}
 
-	public Map<String, Object> getParamsJson() {
-		return paramsJson;
+	public Map<String, Object> getParams() {
+		return params;
 	}
 
-	public void setParamsJson(Map<String, Object> paramsJson) {
-		this.paramsJson = paramsJson;
+	public void setParams(Map<String, Object> params) {
+		this.params = params;
 	}
 }
-

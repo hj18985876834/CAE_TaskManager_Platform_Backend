@@ -17,18 +17,18 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 	}
 
 	@Override
+	public void save(TaskFile file) {
+		TaskFilePO po = toPO(file);
+		taskFileMapper.insert(po);
+		file.setId(po.getId());
+	}
+
+	@Override
 	public void saveBatch(List<TaskFile> files) {
 		for (TaskFile file : files) {
-			TaskFilePO po = new TaskFilePO();
-			po.setTaskId(file.getTaskId());
-			po.setFileRole(file.getFileRole());
-			po.setFileKey(file.getFileKey());
-			po.setOriginName(file.getOriginName());
-			po.setStoragePath(file.getStoragePath());
-			po.setFileSize(file.getFileSize());
-			po.setFileSuffix(file.getFileSuffix());
-			po.setChecksum(file.getChecksum());
+			TaskFilePO po = toPO(file);
 			taskFileMapper.insert(po);
+			file.setId(po.getId());
 		}
 	}
 
@@ -51,5 +51,17 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 		file.setCreatedAt(po.getCreatedAt());
 		return file;
 	}
-}
 
+	private TaskFilePO toPO(TaskFile file) {
+		TaskFilePO po = new TaskFilePO();
+		po.setTaskId(file.getTaskId());
+		po.setFileRole(file.getFileRole());
+		po.setFileKey(file.getFileKey());
+		po.setOriginName(file.getOriginName());
+		po.setStoragePath(file.getStoragePath());
+		po.setFileSize(file.getFileSize());
+		po.setFileSuffix(file.getFileSuffix());
+		po.setChecksum(file.getChecksum());
+		return po;
+	}
+}

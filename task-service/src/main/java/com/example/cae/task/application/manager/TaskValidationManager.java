@@ -11,6 +11,7 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
 import com.example.cae.task.infrastructure.client.SolverClient;
+import com.example.cae.task.interfaces.response.TaskValidateResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,16 +32,32 @@ public class TaskValidationManager {
 		this.taskValidationDomainService = taskValidationDomainService;
 	}
 
-	public void validateTask(Long taskId, Long userId) {
+	public TaskValidateResponse validateTask(Long taskId, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		List<TaskFile> files = taskFileRepository.listByTaskId(taskId);
+		Long profileSolverId = solverClient.getProfileSolverId(task.getProfileId());
+		String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
 		List<FileRuleDTO> rules = solverClient.getFileRules(task.getProfileId());
 
 		taskValidationDomainService.checkTaskEditable(task);
+		if (profileSolverId == null) {
+			throw new BizException(404, "profile not found");
+		}
+		if (!profileSolverId.equals(task.getSolverId())) {
+			throw new BizException(400, "solver and profile do not match");
+		}
+		if (profileTaskType != null && !profileTaskType.isBlank() && !profileTaskType.equals(task.getTaskType())) {
+			throw new BizException(400, "task type and profile do not match");
+		}
 		taskValidationDomainService.checkFilesMatchRules(files, rules);
 
 		taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
+		TaskValidateResponse response = new TaskValidateResponse();
+		response.setTaskId(taskId);
+		response.setValid(Boolean.TRUE);
+		response.setStatus(task.getStatus());
+		return response;
 	}
 
 	private Task loadAndCheckOwner(Long taskId, Long userId) {
@@ -51,4 +68,3 @@ public class TaskValidationManager {
 		return task;
 	}
 }
-

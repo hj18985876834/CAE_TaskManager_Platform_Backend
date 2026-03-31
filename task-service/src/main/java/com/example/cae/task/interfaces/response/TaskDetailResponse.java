@@ -1,5 +1,6 @@
 package com.example.cae.task.interfaces.response;
 
+import java.util.Map;
 import java.time.LocalDateTime;
 
 public class TaskDetailResponse {
@@ -8,11 +9,14 @@ public class TaskDetailResponse {
 	private String taskName;
 	private Long userId;
 	private Long solverId;
+	private String solverName;
 	private Long profileId;
+	private String profileName;
 	private String taskType;
 	private String status;
 	private Long nodeId;
-	private String paramsJson;
+	private String nodeName;
+	private Map<String, Object> params;
 	private String failType;
 	private String failMessage;
 	private LocalDateTime submitTime;
@@ -59,12 +63,28 @@ public class TaskDetailResponse {
 		this.solverId = solverId;
 	}
 
+	public String getSolverName() {
+		return solverName;
+	}
+
+	public void setSolverName(String solverName) {
+		this.solverName = solverName;
+	}
+
 	public Long getProfileId() {
 		return profileId;
 	}
 
 	public void setProfileId(Long profileId) {
 		this.profileId = profileId;
+	}
+
+	public String getProfileName() {
+		return profileName;
+	}
+
+	public void setProfileName(String profileName) {
+		this.profileName = profileName;
 	}
 
 	public String getTaskType() {
@@ -91,12 +111,20 @@ public class TaskDetailResponse {
 		this.nodeId = nodeId;
 	}
 
-	public String getParamsJson() {
-		return paramsJson;
+	public String getNodeName() {
+		return nodeName;
 	}
 
-	public void setParamsJson(String paramsJson) {
-		this.paramsJson = paramsJson;
+	public void setNodeName(String nodeName) {
+		this.nodeName = nodeName;
+	}
+
+	public Map<String, Object> getParams() {
+		return params;
+	}
+
+	public void setParams(Map<String, Object> params) {
+		this.params = params;
 	}
 
 	public String getFailType() {
@@ -139,4 +167,3 @@ public class TaskDetailResponse {
 		this.endTime = endTime;
 	}
 }
-

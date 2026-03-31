@@ -3,6 +3,7 @@ package com.example.cae.task.application.manager;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskLogChunk;
 import com.example.cae.task.domain.model.TaskResultFile;
@@ -50,7 +51,7 @@ public class TaskResultManager {
 		summary.setSuccessFlag(successFlag);
 		summary.setDurationSeconds(request.getDurationSeconds());
 		summary.setSummaryText(request.getSummaryText());
-		summary.setMetricsJson(String.valueOf(request.getMetrics()));
+		summary.setMetricsJson(request.getMetrics() == null ? null : JsonUtil.toJson(request.getMetrics()));
 		taskResultSummaryRepository.saveOrUpdate(summary);
 	}
 
@@ -79,4 +80,3 @@ public class TaskResultManager {
 		taskRepository.update(task);
 	}
 }
-

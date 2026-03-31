@@ -28,6 +28,10 @@ public class TaskFile {
 		return fileKey != null && fileKey.equals(key);
 	}
 
+	public boolean matchOriginName(String pattern) {
+		return originName != null && pattern != null && originName.equalsIgnoreCase(pattern);
+	}
+
 	public Long getId() {
 		return id;
 	}
@@ -108,4 +112,3 @@ public class TaskFile {
 		this.createdAt = createdAt;
 	}
 }
-

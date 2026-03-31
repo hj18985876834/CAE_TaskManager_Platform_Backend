@@ -3,6 +3,9 @@ package com.example.cae.task.application.facade;
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
+import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskSubmitResponse;
+import com.example.cae.task.interfaces.response.TaskValidateResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,16 +21,16 @@ public class TaskCommandFacade {
 		return taskCommandAppService.createTask(request, userId);
 	}
 
-	public void uploadTaskFiles(Long taskId, MultipartFile[] files, Long userId) {
-		taskCommandAppService.uploadTaskFiles(taskId, files, userId);
+	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
+		return taskCommandAppService.uploadTaskFile(taskId, file, fileKey, fileRole, userId);
 	}
 
-	public void validateTask(Long taskId, Long userId) {
-		taskCommandAppService.validateTask(taskId, userId);
+	public TaskValidateResponse validateTask(Long taskId, Long userId) {
+		return taskCommandAppService.validateTask(taskId, userId);
 	}
 
-	public void submitTask(Long taskId, Long userId) {
-		taskCommandAppService.submitTask(taskId, userId);
+	public TaskSubmitResponse submitTask(Long taskId, Long userId) {
+		return taskCommandAppService.submitTask(taskId, userId);
 	}
 
 	public void cancelTask(Long taskId, Long userId, String reason) {

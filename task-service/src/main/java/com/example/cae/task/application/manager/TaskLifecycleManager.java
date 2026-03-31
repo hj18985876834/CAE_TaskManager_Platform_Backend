@@ -6,6 +6,7 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.task.application.assembler.TaskAssembler;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskFile;
+import com.example.cae.task.domain.service.TaskDomainService;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
@@ -16,16 +17,16 @@ import com.example.cae.task.infrastructure.support.TaskNoGenerator;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.StatusReportRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
+import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 public class TaskLifecycleManager {
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
+	private final TaskDomainService taskDomainService;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final TaskValidationDomainService taskValidationDomainService;
 	private final TaskFileStorageService taskFileStorageService;
@@ -33,9 +34,18 @@ public class TaskLifecycleManager {
 	private final TaskNoGenerator taskNoGenerator;
 	private final SchedulerClient schedulerClient;
 
-	public TaskLifecycleManager(TaskRepository taskRepository, TaskFileRepository taskFileRepository, TaskStatusDomainService taskStatusDomainService, TaskValidationDomainService taskValidationDomainService, TaskFileStorageService taskFileStorageService, TaskAssembler taskAssembler, TaskNoGenerator taskNoGenerator, SchedulerClient schedulerClient) {
+	public TaskLifecycleManager(TaskRepository taskRepository,
+								TaskFileRepository taskFileRepository,
+								TaskDomainService taskDomainService,
+								TaskStatusDomainService taskStatusDomainService,
+								TaskValidationDomainService taskValidationDomainService,
+								TaskFileStorageService taskFileStorageService,
+								TaskAssembler taskAssembler,
+								TaskNoGenerator taskNoGenerator,
+								SchedulerClient schedulerClient) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
+		this.taskDomainService = taskDomainService;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.taskValidationDomainService = taskValidationDomainService;
 		this.taskFileStorageService = taskFileStorageService;
@@ -49,29 +59,35 @@ public class TaskLifecycleManager {
 		task.setTaskNo(taskNoGenerator.generateTaskNo());
 		task.setStatus(TaskStatusEnum.CREATED.name());
 		taskRepository.save(task);
+		taskStatusDomainService.recordInitialStatus(task, "task created", OperatorTypeEnum.USER.name(), userId);
 		return taskAssembler.toCreateResponse(task);
 	}
 
-	public void uploadTaskFiles(Long taskId, MultipartFile[] files, Long userId) {
+	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskEditable(task);
-		List<TaskFile> taskFiles = new ArrayList<>();
-		for (MultipartFile file : files) {
-			taskFiles.add(taskFileStorageService.saveInputFile(taskId, file));
-		}
-		taskFileRepository.saveBatch(taskFiles);
+		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, fileKey, fileRole);
+		taskFileRepository.save(taskFile);
+		return toTaskFileResponse(taskFile);
 	}
 
-	public void submitTask(Long taskId, Long userId) {
+	public TaskSubmitResponse submitTask(Long taskId, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskCanSubmit(task);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), "task submitted", OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(taskId);
+		TaskSubmitResponse response = new TaskSubmitResponse();
+		response.setTaskId(taskId);
+		response.setStatus(task.getStatus());
+		return response;
 	}
 
 	public void cancelTask(Long taskId, Long userId, String reason) {
 		Task task = loadAndCheckOwner(taskId, userId);
+		if (!taskDomainService.canCancel(task)) {
+			throw new BizException(400, "task cannot be canceled in current status");
+		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.CANCELED.name(), reason, OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 	}
@@ -92,6 +108,9 @@ public class TaskLifecycleManager {
 
 	public void reportStatus(Long taskId, StatusReportRequest request) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
+		if (request != null && request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
+			throw new BizException(409, "task status mismatch");
+		}
 		String targetStatus = pickStatus(request);
 		String reason = pickReason(request);
 		String operatorType = request == null || request.getOperatorType() == null || request.getOperatorType().isBlank()
@@ -124,6 +143,21 @@ public class TaskLifecycleManager {
 		return request.getReason();
 	}
 
+	private TaskFileResponse toTaskFileResponse(TaskFile file) {
+		TaskFileResponse response = new TaskFileResponse();
+		response.setId(file.getId());
+		response.setTaskId(file.getTaskId());
+		response.setFileRole(file.getFileRole());
+		response.setFileKey(file.getFileKey());
+		response.setOriginName(file.getOriginName());
+		response.setStoragePath(file.getStoragePath());
+		response.setFileSize(file.getFileSize());
+		response.setFileSuffix(file.getFileSuffix());
+		response.setChecksum(file.getChecksum());
+		response.setCreatedAt(file.getCreatedAt());
+		return response;
+	}
+
 	private Task loadAndCheckOwner(Long taskId, Long userId) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(404, "task not found"));
 		if (!task.isOwner(userId)) {
@@ -132,4 +166,3 @@ public class TaskLifecycleManager {
 		return task;
 	}
 }
-

@@ -6,10 +6,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 
 public interface TaskFileStorageService {
-	TaskFile saveInputFile(Long taskId, MultipartFile file);
+	TaskFile saveInputFile(Long taskId, MultipartFile file, String fileKey, String fileRole);
 
 	InputStream openFile(String storagePath);
 
 	void deleteFile(String storagePath);
 }
-
