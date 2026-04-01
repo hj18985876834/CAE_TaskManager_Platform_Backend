@@ -12,6 +12,7 @@ public class TaskListItemResponse {
 	private String profileName;
 	private String taskType;
 	private String status;
+	private Integer priority;
 	private Long nodeId;
 	private String nodeName;
 	private LocalDateTime submitTime;
@@ -88,6 +89,14 @@ public class TaskListItemResponse {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getPriority() {
+		return priority;
+	}
+
+	public void setPriority(Integer priority) {
+		this.priority = priority;
 	}
 
 	public Long getNodeId() {

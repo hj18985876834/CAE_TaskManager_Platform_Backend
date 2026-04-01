@@ -11,10 +11,12 @@ public class TaskDTO {
     private String commandTemplate;
     private String parserName;
     private Integer timeoutSeconds;
+    private Integer priority;
     private String paramsJson;
     private java.util.List<TaskFileDTO> inputFiles;
     private java.util.Map<String, Object> params;
     private Long nodeId;
+    private java.time.LocalDateTime submitTime;
 
     public Long getTaskId() {
         return taskId;
@@ -112,6 +114,14 @@ public class TaskDTO {
         this.timeoutSeconds = timeoutSeconds;
     }
 
+    public Integer getPriority() {
+        return priority;
+    }
+
+    public void setPriority(Integer priority) {
+        this.priority = priority;
+    }
+
     public java.util.List<TaskFileDTO> getInputFiles() {
         return inputFiles;
     }
@@ -126,5 +136,13 @@ public class TaskDTO {
 
     public void setParams(java.util.Map<String, Object> params) {
         this.params = params;
+    }
+
+    public java.time.LocalDateTime getSubmitTime() {
+        return submitTime;
+    }
+
+    public void setSubmitTime(java.time.LocalDateTime submitTime) {
+        this.submitTime = submitTime;
     }
 }

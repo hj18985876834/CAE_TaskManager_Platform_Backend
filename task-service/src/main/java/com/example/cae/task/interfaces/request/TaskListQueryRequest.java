@@ -15,6 +15,8 @@ public class TaskListQueryRequest {
 	private String taskName;
 	private String taskNo;
 	private String status;
+	@Min(value = 0, message = "priority must be greater than or equal to 0")
+	private Integer priority;
 	@Positive(message = "solverId必须大于0")
 	private Long solverId;
 	@Positive(message = "profileId必须大于0")
@@ -66,6 +68,14 @@ public class TaskListQueryRequest {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getPriority() {
+		return priority;
+	}
+
+	public void setPriority(Integer priority) {
+		this.priority = priority;
 	}
 
 	public Long getSolverId() {

@@ -38,6 +38,10 @@ public class Task {
 		this.nodeId = nodeId;
 	}
 
+	public void adjustPriority(Integer priority) {
+		this.priority = priority;
+	}
+
 	public void markScheduled() {
 		this.status = TaskStatusEnum.SCHEDULED.name();
 	}

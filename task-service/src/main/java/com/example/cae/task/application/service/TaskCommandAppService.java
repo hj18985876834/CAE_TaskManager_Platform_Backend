@@ -1,8 +1,10 @@
 package com.example.cae.task.application.service;
 
 import com.example.cae.task.application.manager.TaskLifecycleManager;
+import com.example.cae.task.application.manager.TaskPriorityManager;
 import com.example.cae.task.application.manager.TaskValidationManager;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
@@ -13,10 +15,14 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class TaskCommandAppService {
 	private final TaskLifecycleManager taskLifecycleManager;
+	private final TaskPriorityManager taskPriorityManager;
 	private final TaskValidationManager taskValidationManager;
 
-	public TaskCommandAppService(TaskLifecycleManager taskLifecycleManager, TaskValidationManager taskValidationManager) {
+	public TaskCommandAppService(TaskLifecycleManager taskLifecycleManager,
+								 TaskPriorityManager taskPriorityManager,
+								 TaskValidationManager taskValidationManager) {
 		this.taskLifecycleManager = taskLifecycleManager;
+		this.taskPriorityManager = taskPriorityManager;
 		this.taskValidationManager = taskValidationManager;
 	}
 
@@ -38,5 +44,9 @@ public class TaskCommandAppService {
 
 	public void cancelTask(Long taskId, Long userId, String reason) {
 		taskLifecycleManager.cancelTask(taskId, userId, reason);
+	}
+
+	public void adjustPriority(Long taskId, UpdateTaskPriorityRequest request, Long adminUserId) {
+		taskPriorityManager.adjustPriority(taskId, request.getPriority(), adminUserId);
 	}
 }

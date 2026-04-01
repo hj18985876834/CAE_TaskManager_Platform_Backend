@@ -1,5 +1,6 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.constant.TaskConstants;
 import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.task.domain.model.Task;
@@ -24,7 +25,7 @@ public class TaskAssembler {
 		task.setTaskType(request.getTaskType());
 		task.setParamsJson(request.getParams() == null ? null : JsonUtil.toJson(request.getParams()));
 		task.setStatus(TaskStatusEnum.CREATED.name());
-		task.setPriority(0);
+		task.setPriority(request.getPriority() == null ? TaskConstants.DEFAULT_PRIORITY : request.getPriority());
 		task.setDeletedFlag(0);
 		task.setCreatedAt(LocalDateTime.now());
 		task.setUpdatedAt(LocalDateTime.now());
@@ -36,6 +37,7 @@ public class TaskAssembler {
 		response.setTaskId(task.getId());
 		response.setTaskNo(task.getTaskNo());
 		response.setStatus(task.getStatus());
+		response.setPriority(task.getPriority());
 		return response;
 	}
 
@@ -49,6 +51,7 @@ public class TaskAssembler {
 		response.setProfileId(task.getProfileId());
 		response.setTaskType(task.getTaskType());
 		response.setStatus(task.getStatus());
+		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
 		response.setParams(parseJsonMap(task.getParamsJson()));
 		response.setFailType(task.getFailType());
@@ -68,6 +71,7 @@ public class TaskAssembler {
 		response.setProfileId(task.getProfileId());
 		response.setTaskType(task.getTaskType());
 		response.setStatus(task.getStatus());
+		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
 		response.setSubmitTime(task.getSubmitTime());
 		response.setStartTime(task.getStartTime());

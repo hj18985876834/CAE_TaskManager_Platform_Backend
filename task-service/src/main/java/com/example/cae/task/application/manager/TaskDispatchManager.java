@@ -74,11 +74,13 @@ public class TaskDispatchManager {
 		dto.setSolverId(task.getSolverId());
 		dto.setProfileId(task.getProfileId());
 		dto.setTaskType(task.getTaskType());
+		dto.setPriority(task.getPriority());
 		dto.setParamsJson(task.getParamsJson());
 		dto.setParams(parseParams(task.getParamsJson()));
 		dto.setInputFiles(loadInputFiles(task.getId()));
 		enrichExecutionMeta(task, dto);
 		dto.setNodeId(task.getNodeId());
+		dto.setSubmitTime(task.getSubmitTime());
 		return dto;
 	}
 

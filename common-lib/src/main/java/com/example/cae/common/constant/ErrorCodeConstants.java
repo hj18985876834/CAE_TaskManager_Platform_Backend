@@ -23,6 +23,7 @@ public final class ErrorCodeConstants {
     public static final int INVALID_SCHEDULE_TASK = 4010;
     public static final int INVALID_NODE_STATUS_REQUEST = 4011;
     public static final int UNSUPPORTED_NODE_STATUS = 4012;
+    public static final int TASK_PRIORITY_UPDATE_NOT_ALLOWED = 4013;
 
     public static final int INVALID_LOGIN_CREDENTIALS = 4101;
     public static final int USER_DISABLED = 4102;
