@@ -1,0 +1,6 @@
+.git
+.idea
+**/target
+data
+node-agent-work
+*.iml

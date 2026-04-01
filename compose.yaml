@@ -1,0 +1,161 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: cae-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-111111}
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docs/sql/init_databases.sql:/docker-entrypoint-initdb.d/01-init_databases.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${DB_PASSWORD:-111111}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: user-service
+    environment:
+      SERVER_PORT: 8081
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${USER_DB_NAME:-user_db}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-111111}
+    ports:
+      - "${USER_SERVICE_PORT:-8081}:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  solver-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: solver-service
+    environment:
+      SERVER_PORT: 8082
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${SOLVER_DB_NAME:-solver_db}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-111111}
+    ports:
+      - "${SOLVER_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  task-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: task-service
+    environment:
+      SERVER_PORT: 8083
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${TASK_DB_NAME:-task_db}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-111111}
+      SOLVER_SERVICE_BASE_URL: ${SOLVER_SERVICE_BASE_URL:-http://solver-service:8082}
+      SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
+    ports:
+      - "${TASK_SERVICE_PORT:-8083}:8083"
+    volumes:
+      - shared-task-data:/app/data
+      - shared-node-work:/app/node-agent-work
+    depends_on:
+      mysql:
+        condition: service_healthy
+      solver-service:
+        condition: service_started
+
+  scheduler-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: scheduler-service
+    environment:
+      SERVER_PORT: 8084
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${SCHEDULER_DB_NAME:-scheduler_db}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-111111}
+      TASK_SERVICE_BASE_URL: ${TASK_SERVICE_BASE_URL:-http://task-service:8083}
+      NODE_AGENT_SCHEME: ${NODE_AGENT_SCHEME:-http}
+    ports:
+      - "${SCHEDULER_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      task-service:
+        condition: service_started
+
+  node-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: node-agent
+    environment:
+      SERVER_PORT: 8085
+      NODE_PORT: 8085
+      SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
+      TASK_SERVICE_BASE_URL: ${TASK_SERVICE_BASE_URL:-http://task-service:8083}
+      NODE_ADVERTISED_HOST: ${NODE_ADVERTISED_HOST:-node-agent:8085}
+      NODE_WORK_ROOT: ${NODE_WORK_ROOT:-/app/node-agent-work}
+      NODE_MAX_CONCURRENCY: ${NODE_MAX_CONCURRENCY:-2}
+    ports:
+      - "${NODE_AGENT_PORT:-8085}:8085"
+    volumes:
+      - shared-task-data:/app/data
+      - shared-node-work:/app/node-agent-work
+    depends_on:
+      scheduler-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+      args:
+        MODULE: gateway-service
+    environment:
+      SERVER_PORT: 8080
+      USER_SERVICE_URI: ${USER_SERVICE_URI:-http://user-service:8081}
+      SOLVER_SERVICE_URI: ${SOLVER_SERVICE_URI:-http://solver-service:8082}
+      TASK_SERVICE_URI: ${TASK_SERVICE_URI:-http://task-service:8083}
+      SCHEDULER_SERVICE_URI: ${SCHEDULER_SERVICE_URI:-http://scheduler-service:8084}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      user-service:
+        condition: service_started
+      solver-service:
+        condition: service_started
+      task-service:
+        condition: service_started
+      scheduler-service:
+        condition: service_started
+
+volumes:
+  mysql-data:
+  shared-task-data:
+  shared-node-work:
