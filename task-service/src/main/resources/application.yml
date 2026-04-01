@@ -14,3 +14,5 @@ cae:
   remote:
     solver-base-url: ${SOLVER_SERVICE_BASE_URL:http://localhost:8082}
     scheduler-base-url: ${SCHEDULER_SERVICE_BASE_URL:http://localhost:8084}
+  storage:
+    task-root: ${TASK_STORAGE_ROOT:./data/tasks}

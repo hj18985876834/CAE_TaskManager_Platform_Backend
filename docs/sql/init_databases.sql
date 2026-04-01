@@ -10,10 +10,16 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Adjust these demo host values for your runtime environment.
 -- Local single-machine example:
 --   SET @NODE1_HOST = '127.0.0.1:8085';
+--   SET @TASK_STORAGE_ROOT = '/data/tasks';
+--   SET @NODE_WORK_ROOT = '/node-agent-work';
 -- Docker Compose example:
 --   SET @NODE1_HOST = 'node-agent:8085';
+--   SET @TASK_STORAGE_ROOT = '/app/data/tasks';
+--   SET @NODE_WORK_ROOT = '/app/node-agent-work';
 SET @NODE1_HOST = '127.0.0.1:8085';
 SET @NODE2_HOST = '127.0.0.1:8086';
+SET @TASK_STORAGE_ROOT = '/data/tasks';
+SET @NODE_WORK_ROOT = '/node-agent-work';
 
 -- =========================================================
 -- 1. user_db
@@ -304,17 +310,17 @@ INSERT INTO task_status_history (id, task_id, from_status, to_status, change_rea
 (8, 2, 'CREATED', 'QUEUED', 'task submitted', 'USER', 2, NOW());
 
 INSERT INTO task_file (id, task_id, file_role, file_key, origin_name, storage_path, file_size, file_suffix, checksum, created_at) VALUES
-(1, 1, 'INPUT', 'case_zip', 'case-1.zip', '/data/tasks/1/input/case-1.zip', 102400, 'zip', 'md5-demo-001', NOW()),
-(2, 1, 'CONFIG', 'control_dict', 'controlDict', '/data/tasks/1/input/controlDict', 4096, NULL, 'md5-demo-002', NOW()),
-(3, 2, 'INPUT', 'main_inp', 'beam.inp', '/data/tasks/2/input/beam.inp', 8192, 'inp', 'md5-demo-003', NOW());
+(1, 1, 'INPUT', 'case_zip', 'case-1.zip', CONCAT(@TASK_STORAGE_ROOT, '/1/input/case-1.zip'), 102400, 'zip', 'md5-demo-001', NOW()),
+(2, 1, 'CONFIG', 'control_dict', 'controlDict', CONCAT(@TASK_STORAGE_ROOT, '/1/input/controlDict'), 4096, NULL, 'md5-demo-002', NOW()),
+(3, 2, 'INPUT', 'main_inp', 'beam.inp', CONCAT(@TASK_STORAGE_ROOT, '/2/input/beam.inp'), 8192, 'inp', 'md5-demo-003', NOW());
 
 INSERT INTO task_result_summary (id, task_id, success_flag, duration_seconds, summary_text, metrics_json, created_at, updated_at) VALUES
 (1, 1, 1, 128, '计算完成，残差收敛', '{"maxResidual":9.8e-7,"iteration":420}', NOW(), NOW());
 
 INSERT INTO task_result_file (id, task_id, file_type, file_name, storage_path, file_size, created_at) VALUES
-(1, 1, 'RESULT', 'pressure.vtk', '/data/tasks/1/output/pressure.vtk', 204800, NOW()),
-(2, 1, 'LOG', 'solver.log', '/data/tasks/1/output/solver.log', 65536, NOW()),
-(3, 1, 'REPORT', 'summary.json', '/data/tasks/1/output/summary.json', 2048, NOW());
+(1, 1, 'RESULT', 'pressure.vtk', CONCAT(@NODE_WORK_ROOT, '/1/output/pressure.vtk'), 204800, NOW()),
+(2, 1, 'LOG', 'solver.log', CONCAT(@NODE_WORK_ROOT, '/1/output/solver.log'), 65536, NOW()),
+(3, 1, 'REPORT', 'summary.json', CONCAT(@NODE_WORK_ROOT, '/1/output/summary.json'), 2048, NOW());
 
 INSERT INTO task_log_chunk (id, task_id, seq_no, log_content, created_at) VALUES
 (1, 1, 1, 'Task accepted by node-agent.', NOW()),

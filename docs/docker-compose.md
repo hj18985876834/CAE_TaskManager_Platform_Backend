@@ -36,8 +36,10 @@ http://localhost:8080
 ## Important Notes
 
 - Current implementation still depends on shared local filesystem paths between `task-service` and `node-agent`.
-- `compose.yaml` mounts `shared-task-data` to `/app/data` in both services so uploaded task input files remain readable by `node-agent`.
-- `compose.yaml` mounts `shared-node-work` to `/app/node-agent-work` in both services so result files reported by `node-agent` remain downloadable via `task-service`.
+- `task-service` task root is now configurable through `TASK_STORAGE_ROOT`, defaulting to `./data/tasks` locally and `/app/data/tasks` in compose.
+- `node-agent` work root remains configurable through `NODE_WORK_ROOT`.
+- `compose.yaml` mounts `shared-task-data` to `TASK_STORAGE_ROOT` in both services so uploaded task input files remain readable by `node-agent`.
+- `compose.yaml` mounts `shared-node-work` to `NODE_WORK_ROOT` in both services so result files reported by `node-agent` remain downloadable via `task-service`.
 - `init_databases.sql` now uses configurable demo node hosts. For compose, the default `NODE_ADVERTISED_HOST=node-agent:8085` is the expected setting.
 
 ## Current Limitations

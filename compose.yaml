@@ -72,11 +72,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-111111}
       SOLVER_SERVICE_BASE_URL: ${SOLVER_SERVICE_BASE_URL:-http://solver-service:8082}
       SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
+      TASK_STORAGE_ROOT: ${TASK_STORAGE_ROOT:-/app/data/tasks}
     ports:
       - "${TASK_SERVICE_PORT:-8083}:8083"
     volumes:
-      - shared-task-data:/app/data
-      - shared-node-work:/app/node-agent-work
+      - shared-task-data:${TASK_STORAGE_ROOT:-/app/data/tasks}
+      - shared-node-work:${NODE_WORK_ROOT:-/app/node-agent-work}
     depends_on:
       mysql:
         condition: service_healthy
@@ -123,8 +124,8 @@ services:
     ports:
       - "${NODE_AGENT_PORT:-8085}:8085"
     volumes:
-      - shared-task-data:/app/data
-      - shared-node-work:/app/node-agent-work
+      - shared-task-data:${TASK_STORAGE_ROOT:-/app/data/tasks}
+      - shared-node-work:${NODE_WORK_ROOT:-/app/node-agent-work}
     depends_on:
       scheduler-service:
         condition: service_started

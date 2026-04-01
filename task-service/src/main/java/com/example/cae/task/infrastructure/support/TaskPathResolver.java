@@ -1,31 +1,44 @@
 package com.example.cae.task.infrastructure.support;
 
+import com.example.cae.task.config.TaskStorageProperties;
 import org.springframework.stereotype.Component;
+
+import java.nio.file.Path;
 
 @Component
 public class TaskPathResolver {
+	private final TaskStorageProperties taskStorageProperties;
+
+	public TaskPathResolver(TaskStorageProperties taskStorageProperties) {
+		this.taskStorageProperties = taskStorageProperties;
+	}
+
 	public String resolveTaskRoot(Long taskId) {
-		return "data/tasks/" + taskId;
+		return resolvePath(taskStorageProperties.getTaskRoot(), String.valueOf(taskId));
 	}
 
 	public String resolveInputDir(Long taskId) {
-		return resolveTaskRoot(taskId) + "/input";
+		return resolvePath(resolveTaskRoot(taskId), "input");
 	}
 
 	public String resolveInputRoleDir(Long taskId, String fileRole) {
 		String suffix = fileRole == null || fileRole.isBlank() ? "input" : fileRole.toLowerCase();
-		return resolveTaskRoot(taskId) + "/input/" + suffix;
+		return resolvePath(resolveTaskRoot(taskId), "input", suffix);
 	}
 
 	public String resolveLogDir(Long taskId) {
-		return resolveTaskRoot(taskId) + "/log";
+		return resolvePath(resolveTaskRoot(taskId), "log");
 	}
 
 	public String resolveResultDir(Long taskId) {
-		return resolveTaskRoot(taskId) + "/result";
+		return resolvePath(resolveTaskRoot(taskId), "result");
 	}
 
 	public String resolveLogFile(Long taskId) {
-		return resolveLogDir(taskId) + "/task.log";
+		return resolvePath(resolveLogDir(taskId), "task.log");
+	}
+
+	private String resolvePath(String first, String... more) {
+		return Path.of(first, more).normalize().toString().replace("\\", "/");
 	}
 }
