@@ -13,7 +13,13 @@ public class CommandBuilder {
 		if (context.getCommandTemplate() == null || context.getCommandTemplate().trim().isEmpty()) {
 			throw new BizException("commandTemplate is empty");
 		}
-		return Arrays.asList("cmd", "/c", context.getCommandTemplate());
+
+		String os = System.getProperty("os.name").toLowerCase();
+		if (os.contains("win")) {
+			return Arrays.asList("cmd", "/c", context.getCommandTemplate());
+		} else {
+			return Arrays.asList("/bin/sh", "-c", context.getCommandTemplate());
+		}
 	}
 }
 
