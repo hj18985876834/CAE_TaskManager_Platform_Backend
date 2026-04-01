@@ -371,7 +371,7 @@ DROP TABLE IF EXISTS schedule_record;
 CREATE TABLE schedule_record (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     task_id BIGINT NOT NULL COMMENT '任务ID',
-    node_id BIGINT NOT NULL COMMENT '目标节点ID',
+    node_id BIGINT DEFAULT NULL COMMENT '目标节点ID，可为空（如无可用节点时）',
     strategy_name VARCHAR(50) NOT NULL COMMENT '调度策略名',
     schedule_status VARCHAR(30) NOT NULL COMMENT 'SUCCESS / FAILED',
     schedule_message VARCHAR(255) DEFAULT NULL COMMENT '调度说明',
