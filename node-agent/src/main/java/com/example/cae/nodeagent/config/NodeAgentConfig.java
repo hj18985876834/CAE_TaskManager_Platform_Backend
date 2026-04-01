@@ -12,6 +12,7 @@ public class NodeAgentConfig {
 	private Long nodeId = 1L;
 	private String nodeCode = "NODE_1";
 	private String nodeName = "Worker_Node_1";
+	private String processLogCharset = "GBK";
 	private Integer nodePort = 8085;
 	private Integer maxConcurrency = 2;
 	private String schedulerBaseUrl = "http://localhost:8084";
@@ -44,6 +45,14 @@ public class NodeAgentConfig {
 
 	public void setNodeName(String nodeName) {
 		this.nodeName = nodeName;
+	}
+
+	public String getProcessLogCharset() {
+		return processLogCharset;
+	}
+
+	public void setProcessLogCharset(String processLogCharset) {
+		this.processLogCharset = processLogCharset;
 	}
 
 	public Integer getNodePort() {

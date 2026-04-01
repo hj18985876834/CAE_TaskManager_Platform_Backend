@@ -1,15 +1,23 @@
 server:
   port: ${SERVER_PORT:8085}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   application:
     name: node-agent
+  messages:
+    encoding: UTF-8
 
 cae:
   node:
     id: 1
     node-code: "NODE_1"
     node-name: "Worker_Node_1"
+    process-log-charset: ${NODE_LOG_CHARSET:GBK}
     node-port: ${NODE_PORT:${SERVER_PORT:8085}}
     max-concurrency: ${NODE_MAX_CONCURRENCY:2}
     scheduler-base-url: ${SCHEDULER_SERVICE_BASE_URL:http://localhost:8084}
