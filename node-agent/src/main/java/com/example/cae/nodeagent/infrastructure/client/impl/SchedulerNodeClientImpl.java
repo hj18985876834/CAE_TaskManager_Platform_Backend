@@ -34,8 +34,9 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		body.put("maxConcurrency", nodeInfo.getMaxConcurrency());
 		body.put("solvers", toSolverItems(nodeInfo.getSolverIds()));
 		Result<Object> result = restTemplate.postForObject(url, body, Result.class);
-		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
-			return;
+		validateResult(result, "register node");
+		if (!(result.getData() instanceof Map<?, ?> dataMap)) {
+			throw new IllegalStateException("register node response data is empty");
 		}
 		Object nodeId = dataMap.get("nodeId");
 		Object nodeToken = dataMap.get("nodeToken");
@@ -62,7 +63,8 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		body.put("runningCount", nodeInfo.getRunningCount());
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
-		restTemplate.postForEntity(url, new HttpEntity<>(body, headers), Object.class);
+		Result<?> result = restTemplate.postForObject(url, new HttpEntity<>(body, headers), Result.class);
+		validateResult(result, "heartbeat");
 	}
 
 	@Override
@@ -73,7 +75,17 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		String url = nodeAgentConfig.getSchedulerBaseUrl() + "/internal/nodes/" + nodeAgentConfig.getNodeId() + "/running-count";
 		Map<String, Object> body = new HashMap<>();
 		body.put("delta", delta);
-		restTemplate.postForEntity(url, body, Object.class);
+		Result<?> result = restTemplate.postForObject(url, body, Result.class);
+		validateResult(result, "update running count");
+	}
+
+	private void validateResult(Result<?> result, String action) {
+		if (result == null) {
+			throw new IllegalStateException(action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new IllegalStateException(action + " failed: " + result.getMessage());
+		}
 	}
 
 	private java.util.List<Map<String, Object>> toSolverItems(java.util.List<Long> solverIds) {
