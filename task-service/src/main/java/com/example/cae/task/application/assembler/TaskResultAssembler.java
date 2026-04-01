@@ -37,10 +37,7 @@ public class TaskResultAssembler {
 		response.setTaskId(file.getTaskId());
 		response.setFileType(file.getFileType());
 		response.setFileName(file.getFileName());
-		String displayPath = taskStoragePathSupport.toDisplayResultPath(file.getStoragePath());
-		response.setStoragePath(displayPath);
-		response.setRelativePath(displayPath);
-		response.setDownloadUrl("/api/tasks/result-files/" + file.getId() + "/download");
+		response.setStoragePath(taskStoragePathSupport.toDisplayResultPath(file.getStoragePath()));
 		response.setFileSize(file.getFileSize());
 		response.setCreatedAt(file.getCreatedAt());
 		return response;

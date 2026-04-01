@@ -15,7 +15,7 @@ cae:
     scheduler-base-url: ${SCHEDULER_SERVICE_BASE_URL:http://localhost:8084}
     task-base-url: ${TASK_SERVICE_BASE_URL:http://localhost:8083}
     advertised-host: ${NODE_ADVERTISED_HOST:}
-    work-root: ${NODE_WORK_ROOT:./node-agent-work}
+    work-root: ${NODE_WORK_ROOT:./data/tasks}
     solver-ids: [1]
     solver-versions:
       "1": "v10"

@@ -15,11 +15,11 @@ public class TaskStoragePathSupport {
 	}
 
 	public String toStoredTaskPath(String path) {
-		return normalizeForStorage(path, taskStorageProperties.getTaskRoot());
+		return resolveAbsolutePath(path, taskStorageProperties.getTaskRoot());
 	}
 
 	public String toStoredResultPath(String path) {
-		return normalizeForStorage(path, taskStorageProperties.getResultRoot());
+		return resolveAbsolutePath(path, taskStorageProperties.getResultRoot());
 	}
 
 	public String toAbsoluteTaskPath(String path) {
@@ -31,29 +31,11 @@ public class TaskStoragePathSupport {
 	}
 
 	public String toDisplayTaskPath(String path) {
-		return toDisplayPath(path, taskStorageProperties.getTaskRoot());
+		return resolveAbsolutePath(path, taskStorageProperties.getTaskRoot());
 	}
 
 	public String toDisplayResultPath(String path) {
-		return toDisplayPath(path, taskStorageProperties.getResultRoot());
-	}
-
-	private String normalizeForStorage(String path, String root) {
-		if (path == null || path.isBlank()) {
-			return path;
-		}
-		String normalizedPath = normalize(path);
-		String normalizedRoot = normalize(root);
-		if (!isAbsolutePath(normalizedPath)) {
-			return normalizedPath;
-		}
-		if (normalizedRoot != null && normalizedPath.equals(normalizedRoot)) {
-			return "";
-		}
-		if (normalizedRoot != null && normalizedPath.startsWith(normalizedRoot + "/")) {
-			return normalizedPath.substring(normalizedRoot.length() + 1);
-		}
-		return normalizedPath;
+		return resolveAbsolutePath(path, taskStorageProperties.getResultRoot());
 	}
 
 	private String resolveAbsolutePath(String path, String root) {
@@ -65,22 +47,6 @@ public class TaskStoragePathSupport {
 			return normalizedPath;
 		}
 		return normalize(Path.of(root, normalizedPath).toString());
-	}
-
-	private String toDisplayPath(String path, String root) {
-		if (path == null || path.isBlank()) {
-			return path;
-		}
-		String stored = normalizeForStorage(path, root);
-		if (!isAbsolutePath(stored)) {
-			return stored;
-		}
-		try {
-			Path fileName = Path.of(stored).getFileName();
-			return fileName == null ? stored : fileName.toString().replace("\\", "/");
-		} catch (InvalidPathException ex) {
-			return stored;
-		}
 	}
 
 	private String normalize(String path) {

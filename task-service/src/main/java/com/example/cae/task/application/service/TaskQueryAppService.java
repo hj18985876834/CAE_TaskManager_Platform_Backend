@@ -139,9 +139,7 @@ public class TaskQueryAppService {
 		response.setFileRole(file.getFileRole());
 		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
-		String displayPath = taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath());
-		response.setStoragePath(displayPath);
-		response.setRelativePath(displayPath);
+		response.setStoragePath(taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath()));
 		response.setFileSize(file.getFileSize());
 		response.setFileSuffix(file.getFileSuffix());
 		response.setChecksum(file.getChecksum());

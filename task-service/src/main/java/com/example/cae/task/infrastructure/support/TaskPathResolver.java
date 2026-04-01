@@ -22,8 +22,7 @@ public class TaskPathResolver {
 	}
 
 	public String resolveInputRoleDir(Long taskId, String fileRole) {
-		String suffix = fileRole == null || fileRole.isBlank() ? "input" : fileRole.toLowerCase();
-		return resolvePath(resolveTaskRoot(taskId), "input", suffix);
+		return resolveInputDir(taskId);
 	}
 
 	public String resolveLogDir(Long taskId) {
@@ -31,7 +30,7 @@ public class TaskPathResolver {
 	}
 
 	public String resolveResultDir(Long taskId) {
-		return resolvePath(resolveTaskRoot(taskId), "result");
+		return resolvePath(resolveTaskRoot(taskId), "output");
 	}
 
 	public String resolveLogFile(Long taskId) {

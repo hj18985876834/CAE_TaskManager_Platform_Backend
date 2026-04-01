@@ -11,15 +11,12 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- Local single-machine example:
 --   SET @NODE1_HOST = '127.0.0.1:8085';
 --   SET @TASK_STORAGE_ROOT = '/data/tasks';
---   SET @NODE_WORK_ROOT = '/node-agent-work';
 -- Docker Compose example:
 --   SET @NODE1_HOST = 'node-agent:8085';
 --   SET @TASK_STORAGE_ROOT = '/app/data/tasks';
---   SET @NODE_WORK_ROOT = '/app/node-agent-work';
 SET @NODE1_HOST = '127.0.0.1:8085';
 SET @NODE2_HOST = '127.0.0.1:8086';
 SET @TASK_STORAGE_ROOT = '/data/tasks';
-SET @NODE_WORK_ROOT = '/node-agent-work';
 
 -- =========================================================
 -- 1. user_db
@@ -318,9 +315,9 @@ INSERT INTO task_result_summary (id, task_id, success_flag, duration_seconds, su
 (1, 1, 1, 128, '计算完成，残差收敛', '{"maxResidual":9.8e-7,"iteration":420}', NOW(), NOW());
 
 INSERT INTO task_result_file (id, task_id, file_type, file_name, storage_path, file_size, created_at) VALUES
-(1, 1, 'RESULT', 'pressure.vtk', CONCAT(@NODE_WORK_ROOT, '/1/output/pressure.vtk'), 204800, NOW()),
-(2, 1, 'LOG', 'solver.log', CONCAT(@NODE_WORK_ROOT, '/1/output/solver.log'), 65536, NOW()),
-(3, 1, 'REPORT', 'summary.json', CONCAT(@NODE_WORK_ROOT, '/1/output/summary.json'), 2048, NOW());
+(1, 1, 'RESULT', 'pressure.vtk', CONCAT(@TASK_STORAGE_ROOT, '/1/output/pressure.vtk'), 204800, NOW()),
+(2, 1, 'LOG', 'solver.log', CONCAT(@TASK_STORAGE_ROOT, '/1/output/solver.log'), 65536, NOW()),
+(3, 1, 'REPORT', 'summary.json', CONCAT(@TASK_STORAGE_ROOT, '/1/output/summary.json'), 2048, NOW());
 
 INSERT INTO task_log_chunk (id, task_id, seq_no, log_content, created_at) VALUES
 (1, 1, 1, 'Task accepted by node-agent.', NOW()),

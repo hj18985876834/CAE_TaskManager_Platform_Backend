@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "cae.storage")
 public class TaskStorageProperties {
 	private String taskRoot = "./data/tasks";
-	private String resultRoot = "./node-agent-work";
+	private String resultRoot = "./data/tasks";
 
 	public String getTaskRoot() {
 		return taskRoot;

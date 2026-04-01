@@ -73,12 +73,11 @@ services:
       SOLVER_SERVICE_BASE_URL: ${SOLVER_SERVICE_BASE_URL:-http://solver-service:8082}
       SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
       TASK_STORAGE_ROOT: ${TASK_STORAGE_ROOT:-/app/data/tasks}
-      TASK_RESULT_ROOT: ${TASK_RESULT_ROOT:-/app/node-agent-work}
+      TASK_RESULT_ROOT: ${TASK_RESULT_ROOT:-/app/data/tasks}
     ports:
       - "${TASK_SERVICE_PORT:-8083}:8083"
     volumes:
       - shared-task-data:${TASK_STORAGE_ROOT:-/app/data/tasks}
-      - shared-node-work:${NODE_WORK_ROOT:-/app/node-agent-work}
     depends_on:
       mysql:
         condition: service_healthy
@@ -120,13 +119,12 @@ services:
       SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
       TASK_SERVICE_BASE_URL: ${TASK_SERVICE_BASE_URL:-http://task-service:8083}
       NODE_ADVERTISED_HOST: ${NODE_ADVERTISED_HOST:-node-agent:8085}
-      NODE_WORK_ROOT: ${NODE_WORK_ROOT:-/app/node-agent-work}
+      NODE_WORK_ROOT: ${NODE_WORK_ROOT:-/app/data/tasks}
       NODE_MAX_CONCURRENCY: ${NODE_MAX_CONCURRENCY:-2}
     ports:
       - "${NODE_AGENT_PORT:-8085}:8085"
     volumes:
       - shared-task-data:${TASK_STORAGE_ROOT:-/app/data/tasks}
-      - shared-node-work:${NODE_WORK_ROOT:-/app/node-agent-work}
     depends_on:
       scheduler-service:
         condition: service_started
@@ -160,4 +158,3 @@ services:
 volumes:
   mysql-data:
   shared-task-data:
-  shared-node-work:

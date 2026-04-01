@@ -32,7 +32,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		String normalizedFileRole = normalizeFileRole(fileRole);
 		String fileName = file.getOriginalFilename() == null ? "unknown.bin" : file.getOriginalFilename();
 		String normalizedFileKey = normalizeFileKey(fileKey, fileName);
-		String dir = taskPathResolver.resolveInputRoleDir(taskId, normalizedFileRole);
+		String dir = taskPathResolver.resolveInputDir(taskId);
 		Path path;
 		try {
 			path = Path.of(dir, fileName);

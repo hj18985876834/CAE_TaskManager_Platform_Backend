@@ -18,7 +18,7 @@ public class NodeAgentConfig {
 	private String taskBaseUrl = "http://localhost:8083";
 	private String advertisedHost;
 	private String nodeToken;
-	private String workRoot = "./node-agent-work";
+	private String workRoot = "./data/tasks";
 	private List<Long> solverIds;
 	private Map<String, String> solverVersions;
 
