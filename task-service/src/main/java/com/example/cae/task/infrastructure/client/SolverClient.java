@@ -2,6 +2,7 @@ package com.example.cae.task.infrastructure.client;
 
 import com.example.cae.common.dto.FileRuleDTO;
 import com.example.cae.common.response.Result;
+import com.example.cae.task.config.TaskRemoteServiceProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -14,9 +15,9 @@ public class SolverClient {
 	private final RestTemplate restTemplate;
 	private final String solverServiceBaseUrl;
 
-	public SolverClient(RestTemplate restTemplate) {
+	public SolverClient(RestTemplate restTemplate, TaskRemoteServiceProperties remoteServiceProperties) {
 		this.restTemplate = restTemplate;
-		this.solverServiceBaseUrl = System.getProperty("solver.service.base-url", "http://localhost:8082");
+		this.solverServiceBaseUrl = remoteServiceProperties.getSolverBaseUrl();
 	}
 
 	public Object getProfileDetail(Long profileId) {

@@ -1,11 +1,16 @@
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}
 
 spring:
   application:
     name: task-service
   datasource:
-    url: jdbc:mysql://localhost:3306/task_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
-    username: root
-    password: 111111
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:task_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:111111}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+cae:
+  remote:
+    solver-base-url: ${SOLVER_SERVICE_BASE_URL:http://localhost:8082}
+    scheduler-base-url: ${SCHEDULER_SERVICE_BASE_URL:http://localhost:8084}

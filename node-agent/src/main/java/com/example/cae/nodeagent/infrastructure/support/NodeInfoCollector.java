@@ -33,6 +33,9 @@ public class NodeInfoCollector {
 	}
 
 	private String resolveHostWithPort() {
+		if (nodeAgentConfig.getAdvertisedHost() != null && !nodeAgentConfig.getAdvertisedHost().isBlank()) {
+			return nodeAgentConfig.getAdvertisedHost();
+		}
 		String host;
 		try {
 			host = InetAddress.getLocalHost().getHostAddress();

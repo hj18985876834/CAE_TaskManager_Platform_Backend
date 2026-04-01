@@ -1,6 +1,7 @@
 package com.example.cae.task.infrastructure.client;
 
 import com.example.cae.common.response.Result;
+import com.example.cae.task.config.TaskRemoteServiceProperties;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -15,9 +16,9 @@ public class SchedulerClient {
 	private final RestTemplate restTemplate;
 	private final String schedulerServiceBaseUrl;
 
-	public SchedulerClient(RestTemplate restTemplate) {
+	public SchedulerClient(RestTemplate restTemplate, TaskRemoteServiceProperties remoteServiceProperties) {
 		this.restTemplate = restTemplate;
-		this.schedulerServiceBaseUrl = System.getProperty("scheduler.service.base-url", "http://localhost:8084");
+		this.schedulerServiceBaseUrl = remoteServiceProperties.getSchedulerBaseUrl();
 	}
 
 	public void notifyTaskSubmitted(Long taskId) {

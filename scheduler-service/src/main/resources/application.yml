@@ -1,11 +1,16 @@
 server:
-  port: 8084
+  port: ${SERVER_PORT:8084}
 
 spring:
   application:
     name: scheduler-service
   datasource:
-    url: jdbc:mysql://localhost:3306/scheduler_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
-    username: root
-    password: 111111
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:scheduler_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:111111}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+cae:
+  remote:
+    task-base-url: ${TASK_SERVICE_BASE_URL:http://localhost:8083}
+    node-agent-scheme: ${NODE_AGENT_SCHEME:http}

@@ -1,11 +1,11 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
 
 spring:
   application:
     name: solver-service
   datasource:
-    url: jdbc:mysql://localhost:3306/solver_db?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
-    username: root
-    password: 111111
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:solver_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:111111}
     driver-class-name: com.mysql.cj.jdbc.Driver

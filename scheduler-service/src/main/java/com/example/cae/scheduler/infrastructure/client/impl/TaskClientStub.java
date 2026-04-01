@@ -2,6 +2,7 @@ package com.example.cae.scheduler.infrastructure.client.impl;
 
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.response.Result;
+import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -16,9 +17,9 @@ public class TaskClientStub implements TaskClient {
 	private final RestTemplate restTemplate;
 	private final String taskServiceBaseUrl;
 
-	public TaskClientStub(RestTemplate restTemplate) {
+	public TaskClientStub(RestTemplate restTemplate, SchedulerRemoteServiceProperties remoteServiceProperties) {
 		this.restTemplate = restTemplate;
-		this.taskServiceBaseUrl = System.getProperty("task.service.base-url", "http://localhost:8083");
+		this.taskServiceBaseUrl = remoteServiceProperties.getTaskBaseUrl();
 	}
 
 	@Override

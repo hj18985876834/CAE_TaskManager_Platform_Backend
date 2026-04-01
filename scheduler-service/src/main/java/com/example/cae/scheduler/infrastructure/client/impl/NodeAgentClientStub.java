@@ -4,6 +4,7 @@ import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
+import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
@@ -17,19 +18,21 @@ import java.util.Map;
 public class NodeAgentClientStub implements NodeAgentClient {
 	private final RestTemplate restTemplate;
 	private final ComputeNodeRepository computeNodeRepository;
+	private final SchedulerRemoteServiceProperties remoteServiceProperties;
 
-	public NodeAgentClientStub(RestTemplate restTemplate, ComputeNodeRepository computeNodeRepository) {
+	public NodeAgentClientStub(RestTemplate restTemplate,
+							   ComputeNodeRepository computeNodeRepository,
+							   SchedulerRemoteServiceProperties remoteServiceProperties) {
 		this.restTemplate = restTemplate;
 		this.computeNodeRepository = computeNodeRepository;
+		this.remoteServiceProperties = remoteServiceProperties;
 	}
 
 	@Override
 	public void notifyDispatch(Long nodeId, TaskDTO task) {
 		ComputeNode node = computeNodeRepository.findById(nodeId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found: " + nodeId));
-		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
-				? node.getHost()
-				: "http://" + node.getHost();
+		String baseUrl = buildNodeAgentBaseUrl(node);
 		String url = baseUrl + "/internal/dispatch-task";
 
 		Map<String, Object> request = new HashMap<>();
@@ -60,9 +63,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 	public void cancelTask(Long nodeId, Long taskId, String reason) {
 		ComputeNode node = computeNodeRepository.findById(nodeId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found: " + nodeId));
-		String baseUrl = node.getHost() != null && node.getHost().startsWith("http")
-				? node.getHost()
-				: "http://" + node.getHost();
+		String baseUrl = buildNodeAgentBaseUrl(node);
 		String url = baseUrl + "/internal/cancel-task";
 
 		Map<String, Object> request = new HashMap<>();
@@ -78,5 +79,19 @@ public class NodeAgentClientStub implements NodeAgentClient {
 			Object message = dataMap.get("message");
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected cancel" : String.valueOf(message));
 		}
+	}
+
+	private String buildNodeAgentBaseUrl(ComputeNode node) {
+		if (node == null || node.getHost() == null || node.getHost().isBlank()) {
+			throw new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node host is empty");
+		}
+		if (node.getHost().startsWith("http://") || node.getHost().startsWith("https://")) {
+			return node.getHost();
+		}
+		String scheme = remoteServiceProperties.getNodeAgentScheme();
+		if (scheme == null || scheme.isBlank()) {
+			scheme = "http";
+		}
+		return scheme + "://" + node.getHost();
 	}
 }
