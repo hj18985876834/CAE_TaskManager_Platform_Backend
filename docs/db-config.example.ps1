@@ -14,6 +14,7 @@ $env:TASK_SERVICE_BASE_URL = "http://localhost:8083"
 $env:SCHEDULER_SERVICE_BASE_URL = "http://localhost:8084"
 $env:NODE_AGENT_BASE_URL = "http://localhost:8085"
 $env:TASK_STORAGE_ROOT = "./data/tasks"
+$env:TASK_RESULT_ROOT = "./node-agent-work"
 $env:NODE_ADVERTISED_HOST = "127.0.0.1:8085"
 $env:NODE_WORK_ROOT = "./node-agent-work"
 

@@ -13,6 +13,7 @@ import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SolverClient;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,15 +25,18 @@ public class TaskDispatchManager {
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final SolverClient solverClient;
+	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskDispatchManager(TaskRepository taskRepository,
 						   TaskFileRepository taskFileRepository,
 						   TaskStatusDomainService taskStatusDomainService,
-						   SolverClient solverClient) {
+						   SolverClient solverClient,
+						   TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.solverClient = solverClient;
+		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
 	public List<TaskDTO> listQueuedTasks() {
@@ -124,7 +128,7 @@ public class TaskDispatchManager {
 		dto.setTaskId(file.getTaskId());
 		dto.setFileKey(file.getFileKey());
 		dto.setOriginName(file.getOriginName());
-		dto.setStoragePath(file.getStoragePath());
+		dto.setStoragePath(taskStoragePathSupport.toAbsoluteTaskPath(file.getStoragePath()));
 		dto.setFileSize(file.getFileSize());
 		return dto;
 	}

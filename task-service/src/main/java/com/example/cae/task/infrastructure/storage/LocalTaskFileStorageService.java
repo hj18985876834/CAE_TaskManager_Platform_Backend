@@ -4,6 +4,7 @@ import com.example.cae.common.enums.FileRoleEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,9 +17,11 @@ import java.nio.file.Path;
 @Service
 public class LocalTaskFileStorageService implements TaskFileStorageService {
 	private final TaskPathResolver taskPathResolver;
+	private final TaskStoragePathSupport taskStoragePathSupport;
 
-	public LocalTaskFileStorageService(TaskPathResolver taskPathResolver) {
+	public LocalTaskFileStorageService(TaskPathResolver taskPathResolver, TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskPathResolver = taskPathResolver;
+		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
 	@Override
@@ -48,7 +51,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		taskFile.setFileRole(normalizedFileRole);
 		taskFile.setFileKey(normalizedFileKey);
 		taskFile.setOriginName(fileName);
-		taskFile.setStoragePath(path.toString().replace("\\", "/"));
+		taskFile.setStoragePath(taskStoragePathSupport.toStoredTaskPath(path.toString()));
 		taskFile.setFileSize(file.getSize());
 		taskFile.setFileSuffix(extractSuffix(fileName));
 		return taskFile;

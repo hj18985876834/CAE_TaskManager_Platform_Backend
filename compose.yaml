@@ -73,6 +73,7 @@ services:
       SOLVER_SERVICE_BASE_URL: ${SOLVER_SERVICE_BASE_URL:-http://solver-service:8082}
       SCHEDULER_SERVICE_BASE_URL: ${SCHEDULER_SERVICE_BASE_URL:-http://scheduler-service:8084}
       TASK_STORAGE_ROOT: ${TASK_STORAGE_ROOT:-/app/data/tasks}
+      TASK_RESULT_ROOT: ${TASK_RESULT_ROOT:-/app/node-agent-work}
     ports:
       - "${TASK_SERVICE_PORT:-8083}:8083"
     volumes:

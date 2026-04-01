@@ -9,6 +9,7 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.infrastructure.storage.TaskFileStorageService;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
 import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
@@ -25,19 +26,22 @@ public class TaskResultAppService {
 	private final TaskPermissionChecker taskPermissionChecker;
 	private final TaskResultAssembler taskResultAssembler;
 	private final TaskFileStorageService taskFileStorageService;
+	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskResultAppService(TaskRepository taskRepository,
 								TaskResultSummaryRepository taskResultSummaryRepository,
 								TaskResultFileRepository taskResultFileRepository,
 								TaskPermissionChecker taskPermissionChecker,
 								TaskResultAssembler taskResultAssembler,
-								TaskFileStorageService taskFileStorageService) {
+								TaskFileStorageService taskFileStorageService,
+								TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskPermissionChecker = taskPermissionChecker;
 		this.taskResultAssembler = taskResultAssembler;
 		this.taskFileStorageService = taskFileStorageService;
+		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
 	public TaskResultSummaryResponse getResultSummary(Long taskId, Long userId, String roleCode) {
@@ -60,6 +64,6 @@ public class TaskResultAppService {
 	}
 
 	public InputStream openResultFile(TaskResultFile file) {
-		return taskFileStorageService.openFile(file.getStoragePath());
+		return taskFileStorageService.openFile(taskStoragePathSupport.toAbsoluteResultPath(file.getStoragePath()));
 	}
 }

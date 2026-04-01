@@ -14,6 +14,7 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import org.springframework.stereotype.Service;
@@ -25,13 +26,20 @@ public class TaskResultManager {
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
 	private final TaskResultFileRepository taskResultFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
+	private final TaskStoragePathSupport taskStoragePathSupport;
 
-	public TaskResultManager(TaskRepository taskRepository, TaskLogRepository taskLogRepository, TaskResultSummaryRepository taskResultSummaryRepository, TaskResultFileRepository taskResultFileRepository, TaskStatusDomainService taskStatusDomainService) {
+	public TaskResultManager(TaskRepository taskRepository,
+							 TaskLogRepository taskLogRepository,
+							 TaskResultSummaryRepository taskResultSummaryRepository,
+							 TaskResultFileRepository taskResultFileRepository,
+							 TaskStatusDomainService taskStatusDomainService,
+							 TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskLogRepository = taskLogRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
+		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
 	public void appendLog(Long taskId, Integer seqNo, String content) {
@@ -61,7 +69,7 @@ public class TaskResultManager {
 		file.setTaskId(taskId);
 		file.setFileType(request.getFileType());
 		file.setFileName(request.getFileName());
-		file.setStoragePath(request.getStoragePath());
+		file.setStoragePath(taskStoragePathSupport.toStoredResultPath(request.getStoragePath()));
 		file.setFileSize(request.getFileSize());
 		taskResultFileRepository.save(file);
 	}
