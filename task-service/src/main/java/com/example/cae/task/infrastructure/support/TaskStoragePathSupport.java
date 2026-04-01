@@ -30,6 +30,14 @@ public class TaskStoragePathSupport {
 		return resolveAbsolutePath(path, taskStorageProperties.getResultRoot());
 	}
 
+	public String toDisplayTaskPath(String path) {
+		return toDisplayPath(path, taskStorageProperties.getTaskRoot());
+	}
+
+	public String toDisplayResultPath(String path) {
+		return toDisplayPath(path, taskStorageProperties.getResultRoot());
+	}
+
 	private String normalizeForStorage(String path, String root) {
 		if (path == null || path.isBlank()) {
 			return path;
@@ -57,6 +65,22 @@ public class TaskStoragePathSupport {
 			return normalizedPath;
 		}
 		return normalize(Path.of(root, normalizedPath).toString());
+	}
+
+	private String toDisplayPath(String path, String root) {
+		if (path == null || path.isBlank()) {
+			return path;
+		}
+		String stored = normalizeForStorage(path, root);
+		if (!isAbsolutePath(stored)) {
+			return stored;
+		}
+		try {
+			Path fileName = Path.of(stored).getFileName();
+			return fileName == null ? stored : fileName.toString().replace("\\", "/");
+		} catch (InvalidPathException ex) {
+			return stored;
+		}
 	}
 
 	private String normalize(String path) {

@@ -8,6 +8,8 @@ public class TaskResultFileResponse {
 	private String fileType;
 	private String fileName;
 	private String storagePath;
+	private String relativePath;
+	private String downloadUrl;
 	private Long fileSize;
 	private LocalDateTime createdAt;
 
@@ -51,6 +53,22 @@ public class TaskResultFileResponse {
 		this.storagePath = storagePath;
 	}
 
+	public String getRelativePath() {
+		return relativePath;
+	}
+
+	public void setRelativePath(String relativePath) {
+		this.relativePath = relativePath;
+	}
+
+	public String getDownloadUrl() {
+		return downloadUrl;
+	}
+
+	public void setDownloadUrl(String downloadUrl) {
+		this.downloadUrl = downloadUrl;
+	}
+
 	public Long getFileSize() {
 		return fileSize;
 	}
@@ -67,4 +85,3 @@ public class TaskResultFileResponse {
 		this.createdAt = createdAt;
 	}
 }
-

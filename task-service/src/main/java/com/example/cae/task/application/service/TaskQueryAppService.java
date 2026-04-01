@@ -15,6 +15,7 @@ import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskQueryBuilder;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
@@ -37,6 +38,7 @@ public class TaskQueryAppService {
 	private final TaskQueryBuilder taskQueryBuilder;
 	private final SolverClient solverClient;
 	private final SchedulerClient schedulerClient;
+	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskQueryAppService(TaskRepository taskRepository,
 							   TaskFileRepository taskFileRepository,
@@ -45,7 +47,8 @@ public class TaskQueryAppService {
 							   TaskPermissionChecker taskPermissionChecker,
 							   TaskQueryBuilder taskQueryBuilder,
 							   SolverClient solverClient,
-							   SchedulerClient schedulerClient) {
+							   SchedulerClient schedulerClient,
+							   TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
@@ -54,6 +57,7 @@ public class TaskQueryAppService {
 		this.taskQueryBuilder = taskQueryBuilder;
 		this.solverClient = solverClient;
 		this.schedulerClient = schedulerClient;
+		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
 	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
@@ -135,7 +139,9 @@ public class TaskQueryAppService {
 		response.setFileRole(file.getFileRole());
 		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
-		response.setStoragePath(file.getStoragePath());
+		String displayPath = taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath());
+		response.setStoragePath(displayPath);
+		response.setRelativePath(displayPath);
 		response.setFileSize(file.getFileSize());
 		response.setFileSuffix(file.getFileSuffix());
 		response.setChecksum(file.getChecksum());

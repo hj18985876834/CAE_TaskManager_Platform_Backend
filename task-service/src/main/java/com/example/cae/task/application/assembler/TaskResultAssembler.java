@@ -3,6 +3,7 @@ package com.example.cae.task.application.assembler;
 import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.TaskResultFile;
 import com.example.cae.task.domain.model.TaskResultSummary;
+import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
 import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,12 @@ import java.util.Map;
 
 @Component
 public class TaskResultAssembler {
+	private final TaskStoragePathSupport taskStoragePathSupport;
+
+	public TaskResultAssembler(TaskStoragePathSupport taskStoragePathSupport) {
+		this.taskStoragePathSupport = taskStoragePathSupport;
+	}
+
 	public TaskResultSummaryResponse toSummaryResponse(TaskResultSummary summary) {
 		TaskResultSummaryResponse response = new TaskResultSummaryResponse();
 		response.setId(summary.getId());
@@ -30,7 +37,10 @@ public class TaskResultAssembler {
 		response.setTaskId(file.getTaskId());
 		response.setFileType(file.getFileType());
 		response.setFileName(file.getFileName());
-		response.setStoragePath(file.getStoragePath());
+		String displayPath = taskStoragePathSupport.toDisplayResultPath(file.getStoragePath());
+		response.setStoragePath(displayPath);
+		response.setRelativePath(displayPath);
+		response.setDownloadUrl("/api/tasks/result-files/" + file.getId() + "/download");
 		response.setFileSize(file.getFileSize());
 		response.setCreatedAt(file.getCreatedAt());
 		return response;

@@ -9,6 +9,7 @@ public class TaskFileResponse {
 	private String fileKey;
 	private String originName;
 	private String storagePath;
+	private String relativePath;
 	private Long fileSize;
 	private String fileSuffix;
 	private String checksum;
@@ -62,6 +63,14 @@ public class TaskFileResponse {
 		this.storagePath = storagePath;
 	}
 
+	public String getRelativePath() {
+		return relativePath;
+	}
+
+	public void setRelativePath(String relativePath) {
+		this.relativePath = relativePath;
+	}
+
 	public Long getFileSize() {
 		return fileSize;
 	}
@@ -94,4 +103,3 @@ public class TaskFileResponse {
 		this.createdAt = createdAt;
 	}
 }
-
