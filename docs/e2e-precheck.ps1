@@ -1,5 +1,10 @@
 param(
-    [string]$GatewayBaseUrl = "http://localhost:8080",
+    [string]$GatewayBaseUrl = "",
+    [string]$UserServiceBaseUrl = "",
+    [string]$SolverServiceBaseUrl = "",
+    [string]$TaskServiceBaseUrl = "",
+    [string]$SchedulerServiceBaseUrl = "",
+    [string]$NodeAgentBaseUrl = "",
     [string]$DbHost = "",
     [int]$DbPort = 0,
     [string]$DbUser = "",
@@ -34,6 +39,9 @@ function Resolve-DbConfig {
         }
     }
     if ([string]::IsNullOrWhiteSpace($DbUser)) {
+        $DbUser = $env:DB_USERNAME
+    }
+    if ([string]::IsNullOrWhiteSpace($DbUser)) {
         $DbUser = $env:DB_USER
     }
     if ([string]::IsNullOrWhiteSpace($DbPassword)) {
@@ -55,6 +63,59 @@ function Resolve-DbConfig {
         User = $DbUser
         Password = $DbPassword
         Names = $DbNames
+    }
+}
+
+function Resolve-ServiceBaseUrls {
+    if ([string]::IsNullOrWhiteSpace($GatewayBaseUrl)) {
+        $GatewayBaseUrl = $env:GATEWAY_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($GatewayBaseUrl)) {
+        $GatewayBaseUrl = "http://localhost:8080"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($UserServiceBaseUrl)) {
+        $UserServiceBaseUrl = $env:USER_SERVICE_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($UserServiceBaseUrl)) {
+        $UserServiceBaseUrl = "http://localhost:8081"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($SolverServiceBaseUrl)) {
+        $SolverServiceBaseUrl = $env:SOLVER_SERVICE_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($SolverServiceBaseUrl)) {
+        $SolverServiceBaseUrl = "http://localhost:8082"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($TaskServiceBaseUrl)) {
+        $TaskServiceBaseUrl = $env:TASK_SERVICE_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($TaskServiceBaseUrl)) {
+        $TaskServiceBaseUrl = "http://localhost:8083"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($SchedulerServiceBaseUrl)) {
+        $SchedulerServiceBaseUrl = $env:SCHEDULER_SERVICE_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($SchedulerServiceBaseUrl)) {
+        $SchedulerServiceBaseUrl = "http://localhost:8084"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($NodeAgentBaseUrl)) {
+        $NodeAgentBaseUrl = $env:NODE_AGENT_BASE_URL
+    }
+    if ([string]::IsNullOrWhiteSpace($NodeAgentBaseUrl)) {
+        $NodeAgentBaseUrl = "http://localhost:8085"
+    }
+
+    return [pscustomobject]@{
+        Gateway = $GatewayBaseUrl
+        User = $UserServiceBaseUrl
+        Solver = $SolverServiceBaseUrl
+        Task = $TaskServiceBaseUrl
+        Scheduler = $SchedulerServiceBaseUrl
+        NodeAgent = $NodeAgentBaseUrl
     }
 }
 
@@ -89,6 +150,22 @@ function Test-Port {
         return [bool]$probe.TcpTestSucceeded
     } catch {
         return $false
+    }
+}
+
+function Get-HostPortFromUrl {
+    param([string]$Url)
+
+    $uri = [System.Uri]$Url
+    $port = if ($uri.IsDefaultPort) {
+        if ($uri.Scheme -eq "https") { 443 } else { 80 }
+    } else {
+        $uri.Port
+    }
+
+    return [pscustomobject]@{
+        Host = $uri.Host
+        Port = $port
     }
 }
 
@@ -195,21 +272,24 @@ function Invoke-RouteProbe {
 }
 
 $results = @()
+$serviceBaseUrls = Resolve-ServiceBaseUrls
+$GatewayBaseUrl = $serviceBaseUrls.Gateway
 
-Write-Section "Service Port Checks (8080-8085)"
+Write-Section "Service Port Checks"
 $servicePorts = @(
-    @{ Name = "gateway-service"; Port = 8080 },
-    @{ Name = "user-service"; Port = 8081 },
-    @{ Name = "solver-service"; Port = 8082 },
-    @{ Name = "task-service"; Port = 8083 },
-    @{ Name = "scheduler-service"; Port = 8084 },
-    @{ Name = "node-agent"; Port = 8085 }
+    @{ Name = "gateway-service"; Url = $serviceBaseUrls.Gateway },
+    @{ Name = "user-service"; Url = $serviceBaseUrls.User },
+    @{ Name = "solver-service"; Url = $serviceBaseUrls.Solver },
+    @{ Name = "task-service"; Url = $serviceBaseUrls.Task },
+    @{ Name = "scheduler-service"; Url = $serviceBaseUrls.Scheduler },
+    @{ Name = "node-agent"; Url = $serviceBaseUrls.NodeAgent }
 )
 
 foreach ($svc in $servicePorts) {
-    $ok = Test-Port -ComputerName "localhost" -Port $svc.Port
+    $endpoint = Get-HostPortFromUrl -Url $svc.Url
+    $ok = Test-Port -ComputerName $endpoint.Host -Port $endpoint.Port
     $detail = if ($ok) { "listening" } else { "not listening" }
-    $results += Add-Result -Category "port" -Name "$($svc.Name):$($svc.Port)" -Passed $ok -Detail $detail
+    $results += Add-Result -Category "port" -Name "$($svc.Name):$($endpoint.Host):$($endpoint.Port)" -Passed $ok -Detail "$detail (baseUrl=$($svc.Url))"
 }
 
 if (-not $SkipDatabaseChecks) {
@@ -221,7 +301,7 @@ if (-not $SkipDatabaseChecks) {
 
     if ($dbPortOk) {
         if ([string]::IsNullOrWhiteSpace($dbConfig.User)) {
-            $results += Add-Result -Category "db" -Name "mysql-auth" -Passed $false -Detail "DB_USER is empty; set env vars using docs/db-config.example.ps1"
+            $results += Add-Result -Category "db" -Name "mysql-auth" -Passed $false -Detail "DB_USERNAME/DB_USER is empty; set env vars using docs/db-config.example.ps1"
         } else {
             foreach ($dbName in $dbConfig.Names) {
                 $dbCheck = Test-DatabaseByMysql -DbHost $dbConfig.Host -Port $dbConfig.Port -User $dbConfig.User -Password $dbConfig.Password -DbName $dbName

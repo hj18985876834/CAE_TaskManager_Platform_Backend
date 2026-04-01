@@ -1,5 +1,5 @@
 param(
-    [string]$GatewayBaseUrl = "http://localhost:8080",
+    [string]$GatewayBaseUrl = "",
     [string]$Username = "admin",
     [string]$Password = "123456",
     [long]$SolverId = 1,
@@ -11,6 +11,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($GatewayBaseUrl)) {
+    $GatewayBaseUrl = $env:GATEWAY_BASE_URL
+}
+if ([string]::IsNullOrWhiteSpace($GatewayBaseUrl)) {
+    $GatewayBaseUrl = "http://localhost:8080"
+}
 
 function Assert-GatewayReachable {
     param(

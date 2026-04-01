@@ -15,6 +15,16 @@ Verify one full business chain across gateway, user-service, task-service, sched
 
 ## 2. Service Matrix
 
+These are default local ports. In Docker Compose or other environments, prefer configuring base URLs through environment variables instead of assuming localhost.
+
+- `GATEWAY_BASE_URL`
+- `USER_SERVICE_BASE_URL`
+- `SOLVER_SERVICE_BASE_URL`
+- `TASK_SERVICE_BASE_URL`
+- `SCHEDULER_SERVICE_BASE_URL`
+- `NODE_AGENT_BASE_URL`
+- `NODE_ADVERTISED_HOST`
+
 - gateway-service: 8080
 - user-service: 8081
 - solver-service: 8082
@@ -47,6 +57,10 @@ Recommended command (repository docs folder):
 Optional with explicit DB/env inputs:
 
 - `./e2e-precheck.ps1 -GatewayBaseUrl "http://localhost:8080" -DbHost "localhost" -DbPort 3306`
+
+Optional with explicit service URLs:
+
+- `./e2e-precheck.ps1 -GatewayBaseUrl "http://gateway-service:8080" -TaskServiceBaseUrl "http://task-service:8083" -SchedulerServiceBaseUrl "http://scheduler-service:8084" -NodeAgentBaseUrl "http://node-agent:8085"`
 
 ### 3.3 Route Consistency Gate
 
