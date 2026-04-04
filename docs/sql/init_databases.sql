@@ -107,6 +107,7 @@ CREATE TABLE solver_task_profile (
     profile_code VARCHAR(50) NOT NULL COMMENT '模板编码',
     task_type VARCHAR(50) NOT NULL COMMENT '任务类型，如 STRUCT_STATIC / CFD_STEADY',
     profile_name VARCHAR(100) NOT NULL COMMENT '模板名称',
+    upload_mode VARCHAR(30) NOT NULL DEFAULT 'ZIP_ONLY' COMMENT '上传模式：ZIP_ONLY',
     command_template VARCHAR(255) NOT NULL COMMENT '命令模板',
     params_schema_json TEXT DEFAULT NULL COMMENT '参数模板定义JSON',
     parser_name VARCHAR(100) DEFAULT NULL COMMENT '结果解析器名称',
@@ -131,10 +132,12 @@ CREATE TABLE solver_profile_file_rule (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     profile_id BIGINT NOT NULL COMMENT '模板ID',
     file_key VARCHAR(50) NOT NULL COMMENT '文件标识，如 main_inp / case_zip',
+    path_pattern VARCHAR(255) DEFAULT NULL COMMENT '解压后相对路径规则，如 system/**',
     file_name_pattern VARCHAR(100) DEFAULT NULL COMMENT '文件名或匹配规则',
     file_type VARCHAR(30) NOT NULL COMMENT 'FILE / DIR / ZIP',
     required_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否必需',
     sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
+    rule_json TEXT DEFAULT NULL COMMENT '扩展约束JSON（数量/后缀/大小）',
     description VARCHAR(255) DEFAULT NULL COMMENT '说明',
     PRIMARY KEY (id),
     KEY idx_profile_id (profile_id),
@@ -147,14 +150,14 @@ INSERT INTO solver_definition (id, solver_code, solver_name, version, exec_mode,
 (1, 'OPENFOAM', 'OpenFOAM Solver', 'v10', 'LOCAL', '/opt/openfoam/bin/simpleFoam', 1, '稳态流场求解器', NOW(), NOW()),
 (2, 'CALCULIX', 'CalculiX Solver', '2.20', 'LOCAL', '/opt/calculix/bin/ccx', 1, '结构分析求解器', NOW(), NOW());
 
-INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
-(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'simpleFoam -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
-(2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ccx ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
+INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, upload_mode, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
+(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', 'simpleFoam -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
+(2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ZIP_ONLY', 'ccx ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
 
-INSERT INTO solver_profile_file_rule (id, profile_id, file_key, file_name_pattern, file_type, required_flag, sort_order, description) VALUES
-(1, 1, 'case_zip', '*.zip', 'ZIP', 1, 1, 'OpenFOAM算例压缩包'),
-(2, 1, 'control_dict', 'controlDict', 'FILE', 0, 2, '可选控制参数文件'),
-(3, 2, 'main_inp', '*.inp', 'FILE', 1, 1, 'CalculiX主输入文件');
+INSERT INTO solver_profile_file_rule (id, profile_id, file_key, path_pattern, file_name_pattern, file_type, required_flag, sort_order, rule_json, description) VALUES
+(1, 1, 'input_archive', '**', '*.zip', 'ZIP', 1, 1, '{"allowSuffix":["zip"],"maxSizeMb":2048}', 'OpenFOAM算例压缩包'),
+(2, 1, 'dir_system', 'system/**', 'controlDict', 'FILE', 1, 2, NULL, 'OpenFOAM system 目录规则'),
+(3, 2, 'main_inp', '**', '*.inp', 'FILE', 1, 1, '{"allowSuffix":["inp"],"minCount":1,"maxCount":1}', 'CalculiX主输入文件');
 
 -- =========================================================
 -- 3. task_db
@@ -230,6 +233,9 @@ CREATE TABLE task_file (
     file_key VARCHAR(50) NOT NULL COMMENT '对应模板中的文件标识',
     origin_name VARCHAR(255) NOT NULL COMMENT '原文件名',
     storage_path VARCHAR(500) NOT NULL COMMENT '存储路径',
+    unpack_dir VARCHAR(500) DEFAULT NULL COMMENT '解压后工作目录',
+    relative_path VARCHAR(500) DEFAULT NULL COMMENT '相对路径（解压后）',
+    archive_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否归档包：1是，0否',
     file_size BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小',
     file_suffix VARCHAR(20) DEFAULT NULL COMMENT '后缀名',
     checksum VARCHAR(100) DEFAULT NULL COMMENT '校验值',
@@ -306,10 +312,9 @@ INSERT INTO task_status_history (id, task_id, from_status, to_status, change_rea
 (7, 2, NULL, 'CREATED', 'task created', 'USER', 2, NOW()),
 (8, 2, 'CREATED', 'QUEUED', 'task submitted', 'USER', 2, NOW());
 
-INSERT INTO task_file (id, task_id, file_role, file_key, origin_name, storage_path, file_size, file_suffix, checksum, created_at) VALUES
-(1, 1, 'INPUT', 'case_zip', 'case-1.zip', CONCAT(@TASK_STORAGE_ROOT, '/1/input/case-1.zip'), 102400, 'zip', 'md5-demo-001', NOW()),
-(2, 1, 'CONFIG', 'control_dict', 'controlDict', CONCAT(@TASK_STORAGE_ROOT, '/1/input/controlDict'), 4096, NULL, 'md5-demo-002', NOW()),
-(3, 2, 'INPUT', 'main_inp', 'beam.inp', CONCAT(@TASK_STORAGE_ROOT, '/2/input/beam.inp'), 8192, 'inp', 'md5-demo-003', NOW());
+INSERT INTO task_file (id, task_id, file_role, file_key, origin_name, storage_path, unpack_dir, relative_path, archive_flag, file_size, file_suffix, checksum, created_at) VALUES
+(1, 1, 'ARCHIVE', 'input_archive', 'case-1.zip', CONCAT(@TASK_STORAGE_ROOT, '/1/input/case-1.zip'), CONCAT(@TASK_STORAGE_ROOT, '/1/workdir'), NULL, 1, 102400, 'zip', 'md5-demo-001', NOW()),
+(2, 2, 'ARCHIVE', 'input_archive', 'beam.zip', CONCAT(@TASK_STORAGE_ROOT, '/2/input/beam.zip'), CONCAT(@TASK_STORAGE_ROOT, '/2/workdir'), NULL, 1, 16384, 'zip', 'md5-demo-003', NOW());
 
 INSERT INTO task_result_summary (id, task_id, success_flag, duration_seconds, summary_text, metrics_json, created_at, updated_at) VALUES
 (1, 1, 1, 128, '计算完成，残差收敛', '{"maxResidual":9.8e-7,"iteration":420}', NOW(), NOW());
