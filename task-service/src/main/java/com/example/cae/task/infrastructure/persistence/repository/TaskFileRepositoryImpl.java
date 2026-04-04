@@ -44,6 +44,11 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 		return taskFileMapper.selectByTaskId(taskId).stream().map(this::toDomain).toList();
 	}
 
+	@Override
+	public void deleteById(Long id) {
+		taskFileMapper.deleteById(id);
+	}
+
 	private TaskFile toDomain(TaskFilePO po) {
 		TaskFile file = new TaskFile();
 		file.setId(po.getId());

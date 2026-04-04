@@ -1,6 +1,7 @@
 package com.example.cae.task.infrastructure.persistence.mapper;
 
 import com.example.cae.task.infrastructure.persistence.entity.TaskFilePO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -20,4 +21,7 @@ public interface TaskFileMapper {
 
 	@Update("UPDATE task_file SET file_role = #{fileRole}, file_key = #{fileKey}, origin_name = #{originName}, storage_path = #{storagePath}, unpack_dir = #{unpackDir}, relative_path = #{relativePath}, archive_flag = #{archiveFlag}, file_size = #{fileSize}, file_suffix = #{fileSuffix}, checksum = #{checksum} WHERE id = #{id}")
 	int updateById(TaskFilePO po);
+
+	@Delete("DELETE FROM task_file WHERE id = #{id}")
+	int deleteById(Long id);
 }

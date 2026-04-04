@@ -8,6 +8,7 @@ import com.example.cae.task.infrastructure.persistence.mapper.TaskMapper;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,5 +77,10 @@ public class TaskRepositoryImpl implements TaskRepository {
 	@Override
 	public long countFinished() {
 		return taskMapper.countFinished();
+	}
+
+	@Override
+	public List<Task> listStaleUnsubmittedTasks(LocalDateTime updatedBefore, int limit) {
+		return taskMapper.selectStaleUnsubmittedTasks(updatedBefore, limit).stream().map(taskAssembler::fromPO).toList();
 	}
 }

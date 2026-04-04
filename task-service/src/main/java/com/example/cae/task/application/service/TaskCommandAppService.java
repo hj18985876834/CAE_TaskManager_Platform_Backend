@@ -42,6 +42,10 @@ public class TaskCommandAppService {
 		return taskLifecycleManager.submitTask(taskId, userId);
 	}
 
+	public void discardTask(Long taskId, Long userId, String reason) {
+		taskLifecycleManager.discardTask(taskId, userId, reason);
+	}
+
 	public void cancelTask(Long taskId, Long userId, String reason) {
 		taskLifecycleManager.cancelTask(taskId, userId, reason);
 	}

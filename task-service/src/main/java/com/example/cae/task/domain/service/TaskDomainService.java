@@ -15,4 +15,8 @@ public class TaskDomainService {
 	public boolean canCancel(Task task) {
 		return task != null && taskCancelRule.canCancel(task.getStatus());
 	}
+
+	public boolean canDiscard(Task task) {
+		return task != null && taskCancelRule.canDiscard(task.getStatus());
+	}
 }

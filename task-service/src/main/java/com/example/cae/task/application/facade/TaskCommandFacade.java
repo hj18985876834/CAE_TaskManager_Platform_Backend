@@ -34,6 +34,10 @@ public class TaskCommandFacade {
 		return taskCommandAppService.submitTask(taskId, userId);
 	}
 
+	public void discardTask(Long taskId, Long userId, String reason) {
+		taskCommandAppService.discardTask(taskId, userId, reason);
+	}
+
 	public void cancelTask(Long taskId, Long userId, String reason) {
 		taskCommandAppService.cancelTask(taskId, userId, reason);
 	}

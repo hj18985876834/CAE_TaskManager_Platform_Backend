@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -20,7 +21,7 @@ public interface TaskMapper {
 	@Insert("INSERT INTO sim_task(task_no, task_name, user_id, solver_id, profile_id, task_type, status, priority, node_id, params_json, submit_time, start_time, end_time, fail_type, fail_message, deleted_flag) VALUES(#{taskNo}, #{taskName}, #{userId}, #{solverId}, #{profileId}, #{taskType}, #{status}, #{priority}, #{nodeId}, #{paramsJson}, #{submitTime}, #{startTime}, #{endTime}, #{failType}, #{failMessage}, #{deletedFlag})")
 	int insert(TaskPO po);
 
-	@Update("UPDATE sim_task SET task_name = #{taskName}, status = #{status}, priority = #{priority}, node_id = #{nodeId}, params_json = #{paramsJson}, submit_time = #{submitTime}, start_time = #{startTime}, end_time = #{endTime}, fail_type = #{failType}, fail_message = #{failMessage} WHERE id = #{id}")
+	@Update("UPDATE sim_task SET task_name = #{taskName}, status = #{status}, priority = #{priority}, node_id = #{nodeId}, params_json = #{paramsJson}, submit_time = #{submitTime}, start_time = #{startTime}, end_time = #{endTime}, fail_type = #{failType}, fail_message = #{failMessage}, deleted_flag = #{deletedFlag} WHERE id = #{id}")
 	int updateById(TaskPO po);
 
 	@Select({
@@ -122,4 +123,7 @@ public interface TaskMapper {
 
 	@Select("SELECT COUNT(1) FROM sim_task WHERE status IN ('SUCCESS','FAILED','CANCELED','TIMEOUT') AND deleted_flag = 0")
 	long countFinished();
+
+	@Select("SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt FROM sim_task WHERE deleted_flag = 0 AND submit_time IS NULL AND status IN ('CREATED','VALIDATED') AND updated_at <![CDATA[ <= ]]> #{updatedBefore} ORDER BY updated_at ASC, id ASC LIMIT #{limit}")
+	List<TaskPO> selectStaleUnsubmittedTasks(@Param("updatedBefore") LocalDateTime updatedBefore, @Param("limit") int limit);
 }

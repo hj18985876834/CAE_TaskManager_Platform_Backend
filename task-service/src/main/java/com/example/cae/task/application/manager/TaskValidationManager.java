@@ -92,8 +92,10 @@ public class TaskValidationManager {
 			throw ex;
 		}
 
-		taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
-		taskRepository.update(task);
+		if (!TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
+			taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
+			taskRepository.update(task);
+		}
 		TaskValidateResponse response = new TaskValidateResponse();
 		response.setTaskId(taskId);
 		response.setValid(Boolean.TRUE);

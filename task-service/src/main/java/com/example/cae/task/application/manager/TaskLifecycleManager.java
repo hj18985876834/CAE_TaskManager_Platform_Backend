@@ -80,9 +80,25 @@ public class TaskLifecycleManager {
 		taskValidationDomainService.checkTaskEditable(task);
 		UploadConstraint constraint = resolveUploadConstraint(task);
 		validateArchiveUpload(task, file, constraint);
+		TaskFile existingArchive = replaceExistingArchiveIfNeeded(task, constraint, userId);
 		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, constraint.fileKey(), constraint.fileRole());
 		taskFile.setArchiveFlag(1);
-		taskFileRepository.save(taskFile);
+		if (existingArchive == null) {
+			taskFileRepository.save(taskFile);
+		} else {
+			existingArchive.setFileRole(taskFile.getFileRole());
+			existingArchive.setFileKey(taskFile.getFileKey());
+			existingArchive.setOriginName(taskFile.getOriginName());
+			existingArchive.setStoragePath(taskFile.getStoragePath());
+			existingArchive.setUnpackDir(null);
+			existingArchive.setRelativePath(null);
+			existingArchive.setArchiveFlag(taskFile.getArchiveFlag());
+			existingArchive.setFileSize(taskFile.getFileSize());
+			existingArchive.setFileSuffix(taskFile.getFileSuffix());
+			existingArchive.setChecksum(taskFile.getChecksum());
+			taskFileRepository.update(existingArchive);
+			taskFile = existingArchive;
+		}
 		return toTaskFileResponse(taskFile);
 	}
 
@@ -133,6 +149,22 @@ public class TaskLifecycleManager {
 		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.CANCELED.name(), reason, OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
+	}
+
+	public void discardTask(Long taskId, Long userId, String reason) {
+		Task task = loadAndCheckOwner(taskId, userId);
+		if (!taskDomainService.canDiscard(task)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "task cannot be discarded in current status");
+		}
+		discardTaskInternal(task, reason);
+	}
+
+	public int cleanStaleUnsubmittedTasks() {
+		List<Task> staleTasks = taskRepository.listStaleUnsubmittedTasks(java.time.LocalDateTime.now().minusHours(24), 200);
+		for (Task staleTask : staleTasks) {
+			discardTaskInternal(staleTask, "stale unsubmitted task cleanup");
+		}
+		return staleTasks.size();
 	}
 
 	public void markScheduled(Long taskId, Long nodeId) {
@@ -226,13 +258,40 @@ public class TaskLifecycleManager {
 		if (file.getSize() > maxBytes) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "archive size exceeds limit");
 		}
-		boolean hasArchive = taskFileRepository.listByTaskId(task.getId()).stream().anyMatch(existing ->
-				constraint.fileRole().equalsIgnoreCase(existing.getFileRole())
-						&& constraint.fileKey().equalsIgnoreCase(existing.getFileKey())
-		);
-		if (hasArchive) {
-			throw new BizException(ErrorCodeConstants.CONFLICT, "archive file already uploaded");
+	}
+
+	private TaskFile replaceExistingArchiveIfNeeded(Task task, UploadConstraint constraint, Long userId) {
+		TaskFile existingArchive = taskFileRepository.listByTaskId(task.getId()).stream()
+				.filter(existing -> constraint.fileRole().equalsIgnoreCase(existing.getFileRole())
+						&& constraint.fileKey().equalsIgnoreCase(existing.getFileKey()))
+				.findFirst()
+				.orElse(null);
+		if (existingArchive == null) {
+			return null;
 		}
+		taskFileStorageService.deleteTaskArtifacts(task.getId());
+		deleteOtherTaskFiles(task.getId(), existingArchive.getId());
+		if (TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
+			taskStatusDomainService.transfer(task, TaskStatusEnum.CREATED.name(), "input archive replaced, re-validation required", OperatorTypeEnum.USER.name(), userId);
+			taskRepository.update(task);
+		}
+		return existingArchive;
+	}
+
+	private void deleteOtherTaskFiles(Long taskId, Long keepId) {
+		for (TaskFile taskFile : taskFileRepository.listByTaskId(taskId)) {
+			if (keepId != null && keepId.equals(taskFile.getId())) {
+				continue;
+			}
+			taskFileRepository.deleteById(taskFile.getId());
+		}
+	}
+
+	private void discardTaskInternal(Task task, String reason) {
+		deleteOtherTaskFiles(task.getId(), null);
+		taskFileStorageService.deleteTaskArtifacts(task.getId());
+		task.setDeletedFlag(1);
+		taskRepository.update(task);
 	}
 
 	private String extractSuffix(String fileName) {

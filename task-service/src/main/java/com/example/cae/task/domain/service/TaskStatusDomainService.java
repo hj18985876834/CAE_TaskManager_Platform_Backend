@@ -26,6 +26,7 @@ public class TaskStatusDomainService {
 		}
 
 		switch (normalizedTargetStatus) {
+			case "CREATED" -> task.resetToCreated();
 			case "VALIDATED" -> task.markValidated();
 			case "QUEUED" -> task.submit();
 			case "SCHEDULED" -> task.markScheduled();

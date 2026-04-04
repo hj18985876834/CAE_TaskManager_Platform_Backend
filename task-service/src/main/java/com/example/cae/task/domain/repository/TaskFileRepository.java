@@ -12,4 +12,6 @@ public interface TaskFileRepository {
 	void update(TaskFile file);
 
 	List<TaskFile> listByTaskId(Long taskId);
+
+	void deleteById(Long id);
 }

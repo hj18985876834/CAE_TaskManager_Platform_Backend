@@ -29,6 +29,16 @@ public class Task {
 		this.status = TaskStatusEnum.VALIDATED.name();
 	}
 
+	public void resetToCreated() {
+		this.status = TaskStatusEnum.CREATED.name();
+		this.submitTime = null;
+		this.nodeId = null;
+		this.failType = null;
+		this.failMessage = null;
+		this.startTime = null;
+		this.endTime = null;
+	}
+
 	public void submit() {
 		this.status = TaskStatusEnum.QUEUED.name();
 		this.submitTime = LocalDateTime.now();

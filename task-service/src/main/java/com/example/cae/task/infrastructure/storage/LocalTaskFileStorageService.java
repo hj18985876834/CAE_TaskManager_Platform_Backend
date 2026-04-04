@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 
 @Service
 public class LocalTaskFileStorageService implements TaskFileStorageService {
@@ -72,6 +73,28 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 			Files.deleteIfExists(Path.of(storagePath));
 		} catch (IOException ex) {
 			throw new IllegalStateException("delete file failed", ex);
+		}
+	}
+
+	@Override
+	public void deleteTaskArtifacts(Long taskId) {
+		if (taskId == null) {
+			return;
+		}
+		Path taskRoot = Path.of(taskPathResolver.resolveTaskRoot(taskId));
+		if (!Files.exists(taskRoot)) {
+			return;
+		}
+		try (var stream = Files.walk(taskRoot)) {
+			stream.sorted(Comparator.reverseOrder()).forEach(path -> {
+				try {
+					Files.deleteIfExists(path);
+				} catch (IOException ex) {
+					throw new IllegalStateException("delete task artifacts failed", ex);
+				}
+			});
+		} catch (IOException ex) {
+			throw new IllegalStateException("delete task artifacts failed", ex);
 		}
 	}
 

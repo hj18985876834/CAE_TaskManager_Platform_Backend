@@ -4,6 +4,7 @@ import com.example.cae.common.response.Result;
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CancelTaskRequest;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.request.DiscardTaskRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
@@ -53,6 +54,12 @@ public class TaskController {
 	@PostMapping("/{taskId}/submit")
 	public Result<TaskSubmitResponse> submitTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.submitTask(taskId, userId));
+	}
+
+	@PostMapping("/{taskId}/discard")
+	public Result<Void> discardTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody(required = false) DiscardTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
+		taskCommandAppService.discardTask(taskId, userId, request == null ? null : request.getReason());
+		return Result.success();
 	}
 
 	@PostMapping("/{taskId}/cancel")

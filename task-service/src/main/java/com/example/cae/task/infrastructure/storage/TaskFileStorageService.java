@@ -11,4 +11,6 @@ public interface TaskFileStorageService {
 	InputStream openFile(String storagePath);
 
 	void deleteFile(String storagePath);
+
+	void deleteTaskArtifacts(Long taskId);
 }

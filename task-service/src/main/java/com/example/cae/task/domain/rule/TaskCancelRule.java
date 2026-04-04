@@ -7,7 +7,10 @@ import java.util.Set;
 @Component
 public class TaskCancelRule {
 	public boolean canCancel(String status) {
-		return Set.of("CREATED", "VALIDATED", "QUEUED", "RUNNING").contains(status);
+		return Set.of("QUEUED", "RUNNING").contains(status);
+	}
+
+	public boolean canDiscard(String status) {
+		return Set.of("CREATED", "VALIDATED").contains(status);
 	}
 }
-
