@@ -2,10 +2,12 @@ package com.example.cae.task.application.facade;
 
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.request.UpdateTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
+import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskValidateResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +22,10 @@ public class TaskCommandFacade {
 
 	public TaskCreateResponse createTask(CreateTaskRequest request, Long userId) {
 		return taskCommandAppService.createTask(request, userId);
+	}
+
+	public TaskUpdateResponse updateTask(Long taskId, UpdateTaskRequest request, Long userId) {
+		return taskCommandAppService.updateTask(taskId, request, userId);
 	}
 
 	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {

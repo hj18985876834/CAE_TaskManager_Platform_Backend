@@ -5,15 +5,18 @@ import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CancelTaskRequest;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.DiscardTaskRequest;
+import com.example.cae.task.interfaces.request.UpdateTaskRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
+import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskValidateResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,6 +38,13 @@ public class TaskController {
 	@PostMapping
 	public Result<TaskCreateResponse> createTask(@Valid @RequestBody CreateTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskCommandAppService.createTask(request, userId));
+	}
+
+	@PutMapping("/{taskId}")
+	public Result<TaskUpdateResponse> updateTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+											 @Valid @RequestBody UpdateTaskRequest request,
+											 @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
+		return Result.success(taskCommandAppService.updateTask(taskId, request, userId));
 	}
 
 	@PostMapping("/{taskId}/files")

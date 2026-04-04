@@ -4,6 +4,7 @@ import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.application.assembler.TaskAssembler;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskFile;
@@ -19,14 +20,18 @@ import com.example.cae.task.infrastructure.support.TaskNoGenerator;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.StatusReportRequest;
+import com.example.cae.task.interfaces.request.UpdateTaskRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
+import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class TaskLifecycleManager {
@@ -73,6 +78,29 @@ public class TaskLifecycleManager {
 		taskRepository.save(task);
 		taskStatusDomainService.recordInitialStatus(task, "task created", OperatorTypeEnum.USER.name(), userId);
 		return taskAssembler.toCreateResponse(task);
+	}
+
+	public TaskUpdateResponse updateTask(Long taskId, UpdateTaskRequest request, Long userId) {
+		Task task = loadAndCheckOwner(taskId, userId);
+		taskValidationDomainService.checkTaskEditable(task);
+		ensureTaskUpdateRequestValid(request);
+
+		boolean paramsChanged = false;
+		if (request.getTaskName() != null) {
+			task.setTaskName(request.getTaskName());
+		}
+		if (request.getPriority() != null) {
+			task.setPriority(request.getPriority());
+		}
+		if (request.getParams() != null) {
+			paramsChanged = !Objects.equals(parseParamsJson(task.getParamsJson()), request.getParams());
+			task.setParamsJson(JsonUtil.toJson(request.getParams()));
+		}
+		if (paramsChanged && TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
+			taskStatusDomainService.transfer(task, TaskStatusEnum.CREATED.name(), "task parameters updated, re-validation required", OperatorTypeEnum.USER.name(), userId);
+		}
+		taskRepository.update(task);
+		return taskAssembler.toUpdateResponse(task);
 	}
 
 	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
@@ -292,6 +320,30 @@ public class TaskLifecycleManager {
 		taskFileStorageService.deleteTaskArtifacts(task.getId());
 		task.setDeletedFlag(1);
 		taskRepository.update(task);
+	}
+
+	private void ensureTaskUpdateRequestValid(UpdateTaskRequest request) {
+		if (request == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "update request is required");
+		}
+		if (request.getTaskName() == null && request.getPriority() == null && request.getParams() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "at least one editable field is required");
+		}
+		if (request.getTaskName() != null && request.getTaskName().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskName cannot be blank");
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> parseParamsJson(String paramsJson) {
+		if (paramsJson == null || paramsJson.isBlank()) {
+			return null;
+		}
+		Object parsed = JsonUtil.fromJson(paramsJson, Map.class);
+		if (parsed instanceof Map<?, ?> map) {
+			return (Map<String, Object>) map;
+		}
+		return null;
 	}
 
 	private String extractSuffix(String fileName) {

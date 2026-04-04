@@ -9,6 +9,7 @@ import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -36,6 +37,14 @@ public class TaskAssembler {
 		TaskCreateResponse response = new TaskCreateResponse();
 		response.setTaskId(task.getId());
 		response.setTaskNo(task.getTaskNo());
+		response.setStatus(task.getStatus());
+		response.setPriority(task.getPriority());
+		return response;
+	}
+
+	public TaskUpdateResponse toUpdateResponse(Task task) {
+		TaskUpdateResponse response = new TaskUpdateResponse();
+		response.setTaskId(task.getId());
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
 		return response;
