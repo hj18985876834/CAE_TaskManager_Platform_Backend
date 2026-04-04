@@ -4,10 +4,12 @@ public class FileRuleDTO {
     private Long ruleId;
     private Long profileId;
     private String fileKey;
+    private String pathPattern;
     private String fileNamePattern;
     private String fileType;
     private Integer requiredFlag;
     private Integer sortOrder;
+    private String ruleJson;
     private String remark;
 
     public Long getRuleId() {
@@ -38,6 +40,14 @@ public class FileRuleDTO {
         return fileNamePattern;
     }
 
+    public String getPathPattern() {
+        return pathPattern;
+    }
+
+    public void setPathPattern(String pathPattern) {
+        this.pathPattern = pathPattern;
+    }
+
     public void setFileNamePattern(String fileNamePattern) {
         this.fileNamePattern = fileNamePattern;
     }
@@ -64,6 +74,14 @@ public class FileRuleDTO {
 
     public void setSortOrder(Integer sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public String getRuleJson() {
+        return ruleJson;
+    }
+
+    public void setRuleJson(String ruleJson) {
+        this.ruleJson = ruleJson;
     }
 
     public String getRemark() {

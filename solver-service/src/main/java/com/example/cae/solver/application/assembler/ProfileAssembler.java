@@ -18,6 +18,7 @@ public class ProfileAssembler {
 		profile.setProfileCode(request.getProfileCode());
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
+		profile.setUploadMode(request.getUploadMode());
 		profile.setCommandTemplate(request.getCommandTemplate());
 		profile.setParamsSchemaJson(resolveParamsSchema(request.getParamsSchema(), request.getParamsSchemaJson()));
 		profile.setParserName(request.getParserName());
@@ -37,6 +38,7 @@ public class ProfileAssembler {
 			   response.setProfileCode(profile.getProfileCode());
 			   response.setTaskType(profile.getTaskType());
 			   response.setProfileName(profile.getProfileName());
+			   response.setUploadMode(profile.getUploadMode());
 			   response.setParamsSchema(profile.getParamsSchemaJson());
 			   response.setCommandTemplate(profile.getCommandTemplate());
 			   response.setParserName(profile.getParserName());
@@ -54,6 +56,7 @@ public class ProfileAssembler {
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
+		response.setUploadMode(profile.getUploadMode());
 		response.setCommandTemplate(profile.getCommandTemplate());
 		response.setParamsSchema(profile.getParamsSchemaJson());
 		response.setParamsSchemaJson(profile.getParamsSchemaJson());
@@ -96,6 +99,7 @@ public class ProfileAssembler {
 		profile.setProfileCode(po.getProfileCode());
 		profile.setTaskType(po.getTaskType());
 		profile.setProfileName(po.getProfileName());
+		profile.setUploadMode(po.getUploadMode());
 		profile.setCommandTemplate(po.getCommandTemplate());
 		profile.setParamsSchemaJson(po.getParamsSchemaJson());
 		profile.setParserName(po.getParserName());
@@ -114,6 +118,7 @@ public class ProfileAssembler {
 		po.setProfileCode(profile.getProfileCode());
 		po.setTaskType(profile.getTaskType());
 		po.setProfileName(profile.getProfileName());
+		po.setUploadMode(profile.getUploadMode());
 		po.setCommandTemplate(profile.getCommandTemplate());
 		po.setParamsSchemaJson(profile.getParamsSchemaJson());
 		po.setParserName(profile.getParserName());

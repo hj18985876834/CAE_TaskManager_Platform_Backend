@@ -53,10 +53,12 @@ public class SolverClient {
 			dto.setRuleId(toLong(map.get("ruleId")));
 			dto.setProfileId(toLong(map.get("profileId")));
 			dto.setFileKey(toString(map.get("fileKey")));
+			dto.setPathPattern(toString(map.get("pathPattern")));
 			dto.setFileNamePattern(toString(map.get("fileNamePattern")));
 			dto.setFileType(toString(map.get("fileType")));
 			dto.setRequiredFlag(toInteger(map.get("requiredFlag")));
 			dto.setSortOrder(toInteger(map.get("sortOrder")));
+			dto.setRuleJson(toString(map.get("ruleJson")));
 			dto.setRemark(toString(map.get("remark")));
 			rules.add(dto);
 		}
@@ -67,6 +69,32 @@ public class SolverClient {
 		String url = solverServiceBaseUrl + "/api/profiles/" + profileId + "/upload-spec";
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		return result == null ? null : result.getData();
+	}
+
+	@SuppressWarnings("unchecked")
+	public UploadSpecMeta getUploadSpecMeta(Long profileId) {
+		Object data = getUploadSpec(profileId);
+		if (!(data instanceof Map<?, ?> dataMap)) {
+			return null;
+		}
+		Map<String, Object> map = (Map<String, Object>) dataMap;
+		UploadSpecMeta meta = new UploadSpecMeta();
+		meta.setUploadMode(toString(map.get("uploadMode")));
+		if (map.get("archiveRule") instanceof Map<?, ?> archiveRuleMapRaw) {
+			Map<String, Object> archiveRuleMap = (Map<String, Object>) archiveRuleMapRaw;
+			meta.setArchiveFileKey(toString(archiveRuleMap.get("fileKey")));
+			meta.setMaxSizeMb(toInteger(archiveRuleMap.get("maxSizeMb")));
+			if (archiveRuleMap.get("allowSuffix") instanceof List<?> suffixRows) {
+				List<String> suffixes = new ArrayList<>();
+				for (Object suffix : suffixRows) {
+					if (suffix != null) {
+						suffixes.add(String.valueOf(suffix));
+					}
+				}
+				meta.setAllowSuffix(suffixes);
+			}
+		}
+		return meta;
 	}
 
 	public String getSolverCode(Long solverId) {
@@ -160,6 +188,45 @@ public class SolverClient {
 
 		public void setTimeoutSeconds(Integer timeoutSeconds) {
 			this.timeoutSeconds = timeoutSeconds;
+		}
+	}
+
+	public static class UploadSpecMeta {
+		private String uploadMode;
+		private String archiveFileKey;
+		private Integer maxSizeMb;
+		private List<String> allowSuffix;
+
+		public String getUploadMode() {
+			return uploadMode;
+		}
+
+		public void setUploadMode(String uploadMode) {
+			this.uploadMode = uploadMode;
+		}
+
+		public String getArchiveFileKey() {
+			return archiveFileKey;
+		}
+
+		public void setArchiveFileKey(String archiveFileKey) {
+			this.archiveFileKey = archiveFileKey;
+		}
+
+		public Integer getMaxSizeMb() {
+			return maxSizeMb;
+		}
+
+		public void setMaxSizeMb(Integer maxSizeMb) {
+			this.maxSizeMb = maxSizeMb;
+		}
+
+		public List<String> getAllowSuffix() {
+			return allowSuffix;
+		}
+
+		public void setAllowSuffix(List<String> allowSuffix) {
+			this.allowSuffix = allowSuffix;
 		}
 	}
 }

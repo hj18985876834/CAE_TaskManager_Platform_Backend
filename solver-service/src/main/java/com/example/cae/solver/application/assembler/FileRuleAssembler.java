@@ -14,10 +14,12 @@ public class FileRuleAssembler {
 		SolverProfileFileRule rule = new SolverProfileFileRule();
 		rule.setProfileId(profileId);
 		rule.setFileKey(request.getFileKey());
+		rule.setPathPattern(request.getPathPattern());
 		rule.setFileNamePattern(request.getFileNamePattern());
 		rule.setFileType(request.getFileType());
 		rule.setRequiredFlag(request.getRequiredFlag());
 		rule.setSortOrder(request.getSortOrder());
+		rule.setRuleJson(request.getRuleJson());
 		rule.setRemark(resolveDescription(request.getDescription(), request.getRemark()));
 		return rule;
 	}
@@ -28,10 +30,12 @@ public class FileRuleAssembler {
 		response.setRuleId(rule.getId());
 		response.setProfileId(rule.getProfileId());
 		response.setFileKey(rule.getFileKey());
+		response.setPathPattern(rule.getPathPattern());
 		response.setFileNamePattern(rule.getFileNamePattern());
 		response.setFileType(rule.getFileType());
 		response.setRequiredFlag(rule.getRequiredFlag());
 		response.setSortOrder(rule.getSortOrder());
+		response.setRuleJson(rule.getRuleJson());
 		response.setDescription(rule.getRemark());
 		response.setRemark(rule.getRemark());
 		return response;
@@ -42,8 +46,12 @@ public class FileRuleAssembler {
 		response.setRuleId(rule.getId());
 		response.setProfileId(rule.getProfileId());
 		response.setFileKey(rule.getFileKey());
+		response.setPathPattern(rule.getPathPattern());
 		response.setFileNamePattern(rule.getFileNamePattern());
+		response.setFileType(rule.getFileType());
 		response.setRequiredFlag(rule.getRequiredFlag());
+		response.setSortOrder(rule.getSortOrder());
+		response.setRuleJson(rule.getRuleJson());
 		return response;
 	}
 
@@ -59,10 +67,12 @@ public class FileRuleAssembler {
 		rule.setId(po.getId());
 		rule.setProfileId(po.getProfileId());
 		rule.setFileKey(po.getFileKey());
+		rule.setPathPattern(po.getPathPattern());
 		rule.setFileNamePattern(po.getFileNamePattern());
 		rule.setFileType(po.getFileType());
 		rule.setRequiredFlag(po.getRequiredFlag());
 		rule.setSortOrder(po.getSortOrder());
+		rule.setRuleJson(po.getRuleJson());
 		rule.setRemark(po.getRemark());
 		return rule;
 	}
@@ -72,10 +82,12 @@ public class FileRuleAssembler {
 		po.setId(rule.getId());
 		po.setProfileId(rule.getProfileId());
 		po.setFileKey(rule.getFileKey());
+		po.setPathPattern(rule.getPathPattern());
 		po.setFileNamePattern(rule.getFileNamePattern());
 		po.setFileType(rule.getFileType());
 		po.setRequiredFlag(rule.getRequiredFlag());
 		po.setSortOrder(rule.getSortOrder());
+		po.setRuleJson(rule.getRuleJson());
 		po.setRemark(rule.getRemark());
 		return po;
 	}

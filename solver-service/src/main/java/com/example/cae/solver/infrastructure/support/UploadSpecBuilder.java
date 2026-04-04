@@ -19,6 +19,7 @@ public class UploadSpecBuilder {
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());
+		response.setUploadMode(profile.getUploadMode());
 		response.setParamsSchema(profile.getParamsSchemaJson());
 		response.setParamsSchemaJson(profile.getParamsSchemaJson());
 		response.setTimeoutSeconds(profile.getTimeoutSeconds());
@@ -39,6 +40,12 @@ public class UploadSpecBuilder {
 		response.setRequiredFiles(requiredFiles);
 		response.setOptionalFiles(optionalFiles);
 		response.setFileRules(Stream.concat(requiredFiles.stream(), optionalFiles.stream()).toList());
+
+		UploadSpecResponse.ArchiveRule archiveRule = new UploadSpecResponse.ArchiveRule();
+		archiveRule.setFileKey("input_archive");
+		archiveRule.setAllowSuffix(java.util.List.of("zip"));
+		archiveRule.setMaxSizeMb(2048);
+		response.setArchiveRule(archiveRule);
 		return response;
 	}
 }

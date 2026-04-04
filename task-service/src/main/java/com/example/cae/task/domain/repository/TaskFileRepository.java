@@ -9,5 +9,7 @@ public interface TaskFileRepository {
 
 	void saveBatch(List<TaskFile> files);
 
+	void update(TaskFile file);
+
 	List<TaskFile> listByTaskId(Long taskId);
 }

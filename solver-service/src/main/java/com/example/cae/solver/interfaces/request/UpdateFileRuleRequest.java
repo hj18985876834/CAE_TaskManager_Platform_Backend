@@ -7,6 +7,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class UpdateFileRuleRequest {
+	@NotBlank(message = "pathPattern不能为空")
+	@Size(max = 255, message = "pathPattern长度不能超过255")
+	private String pathPattern;
 	@NotBlank(message = "fileNamePattern不能为空")
 	@Size(max = 255, message = "fileNamePattern长度不能超过255")
 	private String fileNamePattern;
@@ -24,6 +27,15 @@ public class UpdateFileRuleRequest {
 	private String description;
 	@Size(max = 255, message = "remark长度不能超过255")
 	private String remark;
+	private String ruleJson;
+
+	public String getPathPattern() {
+		return pathPattern;
+	}
+
+	public void setPathPattern(String pathPattern) {
+		this.pathPattern = pathPattern;
+	}
 
 	public String getFileNamePattern() {
 		return fileNamePattern;
@@ -72,4 +84,13 @@ public class UpdateFileRuleRequest {
 	public void setRemark(String remark) {
 		this.remark = remark;
 	}
+
+	public String getRuleJson() {
+		return ruleJson;
+	}
+
+	public void setRuleJson(String ruleJson) {
+		this.ruleJson = ruleJson;
+	}
 }
+

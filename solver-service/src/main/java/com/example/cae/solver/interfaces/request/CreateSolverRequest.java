@@ -92,3 +92,4 @@ public class CreateSolverRequest {
 		this.remark = remark;
 	}
 }
+

@@ -10,6 +10,9 @@ public class CreateFileRuleRequest {
 	@NotBlank(message = "fileKey不能为空")
 	@Size(max = 64, message = "fileKey长度不能超过64")
 	private String fileKey;
+	@NotBlank(message = "pathPattern不能为空")
+	@Size(max = 255, message = "pathPattern长度不能超过255")
+	private String pathPattern;
 	@NotBlank(message = "fileNamePattern不能为空")
 	@Size(max = 255, message = "fileNamePattern长度不能超过255")
 	private String fileNamePattern;
@@ -27,6 +30,7 @@ public class CreateFileRuleRequest {
 	private String description;
 	@Size(max = 255, message = "remark长度不能超过255")
 	private String remark;
+	private String ruleJson;
 
 	public String getFileKey() {
 		return fileKey;
@@ -34,6 +38,14 @@ public class CreateFileRuleRequest {
 
 	public void setFileKey(String fileKey) {
 		this.fileKey = fileKey;
+	}
+
+	public String getPathPattern() {
+		return pathPattern;
+	}
+
+	public void setPathPattern(String pathPattern) {
+		this.pathPattern = pathPattern;
 	}
 
 	public String getFileNamePattern() {
@@ -83,4 +95,13 @@ public class CreateFileRuleRequest {
 	public void setRemark(String remark) {
 		this.remark = remark;
 	}
+
+	public String getRuleJson() {
+		return ruleJson;
+	}
+
+	public void setRuleJson(String ruleJson) {
+		this.ruleJson = ruleJson;
+	}
 }
+

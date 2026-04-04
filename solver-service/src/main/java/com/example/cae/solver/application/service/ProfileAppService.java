@@ -74,6 +74,7 @@ public class ProfileAppService {
 		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
+		profile.setUploadMode(request.getUploadMode());
 		profile.setCommandTemplate(request.getCommandTemplate());
 		if (request.getParamsSchema() != null && !request.getParamsSchema().isBlank()) {
 			profile.setParamsSchemaJson(request.getParamsSchema());

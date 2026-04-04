@@ -4,10 +4,12 @@ public class SolverProfileFileRule {
 	private Long id;
 	private Long profileId;
 	private String fileKey;
+	private String pathPattern;
 	private String fileNamePattern;
 	private String fileType;
 	private Integer requiredFlag;
 	private Integer sortOrder;
+	private String ruleJson;
 	private String remark;
 
 	public boolean isRequired() {
@@ -46,6 +48,14 @@ public class SolverProfileFileRule {
 		this.fileKey = fileKey;
 	}
 
+	public String getPathPattern() {
+		return pathPattern;
+	}
+
+	public void setPathPattern(String pathPattern) {
+		this.pathPattern = pathPattern;
+	}
+
 	public String getFileNamePattern() {
 		return fileNamePattern;
 	}
@@ -76,6 +86,14 @@ public class SolverProfileFileRule {
 
 	public void setSortOrder(Integer sortOrder) {
 		this.sortOrder = sortOrder;
+	}
+
+	public String getRuleJson() {
+		return ruleJson;
+	}
+
+	public void setRuleJson(String ruleJson) {
+		this.ruleJson = ruleJson;
 	}
 
 	public String getRemark() {

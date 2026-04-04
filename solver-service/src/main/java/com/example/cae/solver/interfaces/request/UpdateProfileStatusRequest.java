@@ -18,3 +18,4 @@ public class UpdateProfileStatusRequest {
 		this.enabled = enabled;
 	}
 }
+

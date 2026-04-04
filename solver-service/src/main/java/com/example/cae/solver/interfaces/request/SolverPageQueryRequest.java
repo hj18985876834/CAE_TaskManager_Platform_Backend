@@ -53,3 +53,4 @@ public class SolverPageQueryRequest {
 		this.enabled = enabled;
 	}
 }
+

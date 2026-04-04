@@ -33,6 +33,13 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 	}
 
 	@Override
+	public void update(TaskFile file) {
+		TaskFilePO po = toPO(file);
+		po.setId(file.getId());
+		taskFileMapper.updateById(po);
+	}
+
+	@Override
 	public List<TaskFile> listByTaskId(Long taskId) {
 		return taskFileMapper.selectByTaskId(taskId).stream().map(this::toDomain).toList();
 	}
@@ -45,6 +52,9 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 		file.setFileKey(po.getFileKey());
 		file.setOriginName(po.getOriginName());
 		file.setStoragePath(po.getStoragePath());
+		file.setUnpackDir(po.getUnpackDir());
+		file.setRelativePath(po.getRelativePath());
+		file.setArchiveFlag(po.getArchiveFlag());
 		file.setFileSize(po.getFileSize());
 		file.setFileSuffix(po.getFileSuffix());
 		file.setChecksum(po.getChecksum());
@@ -59,6 +69,9 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 		po.setFileKey(file.getFileKey());
 		po.setOriginName(file.getOriginName());
 		po.setStoragePath(file.getStoragePath());
+		po.setUnpackDir(file.getUnpackDir());
+		po.setRelativePath(file.getRelativePath());
+		po.setArchiveFlag(file.getArchiveFlag());
 		po.setFileSize(file.getFileSize());
 		po.setFileSuffix(file.getFileSuffix());
 		po.setChecksum(file.getChecksum());

@@ -68,3 +68,4 @@ public class UpdateSolverRequest {
 		this.remark = remark;
 	}
 }
+

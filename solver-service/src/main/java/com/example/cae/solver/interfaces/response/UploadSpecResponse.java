@@ -7,6 +7,8 @@ public class UploadSpecResponse {
 	private String profileCode;
 	private String taskType;
 	private String profileName;
+	private String uploadMode;
+	private ArchiveRule archiveRule;
 	private String paramsSchema;
 	private String paramsSchemaJson;
 	private Integer timeoutSeconds;
@@ -45,6 +47,22 @@ public class UploadSpecResponse {
 
 	public void setProfileName(String profileName) {
 		this.profileName = profileName;
+	}
+
+	public String getUploadMode() {
+		return uploadMode;
+	}
+
+	public void setUploadMode(String uploadMode) {
+		this.uploadMode = uploadMode;
+	}
+
+	public ArchiveRule getArchiveRule() {
+		return archiveRule;
+	}
+
+	public void setArchiveRule(ArchiveRule archiveRule) {
+		this.archiveRule = archiveRule;
 	}
 
 	public Integer getTimeoutSeconds() {
@@ -101,5 +119,35 @@ public class UploadSpecResponse {
 
 	public void setOptionalFiles(List<FileRuleResponse> optionalFiles) {
 		this.optionalFiles = optionalFiles;
+	}
+
+	public static class ArchiveRule {
+		private String fileKey;
+		private java.util.List<String> allowSuffix;
+		private Integer maxSizeMb;
+
+		public String getFileKey() {
+			return fileKey;
+		}
+
+		public void setFileKey(String fileKey) {
+			this.fileKey = fileKey;
+		}
+
+		public java.util.List<String> getAllowSuffix() {
+			return allowSuffix;
+		}
+
+		public void setAllowSuffix(java.util.List<String> allowSuffix) {
+			this.allowSuffix = allowSuffix;
+		}
+
+		public Integer getMaxSizeMb() {
+			return maxSizeMb;
+		}
+
+		public void setMaxSizeMb(Integer maxSizeMb) {
+			this.maxSizeMb = maxSizeMb;
+		}
 	}
 }

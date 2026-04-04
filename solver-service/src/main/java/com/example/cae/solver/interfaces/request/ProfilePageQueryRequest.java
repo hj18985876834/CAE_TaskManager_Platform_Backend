@@ -64,3 +64,4 @@ public class ProfilePageQueryRequest {
 		this.enabled = enabled;
 	}
 }
+

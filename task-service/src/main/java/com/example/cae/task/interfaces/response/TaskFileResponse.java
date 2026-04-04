@@ -9,6 +9,9 @@ public class TaskFileResponse {
 	private String fileKey;
 	private String originName;
 	private String storagePath;
+	private String unpackDir;
+	private String relativePath;
+	private Integer archiveFlag;
 	private Long fileSize;
 	private String fileSuffix;
 	private String checksum;
@@ -60,6 +63,30 @@ public class TaskFileResponse {
 
 	public void setStoragePath(String storagePath) {
 		this.storagePath = storagePath;
+	}
+
+	public String getUnpackDir() {
+		return unpackDir;
+	}
+
+	public void setUnpackDir(String unpackDir) {
+		this.unpackDir = unpackDir;
+	}
+
+	public String getRelativePath() {
+		return relativePath;
+	}
+
+	public void setRelativePath(String relativePath) {
+		this.relativePath = relativePath;
+	}
+
+	public Integer getArchiveFlag() {
+		return archiveFlag;
+	}
+
+	public void setArchiveFlag(Integer archiveFlag) {
+		this.archiveFlag = archiveFlag;
 	}
 
 	public Long getFileSize() {

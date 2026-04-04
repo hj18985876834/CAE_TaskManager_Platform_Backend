@@ -78,3 +78,4 @@ public class ProfileController {
 		return Result.success(profileFacade.getFileRules(profileId));
 	}
 }
+

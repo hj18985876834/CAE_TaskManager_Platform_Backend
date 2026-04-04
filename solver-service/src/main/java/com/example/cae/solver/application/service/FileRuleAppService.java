@@ -39,10 +39,12 @@ public class FileRuleAppService {
 	public void updateFileRule(Long ruleId, UpdateFileRuleRequest request) {
 		profileRuleValidator.validateUpdateRule(request);
 		SolverProfileFileRule rule = fileRuleRepository.findById(ruleId).orElseThrow(() -> new BizException(ErrorCodeConstants.FILE_RULE_NOT_FOUND, "rule not found"));
+		rule.setPathPattern(request.getPathPattern());
 		rule.setFileNamePattern(request.getFileNamePattern());
 		rule.setFileType(request.getFileType());
 		rule.setRequiredFlag(request.getRequiredFlag());
 		rule.setSortOrder(request.getSortOrder());
+		rule.setRuleJson(request.getRuleJson());
 		if (request.getDescription() != null && !request.getDescription().isBlank()) {
 			rule.setRemark(request.getDescription());
 		} else {

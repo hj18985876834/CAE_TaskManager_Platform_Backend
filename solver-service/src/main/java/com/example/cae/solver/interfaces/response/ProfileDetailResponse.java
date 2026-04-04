@@ -9,6 +9,7 @@ public class ProfileDetailResponse {
 	private String profileCode;
 	private String taskType;
 	private String profileName;
+	private String uploadMode;
 	private String commandTemplate;
 	private String paramsSchema;
 	private String paramsSchemaJson;
@@ -64,6 +65,14 @@ public class ProfileDetailResponse {
 
 	public void setProfileName(String profileName) {
 		this.profileName = profileName;
+	}
+
+	public String getUploadMode() {
+		return uploadMode;
+	}
+
+	public void setUploadMode(String uploadMode) {
+		this.uploadMode = uploadMode;
 	}
 
 	public String getCommandTemplate() {

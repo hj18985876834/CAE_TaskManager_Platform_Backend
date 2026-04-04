@@ -129,6 +129,9 @@ public class TaskDispatchManager {
 		dto.setFileKey(file.getFileKey());
 		dto.setOriginName(file.getOriginName());
 		dto.setStoragePath(taskStoragePathSupport.toAbsoluteTaskPath(file.getStoragePath()));
+		dto.setUnpackDir(taskStoragePathSupport.toAbsoluteTaskPath(file.getUnpackDir()));
+		dto.setRelativePath(file.getRelativePath());
+		dto.setArchiveFlag(file.getArchiveFlag());
 		dto.setFileSize(file.getFileSize());
 		return dto;
 	}

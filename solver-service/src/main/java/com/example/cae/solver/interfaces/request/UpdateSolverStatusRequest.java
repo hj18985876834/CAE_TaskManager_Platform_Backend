@@ -18,3 +18,4 @@ public class UpdateSolverStatusRequest {
 		this.enabled = enabled;
 	}
 }
+

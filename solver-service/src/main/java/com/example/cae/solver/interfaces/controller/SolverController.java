@@ -78,3 +78,4 @@ public class SolverController {
 		return Result.success(solverFacade.getSolverTaskOptions(solverId));
 	}
 }
+

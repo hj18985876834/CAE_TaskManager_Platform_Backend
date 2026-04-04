@@ -7,6 +7,7 @@ public class ProfileListItemResponse {
 	private String profileCode;
 	private String taskType;
 	private String profileName;
+	private String uploadMode;
 	private String paramsSchema;
 	private String commandTemplate;
 	private String parserName;
@@ -75,6 +76,14 @@ public class ProfileListItemResponse {
 
 	public void setProfileName(String profileName) {
 		this.profileName = profileName;
+	}
+
+	public String getUploadMode() {
+		return uploadMode;
+	}
+
+	public void setUploadMode(String uploadMode) {
+		this.uploadMode = uploadMode;
 	}
 
 	public String getParamsSchema() {

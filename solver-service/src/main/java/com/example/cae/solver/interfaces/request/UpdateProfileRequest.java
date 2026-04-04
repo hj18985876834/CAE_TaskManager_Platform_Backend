@@ -12,6 +12,9 @@ public class UpdateProfileRequest {
 	@NotBlank(message = "profileName不能为空")
 	@Size(max = 128, message = "profileName长度不能超过128")
 	private String profileName;
+	@NotBlank(message = "uploadMode不能为空")
+	@Size(max = 32, message = "uploadMode长度不能超过32")
+	private String uploadMode;
 	@NotBlank(message = "commandTemplate不能为空")
 	private String commandTemplate;
 	private String paramsSchema;
@@ -39,6 +42,14 @@ public class UpdateProfileRequest {
 
 	public void setProfileName(String profileName) {
 		this.profileName = profileName;
+	}
+
+	public String getUploadMode() {
+		return uploadMode;
+	}
+
+	public void setUploadMode(String uploadMode) {
+		this.uploadMode = uploadMode;
 	}
 
 	public String getCommandTemplate() {
@@ -89,3 +100,4 @@ public class UpdateProfileRequest {
 		this.description = description;
 	}
 }
+

@@ -12,6 +12,7 @@ import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
+import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.storage.TaskFileStorageService;
 import com.example.cae.task.infrastructure.support.TaskNoGenerator;
@@ -24,6 +25,9 @@ import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Locale;
+
 @Service
 public class TaskLifecycleManager {
 	private final TaskRepository taskRepository;
@@ -35,6 +39,7 @@ public class TaskLifecycleManager {
 	private final TaskAssembler taskAssembler;
 	private final TaskNoGenerator taskNoGenerator;
 	private final SchedulerClient schedulerClient;
+	private final SolverClient solverClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskLifecycleManager(TaskRepository taskRepository,
@@ -46,6 +51,7 @@ public class TaskLifecycleManager {
 								TaskAssembler taskAssembler,
 								TaskNoGenerator taskNoGenerator,
 								SchedulerClient schedulerClient,
+								SolverClient solverClient,
 								TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
@@ -56,6 +62,7 @@ public class TaskLifecycleManager {
 		this.taskAssembler = taskAssembler;
 		this.taskNoGenerator = taskNoGenerator;
 		this.schedulerClient = schedulerClient;
+		this.solverClient = solverClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
@@ -71,9 +78,33 @@ public class TaskLifecycleManager {
 	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskEditable(task);
-		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, fileKey, fileRole);
+		UploadConstraint constraint = resolveUploadConstraint(task);
+		validateArchiveUpload(task, file, constraint);
+		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, constraint.fileKey(), constraint.fileRole());
+		taskFile.setArchiveFlag(1);
 		taskFileRepository.save(taskFile);
 		return toTaskFileResponse(taskFile);
+	}
+
+	private UploadConstraint resolveUploadConstraint(Task task) {
+		SolverClient.UploadSpecMeta uploadSpecMeta = solverClient.getUploadSpecMeta(task.getProfileId());
+		String uploadMode = uploadSpecMeta == null || uploadSpecMeta.getUploadMode() == null
+				? "ZIP_ONLY"
+				: uploadSpecMeta.getUploadMode();
+		if (!"ZIP_ONLY".equalsIgnoreCase(uploadMode)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported uploadMode: " + uploadMode);
+		}
+		String archiveFileKey = uploadSpecMeta == null || uploadSpecMeta.getArchiveFileKey() == null || uploadSpecMeta.getArchiveFileKey().isBlank()
+				? "input_archive"
+				: uploadSpecMeta.getArchiveFileKey();
+		Integer maxSizeMb = uploadSpecMeta == null || uploadSpecMeta.getMaxSizeMb() == null ? 2048 : uploadSpecMeta.getMaxSizeMb();
+		List<String> allowSuffix = uploadSpecMeta == null || uploadSpecMeta.getAllowSuffix() == null || uploadSpecMeta.getAllowSuffix().isEmpty()
+				? List.of("zip")
+				: uploadSpecMeta.getAllowSuffix();
+		return new UploadConstraint(uploadMode, archiveFileKey, "ARCHIVE", maxSizeMb, allowSuffix);
+	}
+
+	private record UploadConstraint(String uploadMode, String fileKey, String fileRole, Integer maxSizeMb, List<String> allowSuffix) {
 	}
 
 	public TaskSubmitResponse submitTask(Long taskId, Long userId) {
@@ -163,6 +194,9 @@ public class TaskLifecycleManager {
 		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
 		response.setStoragePath(taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath()));
+		response.setUnpackDir(file.getUnpackDir());
+		response.setRelativePath(file.getRelativePath());
+		response.setArchiveFlag(file.getArchiveFlag());
 		response.setFileSize(file.getFileSize());
 		response.setFileSuffix(file.getFileSuffix());
 		response.setChecksum(file.getChecksum());
@@ -176,5 +210,33 @@ public class TaskLifecycleManager {
 			throw new BizException(ErrorCodeConstants.FORBIDDEN, "no permission");
 		}
 		return task;
+	}
+
+	private void validateArchiveUpload(Task task, MultipartFile file, UploadConstraint constraint) {
+		if (file == null || file.isEmpty()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "file is required");
+		}
+		String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+		String suffix = extractSuffix(originalName).toLowerCase(Locale.ROOT);
+		boolean suffixAllowed = constraint.allowSuffix().stream().map(v -> v.toLowerCase(Locale.ROOT)).anyMatch(v -> v.equals(suffix));
+		if (!suffixAllowed) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "only zip archive is supported");
+		}
+		long maxBytes = (long) constraint.maxSizeMb() * 1024 * 1024;
+		if (file.getSize() > maxBytes) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "archive size exceeds limit");
+		}
+		boolean hasArchive = taskFileRepository.listByTaskId(task.getId()).stream().anyMatch(existing ->
+				constraint.fileRole().equalsIgnoreCase(existing.getFileRole())
+						&& constraint.fileKey().equalsIgnoreCase(existing.getFileKey())
+		);
+		if (hasArchive) {
+			throw new BizException(ErrorCodeConstants.CONFLICT, "archive file already uploaded");
+		}
+	}
+
+	private String extractSuffix(String fileName) {
+		int idx = fileName.lastIndexOf('.');
+		return idx < 0 ? "" : fileName.substring(idx + 1);
 	}
 }
