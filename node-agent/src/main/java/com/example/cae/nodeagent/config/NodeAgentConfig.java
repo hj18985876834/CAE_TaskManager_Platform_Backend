@@ -20,8 +20,29 @@ public class NodeAgentConfig {
 	private String advertisedHost;
 	private String nodeToken;
 	private String workRoot = "./data/tasks";
+	
+	// NAS / Shared folder mapping for cross-OS compatibility
+	private String pathMappingWindows;
+	private String pathMappingLinux;
+
 	private List<Long> solverIds;
 	private Map<String, String> solverVersions;
+
+	public String getPathMappingWindows() {
+		return pathMappingWindows;
+	}
+
+	public void setPathMappingWindows(String pathMappingWindows) {
+		this.pathMappingWindows = pathMappingWindows;
+	}
+
+	public String getPathMappingLinux() {
+		return pathMappingLinux;
+	}
+
+	public void setPathMappingLinux(String pathMappingLinux) {
+		this.pathMappingLinux = pathMappingLinux;
+	}
 
 	public Long getNodeId() {
 		return nodeId;

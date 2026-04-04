@@ -11,6 +11,12 @@ import java.nio.file.Path;
 
 @Component
 public class InputFilePrepareService {
+	private final PathMappingSupport pathMappingSupport;
+
+	public InputFilePrepareService(PathMappingSupport pathMappingSupport) {
+		this.pathMappingSupport = pathMappingSupport;
+	}
+
 	public void prepare(ExecutionContext context) {
 		if (!context.hasInputFiles()) {
 			return;
@@ -19,7 +25,8 @@ public class InputFilePrepareService {
 			if (inputFile.getStoragePath() == null || inputFile.getStoragePath().trim().isEmpty()) {
 				continue;
 			}
-			File source = new File(inputFile.getStoragePath());
+			String mappedPath = pathMappingSupport.toLinuxPath(inputFile.getStoragePath());
+			File source = new File(mappedPath);
 			if (!source.exists() || source.isDirectory()) {
 				continue;
 			}

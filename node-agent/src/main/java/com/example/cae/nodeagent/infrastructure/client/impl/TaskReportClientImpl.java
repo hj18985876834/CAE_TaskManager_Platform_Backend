@@ -4,6 +4,7 @@ import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
 import com.example.cae.nodeagent.infrastructure.client.TaskReportClient;
+import com.example.cae.nodeagent.infrastructure.storage.PathMappingSupport;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,12 @@ import java.util.Map;
 public class TaskReportClientImpl implements TaskReportClient {
 	private final RestTemplate restTemplate;
 	private final NodeAgentConfig nodeAgentConfig;
+	private final PathMappingSupport pathMappingSupport;
 
-	public TaskReportClientImpl(RestTemplate restTemplate, NodeAgentConfig nodeAgentConfig) {
+	public TaskReportClientImpl(RestTemplate restTemplate, NodeAgentConfig nodeAgentConfig, PathMappingSupport pathMappingSupport) {
 		this.restTemplate = restTemplate;
 		this.nodeAgentConfig = nodeAgentConfig;
+		this.pathMappingSupport = pathMappingSupport;
 	}
 
 	@Override
@@ -65,7 +68,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("fileType", getFileType(file));
 		body.put("fileName", file == null ? null : file.getName());
-		body.put("storagePath", file == null ? null : file.getAbsolutePath());
+		body.put("storagePath", file == null ? null : pathMappingSupport.toWindowsPath(file.getAbsolutePath()));
 		body.put("fileSize", file == null ? null : file.length());
 		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}

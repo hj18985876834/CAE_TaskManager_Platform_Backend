@@ -51,8 +51,14 @@ fi
 
 # 自动获取 Ubuntu 的本机 IP，发给 Windows 的调度中心，让它能找回来！
 UBUNTU_IP=$(hostname -I | awk '{print $1}')
+
+# === 新增：Windows 共享文件夹盘符映射 ===
+# 为了实现零拷贝读取文件，我们需要知道你的 Windows 平台上的文件是存在哪的
+WINDOWS_TASK_ROOT=${3:-"D:\\Project\\CAE_TaskManager_Platform\\Backend\\data\\tasks"}
+
 echo "-> 调度中心地址将被配置为: http://$WINDOWS_IP:8084"
 echo "-> 计算节点的对外观测 IP (Ubuntu_IP): $UBUNTU_IP"
+echo "-> 跨系统路径映射: $WINDOWS_TASK_ROOT <==> /cae-data/workspaces"
 
 # 挂载的硬盘路径 (Ubuntu 本地存储任务文件的路径，用于接收传输)
 WORK_DIR="/opt/cae/data/workspaces"
@@ -81,6 +87,9 @@ for i in $(seq 1 $NODE_COUNT); do
         -e CAE_NODE_ADVERTISED_HOST="$UBUNTU_IP:808$i" \
         -e SCHEDULER_SERVICE_BASE_URL="http://$WINDOWS_IP:8084" \
         -e CAE_NODE_TASK_BASE_URL="http://$WINDOWS_IP:8083" \
+        -e CAE_NODE_PATH_MAPPING_WINDOWS="$WINDOWS_TASK_ROOT" \
+        -e CAE_NODE_PATH_MAPPING_LINUX="/cae-data/workspaces" \
+        -e CAE_NODE_WORK_ROOT="/cae-data/workspaces" \
         -v $WORK_DIR:/cae-data/workspaces \
         cae-node-agent:latest
 done
