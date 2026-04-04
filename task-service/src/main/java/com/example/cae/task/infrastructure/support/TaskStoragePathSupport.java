@@ -43,6 +43,10 @@ public class TaskStoragePathSupport {
 			return path;
 		}
 		String normalizedPath = normalize(path);
+		String normalizedRoot = normalize(root);
+		if (!normalizedRoot.isBlank() && (normalizedPath.equals(normalizedRoot) || normalizedPath.startsWith(normalizedRoot + "/"))) {
+			return normalizedPath;
+		}
 		if (isAbsolutePath(normalizedPath)) {
 			return normalizedPath;
 		}

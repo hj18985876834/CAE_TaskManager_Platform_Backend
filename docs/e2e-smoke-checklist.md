@@ -13,6 +13,13 @@ Verify one full business chain across gateway, user-service, task-service, sched
 - node-agent execution and reports
 - query final task/result/log
 
+Also verify the ZIP_ONLY contract introduced for task input:
+
+- upload mode is ZIP_ONLY
+- archive upload key is input_archive
+- upload role is ARCHIVE
+- validation returns structured issues[] when invalid
+
 ## 2. Service Matrix
 
 These are default local ports. In Docker Compose or other environments, prefer configuring base URLs through environment variables instead of assuming localhost.
@@ -62,6 +69,10 @@ Optional with explicit service URLs:
 
 - `./e2e-precheck.ps1 -GatewayBaseUrl "http://gateway-service:8080" -TaskServiceBaseUrl "http://task-service:8083" -SchedulerServiceBaseUrl "http://scheduler-service:8084" -NodeAgentBaseUrl "http://node-agent:8085"`
 
+ZIP_ONLY one-command smoke run:
+
+- `./e2e-zip-only-smoke.ps1 -GatewayBaseUrl "http://localhost:8080" -Username "demo" -Password "123456" -SolverId 1 -ProfileId 1 -TaskType "SIMULATION"`
+
 ### 3.3 Route Consistency Gate
 
 Current scheduler public paths are:
@@ -88,6 +99,12 @@ Suggested placeholders:
 
 - userA: normal role
 - adminA: admin role
+
+ZIP_ONLY smoke files:
+
+- valid-case.zip (contains required structure)
+- invalid-suffix.rar (suffix check)
+- unsafe-path.zip (contains ../ entry)
 
 ## 5. Main Flow Test Cases
 
@@ -134,6 +151,10 @@ Expected:
 - code=0
 - taskId returned
 
+Headers:
+
+- X-User-Id required in direct task-service calls
+
 Output to capture:
 
 - task_id
@@ -145,9 +166,20 @@ Request:
 - POST /api/tasks/{task_id}/files (through gateway, multipart)
 - Authorization: Bearer <access_token>
 
+Request constraints (ZIP_ONLY):
+
+- fileKey should be input_archive
+- fileRole should be ARCHIVE
+- file suffix should be zip
+
 Expected:
 
 - code=0
+
+Failure checks:
+
+- non-zip should fail with 400 style response
+- duplicate archive upload for one task should fail with conflict style response
 
 ## TC-05 Validate Task
 
@@ -161,6 +193,13 @@ Expected:
 - code=0
 - task status becomes VALIDATED or equivalent
 
+Failure checks (must include issues array in data):
+
+- missing archive: ARCHIVE_MISSING
+- broken archive: ARCHIVE_BROKEN
+- unsafe path: ARCHIVE_UNSAFE_PATH
+- missing required path: MISSING_REQUIRED_PATH
+
 ## TC-06 Submit Task
 
 Request:
@@ -172,6 +211,10 @@ Expected:
 
 - code=0
 - task enters QUEUED/PENDING for scheduler pickup
+
+Negative check:
+
+- submitting an unvalidated task should fail with TASK_NOT_VALIDATED style error
 
 ## TC-07 Scheduler Picks Task
 
@@ -237,6 +280,9 @@ Expected:
 - F-02 node-agent dispatch fails -> scheduler records failure and task status is not silently lost
 - F-03 result report partial failure -> failure reason can be queried from task history/log
 - F-04 scheduler has no available node -> schedule failure record with explicit message
+- F-05 archive suffix invalid -> validate result includes INVALID_ARCHIVE_SUFFIX
+- F-06 archive unsafe path -> validate result includes ARCHIVE_UNSAFE_PATH
+- F-07 required rule mismatch -> validate result includes MISSING_REQUIRED_PATH or INVALID_FILE_TYPE
 
 ## 7. Minimal Acceptance Criteria
 
@@ -246,6 +292,7 @@ All below must be true:
 - Gateway JWT guard works for non-whitelist APIs.
 - Scheduler and node-agent callbacks are observable in task-service data.
 - Logs include trace id for troubleshooting.
+- ZIP_ONLY invalid cases return structured issues[] with errorCode/message.
 
 ## 8. Execution Record Template
 

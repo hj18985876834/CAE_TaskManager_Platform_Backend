@@ -121,8 +121,24 @@ public class TaskValidationManager {
 			return;
 		}
 		for (FileRuleDTO rule : rules) {
+			if (shouldSkipExtractedRuleValidation(rule)) {
+				continue;
+			}
 			validateRule(rule, extracted.entries(), issues);
 		}
+	}
+
+	private boolean shouldSkipExtractedRuleValidation(FileRuleDTO rule) {
+		if (rule == null) {
+			return true;
+		}
+		if ("input_archive".equalsIgnoreCase(rule.getFileKey())) {
+			return true;
+		}
+		if (!isBlank(rule.getFileType()) && "ZIP".equalsIgnoreCase(rule.getFileType())) {
+			return true;
+		}
+		return false;
 	}
 
 	private ExtractedContext extractArchive(Task task, TaskFile archive, List<TaskValidateResponse.ValidationIssue> issues) {
