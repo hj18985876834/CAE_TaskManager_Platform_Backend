@@ -1,1640 +1,683 @@
-# 八、scheduler-service 项目结构设计
+# scheduler-service 模块分析文档
 
-调度服务要突出“节点管理”和“调度编排”两件事。
+## 1. 模块定位
 
-## 1. 推荐结构
+`scheduler-service` 是平台中的任务调度与计算节点管理服务，负责把 `task-service` 中已经进入队列的任务分配到合适的计算节点，并持续维护节点在线状态、负载信息与求解器能力信息。
 
-```text
-scheduler-service/
-└── src/main/java/com/yourorg/scheduler/
-    ├── SchedulerApplication.java
-    ├── interfaces/
-    │   ├── controller/
-    │   ├── internal/
-    │   ├── request/
-    │   └── response/
-    ├── application/
-    │   ├── service/
-    │   ├── facade/
-    │   ├── manager/
-    │   ├── scheduler/
-    │   └── assembler/
-    ├── domain/
-    │   ├── model/
-    │   ├── repository/
-    │   ├── service/
-    │   ├── enums/
-    │   └── strategy/
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   ├── mapper/
-    │   │   └── repository/
-    │   ├── client/
-    │   └── support/
-    ├── config/
-    └── support/
-```
+如果说 `task-service` 解决“任务生命周期如何流转”，那么 `scheduler-service` 解决的就是：
 
-## 2. 重点目录说明
+- 当前有哪些节点可用
+- 哪些节点支持某个求解器
+- 某个排队任务应派发到哪个节点
+- 节点掉线后如何补偿任务状态
+- 如何向平台提供节点与调度记录查询能力
 
-### interfaces/controller
+因此，`scheduler-service` 在整个系统中扮演的是“资源感知型调度中心”和“节点状态中心”的角色。
 
-- `NodeController`
-- `ScheduleController`
+## 2. 模块在系统中的作用
 
-### interfaces/internal
+从系统协作关系看，`scheduler-service` 主要解决以下问题：
 
-- `NodeRegisterController`
-- `NodeHeartbeatController`
+1. 接收节点代理注册信息，建立节点主数据与求解器能力映射。
+2. 接收节点心跳，动态刷新节点状态、负载、运行并发数。
+3. 周期性扫描排队任务，执行节点筛选与调度分配。
+4. 调用 `node-agent` 下发任务，同时回写 `task-service` 的调度状态。
+5. 周期性检查长时间未心跳节点，并触发任务失败补偿。
+6. 对外提供节点查询、可用节点查询和调度记录查询能力。
+7. 对内提供节点 Token 校验、运行数调整和节点侧取消转发能力。
 
-### application/scheduler
+它连接了 `task-service` 和 `node-agent`，是任务真正进入执行阶段前的关键枢纽。
 
-这个目录建议专门保留给定时调度任务：
+## 3. 当前实现架构
 
-- `TaskScheduleJob`
-- `NodeOfflineCheckJob`
+### 3.1 技术栈
 
-### application/manager
+- Spring Boot
+- 分层架构：`interfaces / application / domain / infrastructure`
+- MyBatis Repository 持久化
+- `RestTemplate` 调用 `task-service` 和 `node-agent`
+- Spring 定时任务驱动调度轮询与离线检测
+- 策略模式封装调度算法
 
-- `TaskScheduleManager`
-- `NodeManageManager`
+### 3.2 当前目录结构
 
-### domain/strategy
-
-建议专门放调度策略：
-
-- `ScheduleStrategy`
-- `FcfsLeastLoadStrategy`
-
-这样后面如果要扩展“优先级调度”“标签调度”会很方便。
-
-### domain/model
-
-- `ComputeNode`
-- `NodeSolverCapability`
-- `ScheduleRecord`
-
-### infrastructure/client
-
-- `TaskClient`
-- `NodeAgentClient`
-
-### infrastructure/support
-
-- `NodeLoadCalculator`
-- `NodeHeartbeatChecker`
-
-## 3. 这个服务的关键规范
-
-调度服务一定要做到：
-
-- 调度逻辑不写在 Controller
-- 定时任务不直接操作 Mapper
-- 调度策略单独抽象
-- 节点离线检查单独成任务
-
-这样结构会非常稳。
-
-----------
-
-# 八、scheduler-service 完整包树
-
-你的后端设计里已经明确这个服务需要：
-
-- 节点管理
-- 注册
-- 心跳
-- 定时调度器
-- FCFS + 最小负载策略
-- 节点离线判断
-  这些职责非常适合再抽一层 `strategy` 和 `scheduler`。
-
-## 1. 完整结构
+当前代码结构如下：
 
 ```text
 scheduler-service/
-└── src/main/java/com/example/cae/scheduler/
-    ├── SchedulerApplication.java
-    ├── interfaces/
-    │   ├── controller/
-    │   │   ├── NodeController.java
-    │   │   └── ScheduleController.java
-    │   ├── internal/
-    │   │   ├── NodeRegisterController.java
-    │   │   └── NodeHeartbeatController.java
-    │   ├── request/
-    │   │   ├── NodeRegisterRequest.java
-    │   │   ├── NodeHeartbeatRequest.java
-    │   │   └── UpdateNodeStatusRequest.java
-    │   └── response/
-    │       ├── NodeListItemResponse.java
-    │       ├── NodeDetailResponse.java
-    │       ├── ScheduleRecordResponse.java
-    │       └── AvailableNodeResponse.java
-    ├── application/
-    │   ├── service/
-    │   │   ├── NodeAppService.java
-    │   │   └── ScheduleAppService.java
-    │   ├── facade/
-    │   │   ├── NodeFacade.java
-    │   │   └── ScheduleFacade.java
-    │   ├── manager/
-    │   │   ├── TaskScheduleManager.java
-    │   │   └── NodeManageManager.java
-    │   ├── scheduler/
-    │   │   ├── TaskScheduleJob.java
-    │   │   └── NodeOfflineCheckJob.java
-    │   └── assembler/
-    │       ├── NodeAssembler.java
-    │       └── ScheduleAssembler.java
-    ├── domain/
-    │   ├── model/
-    │   │   ├── ComputeNode.java
-    │   │   ├── NodeSolverCapability.java
-    │   │   └── ScheduleRecord.java
-    │   ├── repository/
-    │   │   ├── ComputeNodeRepository.java
-    │   │   ├── NodeSolverCapabilityRepository.java
-    │   │   └── ScheduleRecordRepository.java
-    │   ├── service/
-    │   │   ├── NodeDomainService.java
-    │   │   └── ScheduleDomainService.java
-    │   ├── strategy/
-    │   │   ├── ScheduleStrategy.java
-    │   │   └── FcfsLeastLoadStrategy.java
-    │   └── enums/
-    │       └── ScheduleStatusEnum.java
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   │   ├── ComputeNodePO.java
-    │   │   │   ├── NodeSolverCapabilityPO.java
-    │   │   │   └── ScheduleRecordPO.java
-    │   │   ├── mapper/
-    │   │   │   ├── ComputeNodeMapper.java
-    │   │   │   ├── NodeSolverCapabilityMapper.java
-    │   │   │   └── ScheduleRecordMapper.java
-    │   │   └── repository/
-    │   │       ├── ComputeNodeRepositoryImpl.java
-    │   │       ├── NodeSolverCapabilityRepositoryImpl.java
-    │   │       └── ScheduleRecordRepositoryImpl.java
-    │   ├── client/
-    │   │   ├── TaskClient.java
-    │   │   └── NodeAgentClient.java
-    │   └── support/
-    │       ├── NodeLoadCalculator.java
-    │       ├── NodeHeartbeatChecker.java
-    │       └── AvailableNodeSelector.java
-    ├── config/
-    │   ├── SchedulerServiceConfig.java
-    │   ├── SchedulingConfig.java
-    │   └── FeignClientConfig.java
-    └── support/
-        └── ScheduleLogWriter.java
+├─ src/main/java/com/example/cae/scheduler/
+│  ├─ SchedulerApplication.java
+│  ├─ config/
+│  │  ├─ SchedulerServiceConfig.java
+│  │  ├─ SchedulerRemoteServiceProperties.java
+│  │  ├─ SchedulingConfig.java
+│  │  └─ FeignClientConfig.java
+│  ├─ interfaces/
+│  │  ├─ controller/
+│  │  │  ├─ NodeController.java
+│  │  │  ├─ NodeAgentController.java
+│  │  │  └─ ScheduleController.java
+│  │  ├─ internal/
+│  │  │  ├─ NodeRegisterController.java
+│  │  │  ├─ NodeHeartbeatController.java
+│  │  │  └─ InternalSchedulerController.java
+│  │  ├─ request/
+│  │  └─ response/
+│  ├─ application/
+│  │  ├─ assembler/
+│  │  ├─ facade/
+│  │  ├─ manager/
+│  │  ├─ scheduler/
+│  │  └─ service/
+│  ├─ domain/
+│  │  ├─ enums/
+│  │  ├─ model/
+│  │  ├─ repository/
+│  │  ├─ service/
+│  │  └─ strategy/
+│  ├─ infrastructure/
+│  │  ├─ client/
+│  │  ├─ persistence/
+│  │  └─ support/
+│  └─ support/
+└─ src/main/resources/application.yml
 ```
 
-## 2. 最关键的几个类
+整体结构很清晰，围绕“节点管理”和“调度执行”两条主线展开。
 
-- `TaskScheduleJob`
-- `TaskScheduleManager`
-- `FcfsLeastLoadStrategy`
-- `TaskClient`
-- `NodeAgentClient`
-- `NodeHeartbeatChecker`
+## 4. 各部分功能与职责
 
-----------
+### 4.1 接口层
 
-# 七、scheduler-service 初始化代码骨架清单
+#### `NodeController`
 
-你的后端设计里已经明确：这里需要 **定时任务调度器**，使用 `@Scheduled(fixedDelay = 5000)` 是当前最简单可行的方案。
+负责平台侧节点管理接口，包括：
 
-## 1. Controller
-
-### `interfaces/controller/NodeController.java`
-
-职责：管理员查看和管理节点
-
-建议方法：
-
-* `pageNodes(NodePageQueryRequest request)`
-* `getNodeDetail(Long nodeId)`
-* `updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request)`
-* `listNodeSolvers(Long nodeId)`
-
----
-
-### `interfaces/controller/ScheduleController.java`
-
-职责：调度记录查询
-
-建议方法：
-
-* `pageSchedules(SchedulePageQueryRequest request)`
-* `listTaskSchedules(Long taskId)`
-
----
-
-### `interfaces/internal/NodeRegisterController.java`
-
-职责：node-agent 注册
-
-建议方法：
-
-* `register(NodeRegisterRequest request)`
-
----
-
-### `interfaces/internal/NodeHeartbeatController.java`
-
-职责：node-agent 心跳上报
-
-建议方法：
-
-* `heartbeat(NodeHeartbeatRequest request)`
-
----
-
-## 2. Application
-
-### `application/service/NodeAppService.java`
-
-建议方法：
-
-* `pageNodes`
-* `getNodeDetail`
-* `updateNodeStatus`
-* `registerNode`
-* `heartbeat`
-
----
-
-### `application/service/ScheduleAppService.java`
-
-建议方法：
-
-* `pageSchedules`
-* `listTaskSchedules`
-
----
-
-### `application/manager/TaskScheduleManager.java`
-
-职责：调度主流程
-
-建议方法：
-
-* `scheduleQueuedTasks()`
-* `scheduleOneTask(TaskDTO task)`
-* `chooseNode(TaskDTO task)`
-* `dispatchToNode(TaskDTO task, NodeDTO node)`
-* `recordSchedule(Long taskId, Long nodeId, String status, String message)`
-
----
-
-### `application/manager/NodeManageManager.java`
-
-职责：节点维护流程
-
-建议方法：
-
-* `register(NodeRegisterRequest request)`
-* `heartbeat(NodeHeartbeatRequest request)`
-* `markOfflineNodes()`
-
----
-
-### `application/scheduler/TaskScheduleJob.java`
-
-职责：定时调度入口
-
-建议方法：
-
-* `scheduleTasks()`
-
----
-
-### `application/scheduler/NodeOfflineCheckJob.java`
-
-职责：定时离线检查
-
-建议方法：
-
-* `checkOfflineNodes()`
-
----
-
-## 3. Domain
-
-### `domain/model/ComputeNode.java`
-
-建议方法：
-
-* `enable()`
-* `disable()`
-* `refreshHeartbeat(...)`
-* `markOffline()`
-* `canDispatch()`
-
----
-
-### `domain/model/NodeSolverCapability.java`
-
-建议方法：
-
-* `supports(Long solverId)`
-
----
-
-### `domain/model/ScheduleRecord.java`
-
----
-
-### `domain/service/ScheduleDomainService.java`
-
-职责：调度规则
-
-建议方法：
-
-* `filterAvailableNodes(List<ComputeNode> nodes, Long solverId)`
-* `checkNodeCanDispatch(ComputeNode node)`
-
----
-
-### `domain/strategy/ScheduleStrategy.java`
-
-职责：调度策略接口
-
-建议方法：
-
-* `selectNode(TaskDTO task, List<NodeDTO> nodes)`
-
----
-
-### `domain/strategy/FcfsLeastLoadStrategy.java`
-
-职责：先到先服务 + 最小负载
-
-建议方法：
-
-* `selectNode(...)`
-
----
-
-## 4. Infrastructure
-
-### `infrastructure/client/TaskClient.java`
-
-职责：调 task-service
-
-建议方法：
-
-* `listQueuedTasks()`
-* `markScheduled(Long taskId, Long nodeId)`
-* `markDispatched(Long taskId, Long nodeId)`
-
----
-
-### `infrastructure/client/NodeAgentClient.java`
-
-职责：调 node-agent
-
-建议方法：
-
-* `dispatchTask(String host, Integer port, TaskDTO task)`
-
----
-
-### `infrastructure/support/NodeLoadCalculator.java`
-
-建议方法：
-
-* `calcLoad(NodeDTO node)`
-
----
-
-### `infrastructure/support/NodeHeartbeatChecker.java`
-
-建议方法：
-
-* `isOffline(ComputeNode node, LocalDateTime now)`
-
----
-
-### `infrastructure/support/AvailableNodeSelector.java`
-
-建议方法：
-
-* `filterBySolverCapability(List<NodeDTO> nodes, Long solverId)`
-
---------
-
-这次我会重点把这几个东西设计清楚：
-
-- 节点管理怎么分层
-- 节点注册/心跳怎么落地
-- 调度主流程怎么编排
-- 调度策略怎么抽象
-- 定时任务怎么组织
-- 和 `task-service`、`node-agent` 怎么对接
-
-------
-
-# 一、scheduler-service 的定位
-
-`scheduler-service` 负责四类核心能力：
-
-1. 计算节点管理
-2. 节点注册与心跳
-3. 排队任务调度
-4. 调度记录与监控
-
-它的本质不是普通 CRUD 服务，而是一个**带调度逻辑的协调服务**。
-所以这里不能只写：
-
-- `NodeController`
-- `ScheduleController`
-- `ScheduleServiceImpl`
-
-就结束了。
-
-最合理的结构是：
-
-- **Controller**：对外管理接口、对内注册心跳接口
-- **Application/Manager**：调度流程编排
-- **Domain/Strategy**：节点筛选、调度策略
-- **Infrastructure/Client**：调 task-service、调 node-agent
-- **Scheduler**：定时任务入口
-
-------
-
-# 二、scheduler-service 最终推荐包树
-
-```text
-scheduler-service/
-└── src/main/java/com/example/cae/scheduler/
-    ├── SchedulerApplication.java
-    ├── interfaces/
-    │   ├── controller/
-    │   │   ├── NodeController.java
-    │   │   └── ScheduleController.java
-    │   ├── internal/
-    │   │   ├── NodeRegisterController.java
-    │   │   └── NodeHeartbeatController.java
-    │   ├── request/
-    │   └── response/
-    ├── application/
-    │   ├── service/
-    │   ├── facade/
-    │   ├── manager/
-    │   ├── scheduler/
-    │   └── assembler/
-    ├── domain/
-    │   ├── model/
-    │   ├── repository/
-    │   ├── service/
-    │   ├── strategy/
-    │   └── enums/
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   ├── mapper/
-    │   │   └── repository/
-    │   ├── client/
-    │   └── support/
-    ├── config/
-    └── support/
-```
-
-------
-
-# 三、核心领域对象设计
-
-------
-
-## 1. ComputeNode.java
-
-这是节点聚合根。
-
-### 建议字段
-
-```java
-public class ComputeNode {
-    private Long id;
-    private String nodeCode;
-    private String nodeName;
-    private String host;
-    private Integer port;
-    private String status;
-    private Integer enabled;
-    private Integer maxConcurrency;
-    private Integer runningCount;
-    private BigDecimal cpuUsage;
-    private BigDecimal memoryUsage;
-    private LocalDateTime lastHeartbeatTime;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-}
-```
-
-### 建议方法
-
-```java
-public void enable()
-public void disable()
-public void markOnline()
-public void markOffline()
-public void refreshHeartbeat(BigDecimal cpuUsage, BigDecimal memoryUsage, Integer runningCount, LocalDateTime heartbeatTime)
-public boolean isOnline()
-public boolean canDispatch()
-public boolean isOverloaded()
-```
-
-### 说明
-
-这里的方法只处理领域行为，不操作数据库。
-
-------
-
-## 2. NodeSolverCapability.java
-
-### 建议字段
-
-```java
-public class NodeSolverCapability {
-    private Long id;
-    private Long nodeId;
-    private Long solverId;
-    private Integer enabled;
-    private LocalDateTime createdAt;
-}
-```
-
-### 建议方法
-
-```java
-public boolean supports(Long solverId)
-public boolean isEnabled()
-```
-
-------
-
-## 3. ScheduleRecord.java
-
-### 建议字段
-
-```java
-public class ScheduleRecord {
-    private Long id;
-    private Long taskId;
-    private Long nodeId;
-    private String strategyName;
-    private String scheduleStatus;
-    private String scheduleMessage;
-    private LocalDateTime createdAt;
-}
-```
-
-------
-
-# 四、request / response 设计
-
-------
-
-## 1. interfaces/request
-
-### NodeRegisterRequest.java
-
-```java
-public class NodeRegisterRequest {
-    private String nodeCode;
-    private String nodeName;
-    private String host;
-    private Integer port;
-    private Integer maxConcurrency;
-    private List<Long> solverIds;
-}
-```
-
-------
-
-### NodeHeartbeatRequest.java
-
-```java
-public class NodeHeartbeatRequest {
-    private String nodeCode;
-    private BigDecimal cpuUsage;
-    private BigDecimal memoryUsage;
-    private Integer runningCount;
-}
-```
-
-------
-
-### UpdateNodeStatusRequest.java
-
-```java
-public class UpdateNodeStatusRequest {
-    private Integer enabled;
-}
-```
-
-------
-
-### NodePageQueryRequest.java
-
-```java
-public class NodePageQueryRequest {
-    private Integer pageNum;
-    private Integer pageSize;
-    private String nodeCode;
-    private String nodeName;
-    private String status;
-    private Integer enabled;
-}
-```
-
-------
-
-### SchedulePageQueryRequest.java
-
-```java
-public class SchedulePageQueryRequest {
-    private Integer pageNum;
-    private Integer pageSize;
-    private Long taskId;
-    private Long nodeId;
-    private String scheduleStatus;
-    private String strategyName;
-}
-```
-
-------
-
-## 2. interfaces/response
-
-### NodeListItemResponse.java
-
-```java
-public class NodeListItemResponse {
-    private Long nodeId;
-    private String nodeCode;
-    private String nodeName;
-    private String host;
-    private Integer port;
-    private String status;
-    private Integer enabled;
-    private Integer maxConcurrency;
-    private Integer runningCount;
-    private BigDecimal cpuUsage;
-    private BigDecimal memoryUsage;
-    private LocalDateTime lastHeartbeatTime;
-}
-```
-
-------
-
-### NodeDetailResponse.java
-
-```java
-public class NodeDetailResponse {
-    private Long nodeId;
-    private String nodeCode;
-    private String nodeName;
-    private String host;
-    private Integer port;
-    private String status;
-    private Integer enabled;
-    private Integer maxConcurrency;
-    private Integer runningCount;
-    private BigDecimal cpuUsage;
-    private BigDecimal memoryUsage;
-    private LocalDateTime lastHeartbeatTime;
-    private List<Long> solverIds;
-}
-```
-
-------
-
-### ScheduleRecordResponse.java
-
-```java
-public class ScheduleRecordResponse {
-    private Long id;
-    private Long taskId;
-    private Long nodeId;
-    private String strategyName;
-    private String scheduleStatus;
-    private String scheduleMessage;
-    private LocalDateTime createdAt;
-}
-```
-
-------
-
-### AvailableNodeResponse.java
-
-```java
-public class AvailableNodeResponse {
-    private Long nodeId;
-    private String nodeCode;
-    private String nodeName;
-    private Integer runningCount;
-    private Integer maxConcurrency;
-    private BigDecimal cpuUsage;
-    private BigDecimal memoryUsage;
-}
-```
-
-------
-
-# 五、Controller 层完整骨架
-
-------
-
-## 1. NodeController.java
-
-职责：管理员节点管理接口。
-
-```java
-@RestController
-@RequestMapping("/api/nodes")
-@RequiredArgsConstructor
-public class NodeController {
-
-    private final NodeAppService nodeAppService;
-
-    @GetMapping
-    public Result<PageResult<NodeListItemResponse>> pageNodes(NodePageQueryRequest request) {
-        return Result.success(nodeAppService.pageNodes(request));
-    }
-
-    @GetMapping("/{nodeId}")
-    public Result<NodeDetailResponse> getNodeDetail(@PathVariable Long nodeId) {
-        return Result.success(nodeAppService.getNodeDetail(nodeId));
-    }
-
-    @PutMapping("/{nodeId}/status")
-    public Result<Void> updateNodeStatus(@PathVariable Long nodeId,
-                                         @RequestBody @Valid UpdateNodeStatusRequest request) {
-        nodeAppService.updateNodeStatus(nodeId, request);
-        return Result.success();
-    }
-
-    @GetMapping("/{nodeId}/solvers")
-    public Result<List<Long>> listNodeSolvers(@PathVariable Long nodeId) {
-        return Result.success(nodeAppService.listNodeSolvers(nodeId));
-    }
-}
-```
-
-------
-
-## 2. ScheduleController.java
-
-职责：调度记录查询。
-
-```java
-@RestController
-@RequestMapping("/api")
-@RequiredArgsConstructor
-public class ScheduleController {
-
-    private final ScheduleAppService scheduleAppService;
-
-    @GetMapping("/schedules")
-    public Result<PageResult<ScheduleRecordResponse>> pageSchedules(SchedulePageQueryRequest request) {
-        return Result.success(scheduleAppService.pageSchedules(request));
-    }
-
-    @GetMapping("/tasks/{taskId}/schedules")
-    public Result<List<ScheduleRecordResponse>> listTaskSchedules(@PathVariable Long taskId) {
-        return Result.success(scheduleAppService.listTaskSchedules(taskId));
-    }
-}
-```
-
-------
-
-## 3. NodeRegisterController.java
-
-职责：供 node-agent 注册使用。
-
-```java
-@RestController
-@RequestMapping("/internal/nodes")
-@RequiredArgsConstructor
-public class NodeRegisterController {
-
-    private final NodeManageManager nodeManageManager;
-
-    @PostMapping("/register")
-    public Result<Void> register(@RequestBody @Valid NodeRegisterRequest request) {
-        nodeManageManager.register(request);
-        return Result.success();
-    }
-}
-```
-
-------
-
-## 4. NodeHeartbeatController.java
-
-职责：供 node-agent 心跳上报。
-
-```java
-@RestController
-@RequestMapping("/internal/nodes")
-@RequiredArgsConstructor
-public class NodeHeartbeatController {
-
-    private final NodeManageManager nodeManageManager;
-
-    @PostMapping("/heartbeat")
-    public Result<Void> heartbeat(@RequestBody @Valid NodeHeartbeatRequest request) {
-        nodeManageManager.heartbeat(request);
-        return Result.success();
-    }
-}
-```
-
-------
-
-# 六、Application 层完整骨架
-
-------
-
-## 1. NodeAppService.java
-
-职责：节点查询和管理应用层。
-
-```java
-@Service
-@RequiredArgsConstructor
-public class NodeAppService {
-
-    private final ComputeNodeRepository computeNodeRepository;
-    private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
-    private final NodeAssembler nodeAssembler;
-
-    public PageResult<NodeListItemResponse> pageNodes(NodePageQueryRequest request) {
-        PageResult<ComputeNode> page = computeNodeRepository.page(request);
-        List<NodeListItemResponse> records = page.getRecords()
-                .stream()
-                .map(nodeAssembler::toListItemResponse)
-                .toList();
-        return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
-    }
-
-    public NodeDetailResponse getNodeDetail(Long nodeId) {
-        ComputeNode node = computeNodeRepository.findById(nodeId);
-        List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(nodeId);
-        return nodeAssembler.toDetailResponse(node, capabilities);
-    }
-
-    public void updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request) {
-        ComputeNode node = computeNodeRepository.findById(nodeId);
-        if (request.getEnabled() != null && request.getEnabled() == 1) {
-            node.enable();
-        } else {
-            node.disable();
-        }
-        computeNodeRepository.update(node);
-    }
-
-    public List<Long> listNodeSolvers(Long nodeId) {
-        return nodeSolverCapabilityRepository.listByNodeId(nodeId)
-                .stream()
-                .filter(NodeSolverCapability::isEnabled)
-                .map(NodeSolverCapability::getSolverId)
-                .toList();
-    }
-}
-```
-
-------
-
-## 2. ScheduleAppService.java
-
-职责：调度记录查询。
-
-```java
-@Service
-@RequiredArgsConstructor
-public class ScheduleAppService {
-
-    private final ScheduleRecordRepository scheduleRecordRepository;
-    private final ScheduleAssembler scheduleAssembler;
-
-    public PageResult<ScheduleRecordResponse> pageSchedules(SchedulePageQueryRequest request) {
-        PageResult<ScheduleRecord> page = scheduleRecordRepository.page(request);
-        List<ScheduleRecordResponse> records = page.getRecords()
-                .stream()
-                .map(scheduleAssembler::toResponse)
-                .toList();
-        return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
-    }
-
-    public List<ScheduleRecordResponse> listTaskSchedules(Long taskId) {
-        return scheduleRecordRepository.listByTaskId(taskId)
-                .stream()
-                .map(scheduleAssembler::toResponse)
-                .toList();
-    }
-}
-```
-
-------
-
-# 七、Manager 层完整骨架
-
-这层最关键。
-
-------
-
-## 1. NodeManageManager.java
-
-职责：节点注册、心跳、离线检查。
-
-```java
-@Service
-@RequiredArgsConstructor
-public class NodeManageManager {
-
-    private final ComputeNodeRepository computeNodeRepository;
-    private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
-    private final NodeDomainService nodeDomainService;
-
-    @Transactional
-    public void register(NodeRegisterRequest request) {
-        ComputeNode node = computeNodeRepository.findByNodeCode(request.getNodeCode());
-
-        if (node == null) {
-            node = new ComputeNode();
-            node.setNodeCode(request.getNodeCode());
-            node.setNodeName(request.getNodeName());
-            node.setHost(request.getHost());
-            node.setPort(request.getPort());
-            node.setMaxConcurrency(request.getMaxConcurrency());
-            node.markOnline();
-            computeNodeRepository.save(node);
-        } else {
-            node.setNodeName(request.getNodeName());
-            node.setHost(request.getHost());
-            node.setPort(request.getPort());
-            node.setMaxConcurrency(request.getMaxConcurrency());
-            node.markOnline();
-            computeNodeRepository.update(node);
-        }
-
-        nodeSolverCapabilityRepository.replaceNodeSolvers(node.getId(), request.getSolverIds());
-    }
-
-    @Transactional
-    public void heartbeat(NodeHeartbeatRequest request) {
-        ComputeNode node = computeNodeRepository.findByNodeCode(request.getNodeCode());
-        if (node == null) {
-            throw new BizException("节点未注册");
-        }
-
-        node.refreshHeartbeat(
-                request.getCpuUsage(),
-                request.getMemoryUsage(),
-                request.getRunningCount(),
-                LocalDateTime.now()
-        );
-        node.markOnline();
-        computeNodeRepository.update(node);
-    }
-
-    @Transactional
-    public void markOfflineNodes() {
-        List<ComputeNode> nodes = computeNodeRepository.listAllEnabled();
-        for (ComputeNode node : nodes) {
-            if (nodeDomainService.isOffline(node, LocalDateTime.now())) {
-                node.markOffline();
-                computeNodeRepository.update(node);
-            }
-        }
-    }
-}
-```
-
-------
-
-## 2. TaskScheduleManager.java
-
-职责：调度主流程。
-
-```java
-@Service
-@RequiredArgsConstructor
-public class TaskScheduleManager {
-
-    private final TaskClient taskClient;
-    private final NodeAgentClient nodeAgentClient;
-    private final ComputeNodeRepository computeNodeRepository;
-    private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
-    private final ScheduleRecordRepository scheduleRecordRepository;
-    private final ScheduleDomainService scheduleDomainService;
-    private final ScheduleStrategy scheduleStrategy;
-
-    @Transactional
-    public void scheduleQueuedTasks() {
-        List<TaskDTO> queuedTasks = taskClient.listQueuedTasks();
-        if (queuedTasks == null || queuedTasks.isEmpty()) {
-            return;
-        }
-
-        for (TaskDTO task : queuedTasks) {
-            scheduleOneTask(task);
-        }
-    }
-
-    @Transactional
-    public void scheduleOneTask(TaskDTO task) {
-        List<ComputeNode> allNodes = computeNodeRepository.listAllEnabled();
-        List<ComputeNode> availableNodes = scheduleDomainService.filterAvailableNodes(
-                allNodes,
-                task.getSolverId(),
-                nodeSolverCapabilityRepository.listAll()
-        );
-
-        if (availableNodes.isEmpty()) {
-            recordSchedule(task.getTaskId(), null, "FAILED", "无可用节点");
-            return;
-        }
-
-        ComputeNode selectedNode = scheduleStrategy.selectNode(task, availableNodes);
-
-        if (selectedNode == null) {
-            recordSchedule(task.getTaskId(), null, "FAILED", "调度策略未选出节点");
-            return;
-        }
-
-        taskClient.markScheduled(task.getTaskId(), selectedNode.getId());
-
-        try {
-            nodeAgentClient.dispatchTask(selectedNode.getHost(), selectedNode.getPort(), task);
-            taskClient.markDispatched(task.getTaskId(), selectedNode.getId());
-            recordSchedule(task.getTaskId(), selectedNode.getId(), "SUCCESS", "调度成功");
-        } catch (Exception ex) {
-            recordSchedule(task.getTaskId(), selectedNode.getId(), "FAILED", "任务下发失败: " + ex.getMessage());
-        }
-    }
-
-    public void recordSchedule(Long taskId, Long nodeId, String status, String message) {
-        ScheduleRecord record = new ScheduleRecord();
-        record.setTaskId(taskId);
-        record.setNodeId(nodeId);
-        record.setStrategyName("FCFS_LEAST_LOAD");
-        record.setScheduleStatus(status);
-        record.setScheduleMessage(message);
-        scheduleRecordRepository.save(record);
-    }
-}
-```
-
-------
-
-# 八、Scheduler 定时任务骨架
-
-------
-
-## 1. TaskScheduleJob.java
-
-```java
-@Component
-@RequiredArgsConstructor
-public class TaskScheduleJob {
-
-    private final TaskScheduleManager taskScheduleManager;
-
-    @Scheduled(fixedDelay = 5000)
-    public void scheduleTasks() {
-        taskScheduleManager.scheduleQueuedTasks();
-    }
-}
-```
-
-------
-
-## 2. NodeOfflineCheckJob.java
-
-```java
-@Component
-@RequiredArgsConstructor
-public class NodeOfflineCheckJob {
-
-    private final NodeManageManager nodeManageManager;
-
-    @Scheduled(fixedDelay = 10000)
-    public void checkOfflineNodes() {
-        nodeManageManager.markOfflineNodes();
-    }
-}
-```
-
-------
-
-# 九、Domain Service / Strategy 层骨架
-
-------
-
-## 1. NodeDomainService.java
-
-职责：节点领域规则。
-
-```java
-@Service
-public class NodeDomainService {
-
-    public boolean isOffline(ComputeNode node, LocalDateTime now) {
-        if (node.getLastHeartbeatTime() == null) {
-            return true;
-        }
-        return Duration.between(node.getLastHeartbeatTime(), now).getSeconds() > 30;
-    }
-
-    public boolean canDispatch(ComputeNode node) {
-        return node != null
-                && node.isOnline()
-                && node.getEnabled() != null
-                && node.getEnabled() == 1
-                && node.getRunningCount() != null
-                && node.getMaxConcurrency() != null
-                && node.getRunningCount() < node.getMaxConcurrency();
-    }
-}
-```
-
-------
-
-## 2. ScheduleDomainService.java
-
-职责：节点筛选逻辑。
-
-```java
-@Service
-@RequiredArgsConstructor
-public class ScheduleDomainService {
-
-    private final NodeDomainService nodeDomainService;
-
-    public List<ComputeNode> filterAvailableNodes(List<ComputeNode> nodes,
-                                                  Long solverId,
-                                                  List<NodeSolverCapability> capabilities) {
-
-        Set<Long> supportedNodeIds = capabilities.stream()
-                .filter(item -> item.getEnabled() != null && item.getEnabled() == 1)
-                .filter(item -> Objects.equals(item.getSolverId(), solverId))
-                .map(NodeSolverCapability::getNodeId)
-                .collect(Collectors.toSet());
-
-        return nodes.stream()
-                .filter(nodeDomainService::canDispatch)
-                .filter(node -> supportedNodeIds.contains(node.getId()))
-                .toList();
-    }
-}
-```
-
-------
-
-## 3. ScheduleStrategy.java
-
-```java
-public interface ScheduleStrategy {
-    ComputeNode selectNode(TaskDTO task, List<ComputeNode> nodes);
-}
-```
-
-------
-
-## 4. FcfsLeastLoadStrategy.java
-
-职责：先到先服务 + 最小负载。
-
-```java
-@Component
-public class FcfsLeastLoadStrategy implements ScheduleStrategy {
-
-    @Override
-    public ComputeNode selectNode(TaskDTO task, List<ComputeNode> nodes) {
-        if (nodes == null || nodes.isEmpty()) {
-            return null;
-        }
-
-        return nodes.stream()
-                .min(Comparator
-                        .comparing(ComputeNode::getRunningCount, Comparator.nullsLast(Integer::compareTo))
-                        .thenComparing(ComputeNode::getCpuUsage, Comparator.nullsLast(BigDecimal::compareTo))
-                        .thenComparing(ComputeNode::getMemoryUsage, Comparator.nullsLast(BigDecimal::compareTo)))
-                .orElse(null);
-    }
-}
-```
-
-------
-
-# 十、Repository 接口骨架
-
-------
-
-## 1. ComputeNodeRepository.java
-
-```java
-public interface ComputeNodeRepository {
-    ComputeNode findById(Long nodeId);
-    ComputeNode findByNodeCode(String nodeCode);
-    void save(ComputeNode node);
-    void update(ComputeNode node);
-    PageResult<ComputeNode> page(NodePageQueryRequest request);
-    List<ComputeNode> listAllEnabled();
-}
-```
-
-------
-
-## 2. NodeSolverCapabilityRepository.java
-
-```java
-public interface NodeSolverCapabilityRepository {
-    List<NodeSolverCapability> listByNodeId(Long nodeId);
-    List<NodeSolverCapability> listAll();
-    void replaceNodeSolvers(Long nodeId, List<Long> solverIds);
-}
-```
-
-------
-
-## 3. ScheduleRecordRepository.java
-
-```java
-public interface ScheduleRecordRepository {
-    void save(ScheduleRecord record);
-    PageResult<ScheduleRecord> page(SchedulePageQueryRequest request);
-    List<ScheduleRecord> listByTaskId(Long taskId);
-}
-```
-
-------
-
-# 十一、Persistence 层骨架
-
-------
-
-## 1. entity
-
-建议类：
-
-- `ComputeNodePO`
-- `NodeSolverCapabilityPO`
-- `ScheduleRecordPO`
-
-字段与表一一对应，不写业务方法。
-
-------
-
-## 2. mapper
-
-### ComputeNodeMapper.java
-
-```java
-@Mapper
-public interface ComputeNodeMapper extends BaseMapper<ComputeNodePO> {
-}
-```
-
-### NodeSolverCapabilityMapper.java
-
-### ScheduleRecordMapper.java
-
-同理。
-
-------
-
-## 3. repository impl
-
-### ComputeNodeRepositoryImpl.java
-
-```java
-@Repository
-@RequiredArgsConstructor
-public class ComputeNodeRepositoryImpl implements ComputeNodeRepository {
-
-    private final ComputeNodeMapper computeNodeMapper;
-    private final NodeAssembler nodeAssembler;
-
-    @Override
-    public ComputeNode findById(Long nodeId) { ... }
-
-    @Override
-    public ComputeNode findByNodeCode(String nodeCode) { ... }
-
-    @Override
-    public void save(ComputeNode node) { ... }
-
-    @Override
-    public void update(ComputeNode node) { ... }
-
-    @Override
-    public PageResult<ComputeNode> page(NodePageQueryRequest request) { ... }
-
-    @Override
-    public List<ComputeNode> listAllEnabled() { ... }
-}
-```
-
-------
-
-### NodeSolverCapabilityRepositoryImpl.java
-
-```java
-@Repository
-@RequiredArgsConstructor
-public class NodeSolverCapabilityRepositoryImpl implements NodeSolverCapabilityRepository {
-
-    private final NodeSolverCapabilityMapper mapper;
-    private final NodeAssembler nodeAssembler;
-
-    @Override
-    public List<NodeSolverCapability> listByNodeId(Long nodeId) { ... }
-
-    @Override
-    public List<NodeSolverCapability> listAll() { ... }
-
-    @Override
-    @Transactional
-    public void replaceNodeSolvers(Long nodeId, List<Long> solverIds) { ... }
-}
-```
-
-------
-
-### ScheduleRecordRepositoryImpl.java
-
-```java
-@Repository
-@RequiredArgsConstructor
-public class ScheduleRecordRepositoryImpl implements ScheduleRecordRepository {
-
-    private final ScheduleRecordMapper scheduleRecordMapper;
-    private final ScheduleAssembler scheduleAssembler;
-
-    @Override
-    public void save(ScheduleRecord record) { ... }
-
-    @Override
-    public PageResult<ScheduleRecord> page(SchedulePageQueryRequest request) { ... }
-
-    @Override
-    public List<ScheduleRecord> listByTaskId(Long taskId) { ... }
-}
-```
-
-------
-
-# 十二、Client 层骨架
-
-------
-
-## 1. TaskClient.java
-
-职责：调 task-service。
-
-```java
-@FeignClient(name = "task-service")
-public interface TaskClient {
-
-    @GetMapping("/internal/tasks/queued")
-    Result<List<TaskDTO>> listQueuedTasks();
-
-    @PostMapping("/internal/tasks/{taskId}/mark-scheduled")
-    Result<Void> markScheduled(@PathVariable("taskId") Long taskId,
-                               @RequestParam("nodeId") Long nodeId);
-
-    @PostMapping("/internal/tasks/{taskId}/mark-dispatched")
-    Result<Void> markDispatched(@PathVariable("taskId") Long taskId,
-                                @RequestParam("nodeId") Long nodeId);
-}
-```
-
-------
-
-## 2. NodeAgentClient.java
-
-职责：调 node-agent。
-
-```java
-@Component
-public class NodeAgentClient {
-
-    private final RestTemplate restTemplate;
-
-    public NodeAgentClient(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
-    public void dispatchTask(String host, Integer port, TaskDTO task) {
-        String url = "http://" + host + ":" + port + "/internal/dispatch-task";
-        restTemplate.postForObject(url, task, Void.class);
-    }
-}
-```
-
-后面也可以换成 OpenFeign 或 WebClient。
-
-------
-
-# 十三、Assembler 层骨架
-
-------
-
-## 1. NodeAssembler.java
-
-```java
-@Component
-public class NodeAssembler {
-
-    public NodeListItemResponse toListItemResponse(ComputeNode node) { ... }
-
-    public NodeDetailResponse toDetailResponse(ComputeNode node, List<NodeSolverCapability> capabilities) { ... }
-
-    public ComputeNode fromPO(ComputeNodePO po) { ... }
-
-    public ComputeNodePO toPO(ComputeNode node) { ... }
-
-    public NodeSolverCapability fromPO(NodeSolverCapabilityPO po) { ... }
-
-    public NodeSolverCapabilityPO toPO(NodeSolverCapability capability) { ... }
-}
-```
-
-------
-
-## 2. ScheduleAssembler.java
-
-```java
-@Component
-public class ScheduleAssembler {
-
-    public ScheduleRecordResponse toResponse(ScheduleRecord record) { ... }
-
-    public ScheduleRecord fromPO(ScheduleRecordPO po) { ... }
-
-    public ScheduleRecordPO toPO(ScheduleRecord record) { ... }
-}
-```
-
-------
-
-# 十四、Config 层骨架
-
-建议先建这几个：
-
-### SchedulerApplication.java
-
-```java
-@SpringBootApplication
-@EnableScheduling
-@EnableFeignClients
-public class SchedulerApplication {
-    public static void main(String[] args) {
-        SpringApplication.run(SchedulerApplication.class, args);
-    }
-}
-```
-
-------
-
-### FeignClientConfig.java
-
-可先空壳，后续加统一 header、超时配置。
-
-------
-
-### SchedulingConfig.java
-
-如果你后期要统一线程池，可放这里。
-
-------
-
-# 十五、最小可运行实现顺序
-
-你不要一次写全，按这个顺序最稳。
-
-## 第一批
-
-先建：
-
-- `ComputeNode`
-- `NodeController`
-- `NodeAppService`
-- `ComputeNodeRepository`
-- `ComputeNodeRepositoryImpl`
-- `ComputeNodeMapper`
-- `NodeAssembler`
-
-先跑通：
-
-- 节点列表
-- 节点详情
+- 节点分页查询
+- 节点详情查询
 - 启停节点
+- 启停节点上的某个求解器能力
+- 查询节点支持的求解器列表
 
-------
+这部分主要面向前端管理端使用。
 
-## 第二批
+#### `NodeAgentController`
 
-再建：
+负责面向节点代理的公开接口，包括：
 
-- `NodeRegisterController`
-- `NodeHeartbeatController`
-- `NodeManageManager`
-- `NodeDomainService`
-- `NodeSolverCapabilityRepository`
+- 节点注册 `/api/node-agent/register`
+- 节点心跳 `/api/node-agent/heartbeat`
 
-跑通：
+这是“节点动态状态”的起点。当前节点并不是靠人工静态维护，而是由节点代理主动注册并持续发送心跳来驱动状态刷新。
 
-- 节点注册
-- 节点心跳
-- 节点在线/离线更新
+#### `ScheduleController`
 
-------
+负责调度记录查询，包括：
 
-## 第三批
+- 调度记录分页
+- 按任务查询调度记录
 
-再建：
+这让调度过程具备可追踪性，而不是仅在日志中体现。
 
-- `TaskClient`
-- `TaskScheduleManager`
-- `TaskScheduleJob`
-- `ScheduleStrategy`
-- `FcfsLeastLoadStrategy`
+#### `InternalSchedulerController`
 
-跑通：
+负责提供给其他服务的内部接口，包括：
 
-- 拉取 queued 任务
-- 节点筛选
-- 标记 scheduled
+- 查询某求解器的可用节点
+- 记录调度记录
+- 调整节点运行数
+- 转发取消任务到节点
+- 校验节点 Token
 
-------
+其中 `/internal/nodes/available` 还被 `task-service` 用于生成 `queueReason`，说明它不仅参与调度，也参与“排队原因解释”。
 
-## 第四批
+#### `NodeRegisterController` 与 `NodeHeartbeatController`
 
-再建：
+这两个控制器提供了更早期或更内部化的节点注册、心跳接口，体现出当前系统同时兼顾“节点代理直接接入”和“内部接口方式接入”的兼容思路。
 
-- `NodeAgentClient`
-- `ScheduleRecordRepository`
-- `ScheduleController`
-- `ScheduleAppService`
+### 4.2 应用层
 
-跑通：
+#### `NodeAppService`
+
+这是节点管理主服务，负责：
+
+- 注册新节点
+- 处理节点代理注册
+- 处理心跳
+- 更新节点启停状态
+- 更新节点求解器能力启停状态
+- 查询节点详情和能力列表
+- 标记节点离线
+- 查询在线节点和可用节点
+- 维护节点 `runningCount`
+- 生成和校验 `nodeToken`
+
+它是“节点状态中心”的核心实现。
+
+#### `ScheduleAppService`
+
+这是调度主服务，负责：
+
+- 执行调度算法选节点
+- 预占节点运行数
+- 记录调度成功与失败
+- 调用 `node-agent` 下发任务
+- 转发取消请求
+- 查询调度记录
+
+它是“调度中心”的核心实现。
+
+### 4.3 Manager 与 Facade 层
+
+#### `NodeManageManager` 与 `NodeFacade`
+
+负责对节点相关应用流程做进一步封装，让控制器保持更薄。这一层虽然不复杂，但使结构更规整，方便论文和答辩时表达分层设计。
+
+#### `TaskScheduleManager` 与 `ScheduleFacade`
+
+负责调度流程和调度记录查询的统一入口，屏蔽控制器对 `ScheduleAppService` 的直接依赖。
+
+### 4.4 定时任务层
+
+#### `TaskScheduleJob`
+
+这是整个模块最关键的执行入口之一。它按固定周期执行：
+
+1. 调用 `task-service` 拉取排队任务
+2. 根据调度策略选择节点
+3. 先在本地预占节点 `runningCount`
+4. 回写任务状态为 `SCHEDULED`
+5. 调用 `node-agent` 下发任务
+6. 成功后回写为 `DISPATCHED`
+7. 记录调度成功记录
+8. 如失败则释放节点预占并记录失败
+
+这说明当前项目的调度实现是“调度器主动轮询 + 同步派发”的模式。
+
+#### `NodeOfflineCheckJob`
+
+负责按固定周期执行节点离线检查。它会调用 `NodeHeartbeatChecker` 判断在线节点是否长时间没有心跳，若超时则：
+
+- 通知 `task-service` 将该节点影响的任务批量标记失败
+- 再将节点标记为离线
+
+这条链路是节点动态状态真正闭环的关键。
+
+### 4.5 领域层
+
+#### `ComputeNode`
+
+`ComputeNode` 是节点聚合根，承载了节点核心运行状态，包括：
+
+- `status`
+- `enabled`
+- `maxConcurrency`
+- `runningCount`
+- `cpuUsage`
+- `memoryUsage`
+- `lastHeartbeatTime`
+- `nodeToken`
+
+并提供关键领域行为：
+
+- `markOnline()`
+- `markOffline()`
+- `refreshHeartbeat()`
+- `enable()`
+- `disable()`
+- `canDispatch()`
+
+其中 `canDispatch()` 非常关键，它要求节点同时满足：
+
+- 在线
+- 启用
+- 当前运行数小于最大并发数
+
+这说明当前系统中的节点状态确实是动态调度状态，而不是数据库中的静态标签。
+
+#### `NodeSolverCapability`
+
+负责描述节点支持哪些求解器以及对应版本、是否启用。  
+这是调度时“节点能不能跑这个任务”的核心依据。
+
+#### `ScheduleRecord`
+
+负责记录每次调度行为，包括：
+
+- 任务 ID
+- 节点 ID
+- 调度策略名
+- 调度状态
+- 调度消息
+
+它构成了调度过程的审计轨迹。
+
+#### `NodeDomainService`
+
+负责节点领域规则，包括：
+
+- 注册请求合法性校验
+- 心跳请求合法性校验
+- 节点是否可派发判断
+
+#### `ScheduleDomainService`
+
+负责可调度节点过滤逻辑，即：
+
+- 先看节点是否在线、启用且未满载
+- 再看节点是否支持该求解器且能力启用
+
+它把“节点资源状态”和“节点能力状态”合并为统一调度前置判断。
+
+#### `ScheduleStrategy` 与 `FcfsLeastLoadStrategy`
+
+当前调度策略采用策略模式封装，实际实现为 `FcfsLeastLoadStrategy`。  
+当前策略核心特征是：
+
+- 以可派发节点集合为输入
+- 优先选择 `runningCount` 更小的节点
+- 若并列，再比较 CPU 使用率
+- 再比较内存使用率
+
+虽然类名叫 FCFS + Least Load，但从当前代码看，真正落实的是“在当前可调度任务列表顺序下，节点侧采用最小负载优先”。
+
+### 4.6 基础设施层
+
+#### `TaskClient` / `TaskClientStub`
+
+负责和 `task-service` 交互，当前已支持：
+
+- 拉取排队任务
+- 标记任务已调度
+- 标记任务已下发
+- 标记任务调度失败
+- 节点离线时批量标记任务失败
+
+这是调度服务和任务服务的核心协作接口。
+
+#### `NodeAgentClient` / `NodeAgentClientStub`
+
+负责和节点代理通信，当前已支持：
 
 - 下发任务
-- 标记 dispatched
-- 写调度记录
-- 查看调度记录
+- 转发取消任务
 
-------
+它会根据节点 `host` 拼装 node-agent 地址，并将调度所需元数据一并发送给节点侧。
 
-# 十六、你现在最该先建的 12 个类
+#### 仓储层
 
-如果你只想先把主骨架搭出来，建议先建这 12 个：
+当前主要包括：
 
-1. `ComputeNode`
-2. `NodeController`
-3. `NodeRegisterController`
-4. `NodeHeartbeatController`
-5. `NodeAppService`
-6. `NodeManageManager`
-7. `TaskScheduleManager`
-8. `TaskScheduleJob`
-9. `NodeDomainService`
-10. `ScheduleStrategy`
-11. `FcfsLeastLoadStrategy`
-12. `TaskClient`
+- `ComputeNodeRepository`
+- `NodeSolverCapabilityRepository`
+- `ScheduleRecordRepository`
 
-这 12 个一出来，`scheduler-service` 的主干就有了。
+这些仓储完成节点主数据、节点能力和调度记录的持久化。
 
-------
+其中 `NodeSolverCapabilityRepositoryImpl` 的一个重要特点是：
 
-# 十七、最终建议
+- 节点重新注册时会整体替换能力集合
 
-`scheduler-service` 最怕的两个坑是：
+这意味着平台始终以节点最新上报的能力信息为准。
 
-- 把调度逻辑写进定时任务类
-- 把节点逻辑和调度逻辑混成一个 Service
+#### 支撑组件
 
-你现在这版骨架已经把它拆开了：
+当前还有一些支撑类：
 
-- `NodeManageManager` 专管节点
-- `TaskScheduleManager` 专管调度
-- `TaskScheduleJob` 只是入口
-- `ScheduleStrategy` 专门抽调度算法
-- `TaskClient / NodeAgentClient` 专门做外部调用
+- `NodeHeartbeatChecker`：离线检测与补偿触发
+- `AvailableNodeSelector`：可派发节点过滤辅助
+- `NodeLoadCalculator`：负载评分预留能力
+- `ScheduleLogWriter`：调度日志输出辅助
 
-这就是比较规范、后面也不容易乱的结构。
+其中 `NodeLoadCalculator` 目前更偏预留扩展点，当前实际调度主要还是由 `FcfsLeastLoadStrategy` 完成。
 
---------
+## 5. 核心业务流程
 
+### 5.1 节点注册与发现流程
+
+```text
+node-agent 启动
+  -> 调用 /api/node-agent/register
+  -> NodeAgentController
+  -> NodeAppService.registerNodeFromAgent
+  -> NodeAppService.registerNode
+  -> 写入/更新 compute_node
+  -> 写入/替换 node_solver_capability
+  -> 生成或复用 nodeToken
+  -> 返回 nodeId + nodeToken
+```
+
+这个流程说明：
+
+- 节点发现不是写死在数据库里
+- 节点可以重复注册并刷新自身元数据
+- 平台会根据 `nodeCode` 识别已有节点并更新其主数据
+
+### 5.2 节点心跳与动态状态刷新流程
+
+```text
+node-agent 定期发送心跳
+  -> /api/node-agent/heartbeat
+  -> 携带 X-Node-Token
+  -> NodeAppService.heartbeat
+  -> 校验 nodeToken
+  -> 更新 cpuUsage / memoryUsage / runningCount / lastHeartbeatTime
+  -> 节点标记为 ONLINE
+```
+
+这条流程非常关键，因为它说明前端看到的节点状态、负载和运行数并不是纯静态数据库演示数据，而是会被节点持续刷新。
+
+### 5.3 节点离线检测与补偿流程
+
+```text
+NodeOfflineCheckJob 定时运行
+  -> NodeHeartbeatChecker.markOfflineNodes
+  -> 查找 ONLINE 节点
+  -> 超过阈值未心跳则判定离线
+  -> 调用 task-service 批量标记该节点影响任务失败
+  -> 节点标记 OFFLINE
+  -> 清零 runningCount / cpuUsage / memoryUsage
+```
+
+这说明“离线”不是管理员手工改状态，而是由调度器根据心跳超时自动判定。
+
+### 5.4 调度与派发流程
+
+```text
+TaskScheduleJob 定时运行
+  -> TaskClient.listPendingTasks(20)
+  -> ScheduleAppService.scheduleTask
+  -> ScheduleDomainService 过滤可用节点
+  -> FcfsLeastLoadStrategy 选节点
+  -> 预占节点 runningCount +1
+  -> task-service markScheduled
+  -> node-agent dispatch-task
+  -> task-service markDispatched
+  -> 保存 SUCCESS 调度记录
+```
+
+若中途失败，则会：
+
+- 释放节点预占
+- 在必要时回写任务失败
+- 保存 FAILED 调度记录
+
+### 5.5 任务取消流程
+
+```text
+task-service 请求取消运行中任务
+  -> scheduler-service /internal/nodes/{nodeId}/cancel-task
+  -> ScheduleAppService.cancelTaskOnNode
+  -> NodeAgentClient.cancelTask
+  -> node-agent 执行取消
+```
+
+因此，运行中取消并不是直接改数据库，而是通过调度器向执行侧转发。
+
+## 6. 核心设计
+
+### 6.1 设计一：节点状态由“注册 + 心跳 + 离线检查”动态驱动
+
+这是 `scheduler-service` 最重要的设计点之一。  
+当前节点状态不是静态维护，而是靠三步构成闭环：
+
+1. 节点启动时注册
+2. 节点运行中持续心跳
+3. 调度器定时离线检查
+
+这正是计算节点动态管理的核心机制，也使节点状态真正能够反映实际调度环境。
+
+### 6.2 设计二：将节点“主状态”和“求解器能力”分离
+
+系统没有把“节点是否支持某求解器”写成节点表中的单个字段，而是单独维护 `node_solver_capability`。  
+这样做的好处是：
+
+- 一个节点可以支持多个求解器
+- 每个求解器能力可以单独启停
+- 可以记录版本信息
+- 未来更容易扩展多求解器场景
+
+### 6.3 设计三：调度链路分成“选节点”和“下发任务”两个阶段
+
+当前调度过程不是一步到位，而是分成：
+
+- 先筛选并选择节点
+- 再通知任务服务更新调度状态
+- 再向节点代理发送下发请求
+
+这种分段式设计使系统更容易定位问题，例如是“没有可用节点”“调度成功但下发失败”还是“节点执行阶段失败”。
+
+### 6.4 设计四：用调度记录沉淀调度轨迹
+
+当前系统不仅做调度动作，还会记录：
+
+- 任务调度到哪个节点
+- 使用什么策略
+- 成功还是失败
+- 失败原因是什么
+
+这使调度过程具备了可查询、可解释和可答辩的依据。
+
+### 6.5 设计五：通过节点 Token 保证节点侧接口可信
+
+节点注册后会获得 `nodeToken`，后续心跳和任务回传都围绕该令牌展开。  
+当前令牌虽然是轻量级 Base64 方案，但已经体现出：
+
+- 节点身份需要显式认证
+- 并非所有请求都可伪造为某个节点
+- `task-service` 与 `scheduler-service` 共享节点身份校验职责
+
+## 7. 架构难点与解决方案
+
+### 7.1 难点一：如何让节点状态反映真实运行状态
+
+问题：
+
+- 如果节点状态只靠数据库初始数据，前端展示就会是静态假象
+- 调度器也无法判断节点是否真的还活着
+
+当前解决方案：
+
+- 节点代理启动时主动注册
+- 运行中持续心跳更新负载与并发
+- 调度器定时检查超时并自动标记离线
+
+这正是当前实现中“节点状态动态化”的核心。
+
+### 7.2 难点二：如何在调度前同时考虑节点资源与节点能力
+
+问题：
+
+- 节点在线并不意味着它能运行当前任务
+- 节点支持求解器也不意味着它当前有空闲并发
+
+当前解决方案：
+
+- `ScheduleDomainService` 同时检查节点能力和节点可派发状态
+- 调度策略只在通过前置过滤后的节点集合中进行选择
+
+这样避免了把能力判断和资源判断混在调度算法内部。
+
+### 7.3 难点三：节点离线后如何补偿任务状态
+
+问题：
+
+- 如果节点离线但任务仍停留在 `RUNNING` 或 `DISPATCHED`，系统状态会失真
+
+当前解决方案：
+
+- 离线检测后，调度器调用 `task-service` 批量标记相关任务失败
+- 失败原因中写明是节点心跳超时导致
+
+这让系统能够从真实执行故障中恢复到一致状态。
+
+### 7.4 难点四：任务派发失败如何避免节点资源“假占用”
+
+问题：
+
+- 调度器在选择节点后已经预占了 `runningCount`
+- 如果后续通知节点失败，就必须回收预占
+
+当前解决方案：
+
+- `scheduleTask()` 先预占并发
+- 若派发失败则调用 `releaseNodeReservation()`
+
+这说明当前实现已经考虑了派发失败时的资源回滚。
+
+### 7.5 难点五：如何在原型复杂度和调度真实性之间平衡
+
+问题：
+
+- 真正的分布式调度器通常包含锁、队列、中间件、抢占、优先级、多实例一致性等复杂能力
+- 本科原型项目不能直接做成生产级调度中台
+
+当前解决方案：
+
+- 采用定时轮询 + 单策略 + 同步下发的轻量方案
+- 保留节点能力、动态心跳、离线补偿和调度记录这些最关键能力
+
+这使系统既有真实调度闭环，又保持了实现可控。
+
+## 8. 关键技术手段
+
+### 8.1 Spring 定时任务
+
+当前依赖两个定时任务驱动系统核心行为：
+
+- `TaskScheduleJob`：周期性调度
+- `NodeOfflineCheckJob`：周期性离线检测
+
+这是当前调度系统的“时钟”。
+
+### 8.2 策略模式
+
+通过 `ScheduleStrategy` 抽象调度算法，并以 `FcfsLeastLoadStrategy` 作为当前实现。  
+这样未来可以扩展更多策略，而不需要重写整体调度流程。
+
+### 8.3 微服务内部 HTTP 协作
+
+当前 `scheduler-service` 通过内部 HTTP 与：
+
+- `task-service`
+- `node-agent`
+
+进行协作，形成完整调度闭环，体现了微服务边界下的职责分离。
+
+### 8.4 节点能力映射模型
+
+通过 `ComputeNode + NodeSolverCapability` 的双层模型表达：
+
+- 节点基础状态
+- 节点支持的求解器能力
+
+这是实现多求解器多节点调度的关键数据结构。
+
+### 8.5 运行数预占与心跳反馈结合
+
+当前节点负载管理并不是单纯依赖心跳，也不是单纯依赖数据库统计，而是采用：
+
+- 调度瞬间先预占 `runningCount`
+- 节点后续再通过心跳持续刷新实际 `runningCount`
+
+这是一种适合原型平台的简化运行数管理方案。
+
+## 9. 当前实现的优点
+
+- 已实现节点注册、心跳、离线检测的动态节点状态闭环。
+- 已建立节点与求解器能力映射，能够支持多求解器场景下的节点筛选。
+- 已实现调度器轮询任务、选择节点、下发任务、记录结果的完整调度主链。
+- 已实现节点离线后的任务失败补偿，避免任务长期卡死在运行态。
+- 已实现节点 Token 生成与校验，内部安全性优于纯白名单放行。
+- 已提供节点查询、调度记录查询和可用节点查询能力，便于前端展示和问题定位。
+
+## 10. 当前实现的局限与边界
+
+### 10.1 当前更适合单实例调度器原型
+
+当前调度链路中没有看到分布式锁、任务抢占保护或多实例幂等协调机制。  
+这意味着如果未来扩展成多实例调度器，可能出现重复轮询和重复调度风险。
+
+### 10.2 调度触发仍为轮询模式
+
+当前调度器依赖 `TaskScheduleJob` 周期性轮询 `task-service`。  
+因此任务提交后不会立即被推送调度，而是等待下一轮扫描。
+
+### 10.3 调度策略较基础
+
+当前仅实现了 `FcfsLeastLoadStrategy`，主要考虑：
+
+- 当前并发数
+- CPU 使用率
+- 内存使用率
+
+尚未进一步纳入：
+
+- 严格任务优先级排序控制
+- 任务预估资源需求
+- 节点亲和性
+- 公平调度
+- 抢占式调度
+
+### 10.4 节点 Token 仍是轻量原型方案
+
+当前 `nodeToken` 是基于 `nodeCode + UUID` 的 Base64 编码生成结果。  
+它能满足原型系统的节点身份识别，但还不是生产级的节点证书或强签名方案。
+
+### 10.5 缺少更强的调度治理能力
+
+当前还没有实现：
+
+- 调度任务队列中间件
+- 调度重试策略
+- 分布式锁
+- 多副本高可用协调
+- 调度事件流审计
+- 节点黑名单和故障熔断
+
+这些都更适合作为扩展点，而不是当前本科毕设原型的首版目标。
+
+## 11. 对本科毕设的价值
+
+从本科毕业设计角度看，`scheduler-service` 的价值非常高，主要体现在：
+
+1. 它体现了平台不是静态任务管理系统，而是真正具备“资源调度”能力的任务平台。
+2. 它能够说明系统中的节点状态是动态变化的，而不是展示层假数据。
+3. 它将微服务拆分、节点管理、任务调度、故障补偿这些关键技术点连接起来。
+4. 它足以支撑“分布式计算节点调度原型”这一核心技术指标的展示。
+
+因此，`scheduler-service` 是答辩时非常值得重点讲解的模块。
+
+## 12. 答辩时可采用的表述
+
+可以将该模块概括为：
+
+> `scheduler-service` 是平台的调度与节点管理中心，负责计算节点的注册、能力维护、心跳接收、离线检测以及排队任务的节点分配。系统通过节点代理注册和周期性心跳实现节点状态动态刷新，通过节点能力映射和负载筛选实现任务与节点的匹配，通过定时调度作业完成任务轮询、节点选择和任务下发，并在节点离线时触发任务失败补偿，从而形成面向 CAE 仿真任务的轻量级调度闭环。
+
+## 13. 后续可扩展方向
+
+在不改变当前原型定位的前提下，后续可以继续扩展：
+
+- 引入提交后主动触发调度，而不只依赖轮询
+- 增加更丰富的调度策略，如优先级调度、资源感知调度
+- 引入分布式锁或一致性机制，支持多实例调度器
+- 增加节点故障熔断、黑名单和重试机制
+- 将节点 Token 升级为更强的安全认证方案
+- 增加更精细的资源模型，如 GPU、磁盘、许可证等资源维度
+- 完善调度日志、审计和运行监控能力
+
+这些内容更适合作为扩展能力，而不是当前首版必须全部完成的内容。
+
+## 14. 当前结论
+
+`scheduler-service` 当前已经完成了本项目原型平台中与“调度”和“动态节点管理”相关的核心能力：
+
+- 可实现节点注册、心跳上报与离线检测
+- 可动态维护节点在线状态、负载和并发数
+- 可维护节点支持的求解器能力集合
+- 可轮询排队任务并执行节点选择与任务下发
+- 可记录调度成功与失败轨迹
+- 可在节点离线时触发任务失败补偿
+
+从实现深度看，它已经超出了“数据库里写几个节点状态供前端展示”的静态演示层面，而是真正实现了一个具备动态节点状态管理、基础调度策略和故障补偿能力的轻量级调度原型。  
+从本科毕设要求看，这个模块已经能够很好支撑“微服务 + 分布式节点 + 任务调度”这几个核心技术指标的展示。

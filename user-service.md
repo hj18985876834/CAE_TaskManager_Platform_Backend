@@ -1,1686 +1,623 @@
-# 五、user-service 项目结构设计
+# user-service 模块分析文档
 
-用户服务相对简单，适合采用标准分层。
+## 1. 模块定位
 
-## 1. 推荐结构
+`user-service` 是平台中的用户与认证基础服务，负责管理“谁可以进入系统、当前用户是谁、用户基本资料如何维护”这类通用能力。
 
-```text
-user-service/
-└── src/main/java/com/yourorg/user/
-    ├── UserApplication.java
-    ├── interfaces/
-    │   ├── controller/
-    │   ├── request/
-    │   └── response/
-    ├── application/
-    │   ├── service/
-    │   ├── facade/
-    │   └── assembler/
-    ├── domain/
-    │   ├── model/
-    │   ├── repository/
-    │   ├── service/
-    │   └── enums/
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   ├── mapper/
-    │   │   └── repository/
-    │   └── security/
-    ├── config/
-    └── support/
-```
+在当前项目中，它承担的核心职责主要有四类：
 
-## 2. 推荐核心类划分
+- 用户登录
+- 当前登录用户信息查询
+- 用户管理
+- 面向其他微服务的内部用户基础信息查询
 
-### interfaces/controller
+它不负责网关鉴权拦截，不负责任务调度、节点管理、求解器管理等业务能力，也不实现复杂 RBAC 权限平台。
 
-- `AuthController`
-- `UserController`
+当前系统将认证与用户基础管理聚合在同一个服务中，这种设计对于本科毕设原型平台是合理的，既能体现服务拆分，也不会把认证体系做得过重。
 
-### interfaces/request
+## 2. 模块在系统中的作用
 
-- `LoginRequest`
-- `CreateUserRequest`
-- `UpdateUserRequest`
-- `UpdateUserStatusRequest`
+从整体架构上看，`user-service` 主要解决以下问题：
 
-### interfaces/response
+1. 接收用户登录请求并颁发访问 Token。
+2. 维护平台中的用户账号、角色、状态、密码等基础数据。
+3. 为网关透传身份后的业务访问提供“当前用户信息”查询能力。
+4. 为其他服务按用户 ID 提供基础资料查询能力，减少跨服务直接访问用户库的需求。
 
-- `LoginResponse`
-- `UserDetailResponse`
-- `UserListItemResponse`
+因此，`user-service` 在整个系统中既是认证入口的一部分，也是平台用户主数据服务。
 
-### application/service
+## 3. 当前实现架构
 
-- `AuthAppService`
-- `UserAppService`
+### 3.1 技术栈
 
-这里负责流程，例如：
+- Spring Boot
+- MVC 风格 Controller
+- 分层架构：`interfaces / application / domain / infrastructure`
+- MyBatis 注解 Mapper
+- `common-lib` 中的异常、返回体、错误码、Token 工具
 
-- 登录校验
-- 创建用户流程
-- 修改状态流程
+### 3.2 当前目录结构
 
-### application/facade
-
-如果你想让 Controller 更薄，可以让 Controller 只调 Facade：
-
-- `AuthFacade`
-- `UserFacade`
-
-### application/assembler
-
-专门做转换：
-
-- `UserAssembler`
-
-### domain/model
-
-- `User`
-- `Role`
-
-### domain/repository
-
-- `UserRepository`
-- `RoleRepository`
-
-### domain/service
-
-- `PasswordDomainService`
-- `UserDomainService`
-
-### infrastructure/persistence/entity
-
-- `UserPO`
-- `RolePO`
-
-### infrastructure/persistence/mapper
-
-- `UserMapper`
-- `RoleMapper`
-
-### infrastructure/persistence/repository
-
-- `UserRepositoryImpl`
-- `RoleRepositoryImpl`
-
-### infrastructure/security
-
-- `PasswordEncoderSupport`
-- `JwtTokenService`
-
-## 3. 这样分的好处
-
-用户服务虽然不复杂，但这样拆以后：
-
-- 登录逻辑不会和 CRUD 混在一起
-- DTO/VO/PO 不会混用
-- 后面接 RBAC 也容易扩展
-
-------
-
-# 五、user-service 完整包树
-
-用户服务整体比较标准，主要负责登录、用户管理、角色控制。后端设计里也明确它不做复杂权限系统，只保留 `roleCode` 判断。
-
-## 1. 完整结构
+当前代码结构如下：
 
 ```text
 user-service/
 └── src/main/java/com/example/cae/user/
     ├── UserApplication.java
-    ├── interfaces/
-    │   ├── controller/
-    │   │   ├── AuthController.java
-    │   │   └── UserController.java
-    │   ├── request/
-    │   │   ├── LoginRequest.java
-    │   │   ├── CreateUserRequest.java
-    │   │   ├── UpdateUserRequest.java
-    │   │   ├── UpdateUserStatusRequest.java
-    │   │   └── ResetPasswordRequest.java
-    │   └── response/
-    │       ├── LoginResponse.java
-    │       ├── CurrentUserResponse.java
-    │       ├── UserListItemResponse.java
-    │       └── UserDetailResponse.java
     ├── application/
-    │   ├── service/
-    │   │   ├── AuthAppService.java
-    │   │   └── UserAppService.java
+    │   ├── assembler/
+    │   │   └── UserAssembler.java
     │   ├── facade/
     │   │   ├── AuthFacade.java
     │   │   └── UserFacade.java
-    │   └── assembler/
-    │       └── UserAssembler.java
+    │   └── service/
+    │       ├── AuthAppService.java
+    │       └── UserAppService.java
+    ├── config/
+    │   ├── MybatisPlusConfig.java
+    │   └── UserServiceConfig.java
     ├── domain/
+    │   ├── enums/
+    │   │   └── UserStatusEnum.java
     │   ├── model/
-    │   │   ├── User.java
-    │   │   └── Role.java
+    │   │   ├── Role.java
+    │   │   └── User.java
     │   ├── repository/
-    │   │   ├── UserRepository.java
-    │   │   └── RoleRepository.java
-    │   ├── service/
-    │   │   ├── UserDomainService.java
-    │   │   └── PasswordDomainService.java
-    │   └── enums/
-    │       └── UserStatusEnum.java
+    │   │   ├── RoleRepository.java
+    │   │   └── UserRepository.java
+    │   └── service/
+    │       ├── PasswordDomainService.java
+    │       └── UserDomainService.java
     ├── infrastructure/
     │   ├── persistence/
     │   │   ├── entity/
-    │   │   │   ├── UserPO.java
-    │   │   │   └── RolePO.java
+    │   │   │   ├── RolePO.java
+    │   │   │   └── UserPO.java
     │   │   ├── mapper/
-    │   │   │   ├── UserMapper.java
-    │   │   │   └── RoleMapper.java
+    │   │   │   ├── RoleMapper.java
+    │   │   │   └── UserMapper.java
     │   │   └── repository/
-    │   │       ├── UserRepositoryImpl.java
-    │   │       └── RoleRepositoryImpl.java
+    │   │       ├── RoleRepositoryImpl.java
+    │   │       └── UserRepositoryImpl.java
     │   └── security/
     │       ├── JwtTokenService.java
     │       └── PasswordEncoderService.java
-    ├── config/
-    │   ├── UserServiceConfig.java
-    │   └── MybatisPlusConfig.java
-    └── support/
-        └── UserQueryBuilder.java
-```
-
-## 2. 你真正会高频写的类
-
-- `AuthController`
-- `UserController`
-- `AuthAppService`
-- `UserAppService`
-- `UserRepositoryImpl`
-- `UserMapper`
-
------------
-
-# 四、user-service 初始化代码骨架清单
-
-你的设计里，user-service 不做复杂权限系统，只做登录、用户管理、角色判断，所以结构可以标准一些。
-
-## 1. Controller
-
-### `interfaces/controller/AuthController.java`
-
-职责：
-
-* 登录
-* 获取当前用户
-* 退出登录
-
-建议方法：
-
-* `login(LoginRequest request)`
-* `me()`
-* `logout()`
-
----
-
-### `interfaces/controller/UserController.java`
-
-职责：
-
-* 用户列表
-* 创建用户
-* 修改用户
-* 启停用户
-* 重置密码
-
-建议方法：
-
-* `pageUsers(UserPageQueryRequest request)`
-* `createUser(CreateUserRequest request)`
-* `updateUser(Long userId, UpdateUserRequest request)`
-* `updateStatus(Long userId, UpdateUserStatusRequest request)`
-* `resetPassword(Long userId, ResetPasswordRequest request)`
-
----
-
-## 2. Application
-
-### `application/service/AuthAppService.java`
-
-职责：登录流程编排
-
-建议方法：
-
-* `login(String username, String password)`
-* `getCurrentUser(Long userId)`
-* `logout(Long userId)`
-
----
-
-### `application/service/UserAppService.java`
-
-职责：用户管理流程编排
-
-建议方法：
-
-* `pageUsers(UserPageQueryRequest request)`
-* `createUser(CreateUserRequest request)`
-* `updateUser(Long userId, UpdateUserRequest request)`
-* `updateStatus(Long userId, Integer status)`
-* `resetPassword(Long userId, String newPassword)`
-
----
-
-### `application/assembler/UserAssembler.java`
-
-职责：
-
-* Request -> Domain
-* Domain -> Response
-
-建议方法：
-
-* `toDomain(CreateUserRequest request)`
-* `toDetailResponse(User user)`
-* `toListItemResponse(User user)`
-
----
-
-## 3. Domain
-
-### `domain/model/User.java`
-
-职责：用户领域对象
-
-建议方法：
-
-* `enable()`
-* `disable()`
-* `resetPassword(String encodedPassword)`
-* `checkEnabled()`
-
----
-
-### `domain/model/Role.java`
-
-职责：角色领域对象
-
----
-
-### `domain/repository/UserRepository.java`
-
-职责：用户仓储接口
-
-建议方法：
-
-* `findById(Long userId)`
-* `findByUsername(String username)`
-* `save(User user)`
-* `update(User user)`
-* `page(UserPageQuery query)`
-
----
-
-### `domain/service/UserDomainService.java`
-
-职责：用户领域规则
-
-建议方法：
-
-* `checkUsernameUnique(String username)`
-* `checkLogin(User user, String rawPassword)`
-* `checkCanModify(User operator, User target)`
-
----
-
-### `domain/service/PasswordDomainService.java`
-
-职责：密码相关规则
-
-建议方法：
-
-* `encode(String rawPassword)`
-* `matches(String rawPassword, String encodedPassword)`
-
----
-
-## 4. Infrastructure
-
-### `infrastructure/persistence/entity/UserPO.java`
-
-### `infrastructure/persistence/entity/RolePO.java`
-
----
-
-### `infrastructure/persistence/mapper/UserMapper.java`
-
-建议方法：
-
-* 继承 `BaseMapper<UserPO>`
-
----
-
-### `infrastructure/persistence/mapper/RoleMapper.java`
-
----
-
-### `infrastructure/persistence/repository/UserRepositoryImpl.java`
-
-职责：仓储落地实现
-
-建议方法：
-
-* `findById`
-* `findByUsername`
-* `save`
-* `update`
-* `page`
-
----
-
-### `infrastructure/security/JwtTokenService.java`
-
-职责：JWT 发放
-
-建议方法：
-
-* `generateToken(User user)`
-* `parseUserContext(String token)`
-
----
-
-### `infrastructure/security/PasswordEncoderService.java`
-
-职责：密码加密实现
-
-建议方法：
-
-* `encode`
-* `matches`
-
--------
-
-继续。下面我给你 **`user-service` 的完整初始化代码骨架**，保持和前面几个模块同样的粒度，并严格对齐你已经统一后的后端设计口径：
-
-- `user-service` 负责：**登录、当前用户信息、用户管理、角色管理**
-- 系统只保留两类角色：`ADMIN / USER`
-- 不做复杂 RBAC
-- 网关负责鉴权，`user-service` 负责登录与用户数据管理
-- token 统一走 `Authorization: Bearer {token}` 体系
-
-------
-
-# 一、user-service 的定位
-
-`user-service` 在整个系统里承担的是**认证与用户基础管理**职责，重点有四类：
-
-1. 用户登录
-2. 获取当前登录用户信息
-3. 用户管理
-4. 角色基础管理
-
-它是一个相对“标准 CRUD + 认证”的服务，不像 `task-service` 那样流程复杂，所以可以用比较标准的分层结构，不必额外引入太多复杂抽象。
-
-但也要避免两个常见问题：
-
-- 把登录逻辑和用户管理全塞进一个 `UserServiceImpl`
-- DTO / VO / PO / Domain 对象混用
-
-正确做法是：
-
-- **Controller**：收参和返回
-- **Application**：流程编排
-- **Domain**：规则与领域对象
-- **Infrastructure**：数据库与 token 落地实现
-
-------
-
-# 二、user-service 最终推荐包树
-
-```text
-user-service/
-└── src/main/java/com/example/cae/user/
-    ├── UserApplication.java
     ├── interfaces/
     │   ├── controller/
     │   │   ├── AuthController.java
+    │   │   ├── InternalUserController.java
     │   │   └── UserController.java
     │   ├── request/
-    │   │   ├── LoginRequest.java
     │   │   ├── CreateUserRequest.java
+    │   │   ├── LoginRequest.java
+    │   │   ├── ResetPasswordRequest.java
     │   │   ├── UpdateUserRequest.java
     │   │   ├── UpdateUserStatusRequest.java
-    │   │   ├── ResetPasswordRequest.java
     │   │   └── UserPageQueryRequest.java
     │   └── response/
-    │       ├── LoginResponse.java
     │       ├── CurrentUserResponse.java
-    │       ├── UserListItemResponse.java
-    │       └── UserDetailResponse.java
-    ├── application/
-    │   ├── service/
-    │   │   ├── AuthAppService.java
-    │   │   └── UserAppService.java
-    │   ├── facade/
-    │   │   ├── AuthFacade.java
-    │   │   └── UserFacade.java
-    │   └── assembler/
-    │       └── UserAssembler.java
-    ├── domain/
-    │   ├── model/
-    │   │   ├── User.java
-    │   │   └── Role.java
-    │   ├── repository/
-    │   │   ├── UserRepository.java
-    │   │   └── RoleRepository.java
-    │   ├── service/
-    │   │   ├── UserDomainService.java
-    │   │   └── PasswordDomainService.java
-    │   └── enums/
-    │       └── UserStatusEnum.java
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   │   ├── UserPO.java
-    │   │   │   └── RolePO.java
-    │   │   ├── mapper/
-    │   │   │   ├── UserMapper.java
-    │   │   │   └── RoleMapper.java
-    │   │   └── repository/
-    │   │       ├── UserRepositoryImpl.java
-    │   │       └── RoleRepositoryImpl.java
-    │   └── security/
-    │       ├── JwtTokenService.java
-    │       └── PasswordEncoderService.java
-    ├── config/
-    │   ├── UserServiceConfig.java
-    │   └── MybatisPlusConfig.java
+    │       ├── InternalUserBasicResponse.java
+    │       ├── LoginResponse.java
+    │       ├── UserCreateResponse.java
+    │       ├── UserDetailResponse.java
+    │       └── UserListItemResponse.java
     └── support/
         └── UserQueryBuilder.java
 ```
 
-这版结构和你前面已经确定的用户服务职责边界是一致的。
+这种结构比较标准，适合用户服务这类“认证 + 基础管理”型服务。
 
-------
+## 4. 各部分功能与职责
 
-# 三、user-service 的核心调用链
+### 4.1 启动与配置层
 
-## 1. 登录链路
-
-```
-AuthController -> AuthAppService -> UserRepository / PasswordDomainService / JwtTokenService
-```
-
-## 2. 当前用户信息链路
-
-```
-AuthController -> AuthAppService -> UserRepository
-```
-
-## 3. 用户管理链路
-
-```
-UserController -> UserAppService -> UserDomainService -> UserRepository
-```
-
-这样划分后，登录和用户管理不会混在一起。
-
-------
-
-# 四、request / response 设计
-
-------
-
-## 1. interfaces/request
-
-### LoginRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class LoginRequest {
-    private String username;
-    private String password;
-}
-```
-
-------
-
-### CreateUserRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class CreateUserRequest {
-    private String username;
-    private String password;
-    private String realName;
-    private Long roleId;
-}
-```
-
-------
-
-### UpdateUserRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class UpdateUserRequest {
-    private String realName;
-    private Long roleId;
-}
-```
-
-------
-
-### UpdateUserStatusRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class UpdateUserStatusRequest {
-    private Integer status;
-}
-```
-
-------
-
-### ResetPasswordRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class ResetPasswordRequest {
-    private String newPassword;
-}
-```
-
-------
-
-### UserPageQueryRequest.java
-
-```java
-package com.example.cae.user.interfaces.request;
-
-import lombok.Data;
-
-@Data
-public class UserPageQueryRequest {
-    private Integer pageNum;
-    private Integer pageSize;
-    private String username;
-    private String realName;
-    private Integer status;
-    private Long roleId;
-}
-```
-
-------
-
-## 2. interfaces/response
-
-### LoginResponse.java
-
-```java
-package com.example.cae.user.interfaces.response;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-public class LoginResponse {
-    private String token;
-    private String tokenType;
-}
-```
-
-------
-
-### CurrentUserResponse.java
-
-```java
-package com.example.cae.user.interfaces.response;
-
-import lombok.Data;
-
-@Data
-public class CurrentUserResponse {
-    private Long userId;
-    private String username;
-    private String realName;
-    private String roleCode;
-}
-```
-
-------
-
-### UserListItemResponse.java
-
-```java
-package com.example.cae.user.interfaces.response;
-
-import lombok.Data;
-
-@Data
-public class UserListItemResponse {
-    private Long userId;
-    private String username;
-    private String realName;
-    private Long roleId;
-    private String roleCode;
-    private Integer status;
-}
-```
-
-------
-
-### UserDetailResponse.java
-
-```java
-package com.example.cae.user.interfaces.response;
-
-import lombok.Data;
-
-@Data
-public class UserDetailResponse {
-    private Long userId;
-    private String username;
-    private String realName;
-    private Long roleId;
-    private String roleCode;
-    private Integer status;
-}
-```
-
-------
-
-# 五、Controller 层完整骨架
-
-------
-
-## 1. AuthController.java
+#### `UserApplication`
 
 职责：
 
-- 登录
-- 获取当前用户
-- 退出登录
+- 启动 `user-service`
+- 扫描各层 Bean
 
-```java
-package com.example.cae.user.interfaces.controller;
+#### `UserServiceConfig`
 
-import com.example.cae.common.response.Result;
-import com.example.cae.user.application.service.AuthAppService;
-import com.example.cae.user.interfaces.request.LoginRequest;
-import com.example.cae.user.interfaces.response.CurrentUserResponse;
-import com.example.cae.user.interfaces.response.LoginResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+当前为轻量配置类，主要起到配置容器承载作用。
 
-@RestController
-@RequestMapping("/api/auth")
-@RequiredArgsConstructor
-public class AuthController {
+#### `MybatisPlusConfig`
 
-    private final AuthAppService authAppService;
+当前已预留，但实际仓储仍主要使用 MyBatis 注解 Mapper，而不是复杂的 MyBatis-Plus 特性。
 
-    @PostMapping("/login")
-    public Result<LoginResponse> login(@RequestBody LoginRequest request) {
-        return Result.success(authAppService.login(request));
-    }
+### 4.2 接口层
 
-    @GetMapping("/me")
-    public Result<CurrentUserResponse> me(@RequestHeader("X-User-Id") Long userId) {
-        return Result.success(authAppService.getCurrentUser(userId));
-    }
-
-    @PostMapping("/logout")
-    public Result<Void> logout() {
-        return Result.success();
-    }
-}
-```
-
-### 说明
-
-- `/api/auth/me` 不再自己解析 token，而是依赖网关透传的 `X-User-Id`
-- 这样符合你整套网关统一鉴权的架构口径
-
-------
-
-## 2. UserController.java
+#### `AuthController`
 
 职责：
 
-- 用户分页
+- 提供登录接口 `/api/auth/login`
+- 提供当前用户接口 `/api/auth/me`
+- 提供登出接口 `/api/auth/logout`
+
+其中：
+
+- 登录由 `user-service` 自身完成用户名密码校验并签发 Token；
+- `/api/auth/me` 不自己解析前端 Token，而是读取网关透传的 `X-User-Id`；
+- `logout` 当前为无状态 Token 模式下的空操作。
+
+#### `UserController`
+
+职责：
+
+- 用户分页查询
 - 创建用户
-- 更新用户
-- 启停用户
+- 查询用户详情
+- 更新用户资料
+- 修改用户启停状态
 - 重置密码
 
-```java
-package com.example.cae.user.interfaces.controller;
+这一层对外暴露的是典型管理接口，主要面向管理员使用。
 
-import com.example.cae.common.response.PageResult;
-import com.example.cae.common.response.Result;
-import com.example.cae.user.application.service.UserAppService;
-import com.example.cae.user.interfaces.request.*;
-import com.example.cae.user.interfaces.response.UserDetailResponse;
-import com.example.cae.user.interfaces.response.UserListItemResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+#### `InternalUserController`
 
-@RestController
-@RequestMapping("/api/users")
-@RequiredArgsConstructor
-public class UserController {
+职责：
 
-    private final UserAppService userAppService;
+- 提供内部接口 `/internal/users/{id}`
+- 供其他服务按用户 ID 查询最基础的用户信息
 
-    @GetMapping
-    public Result<PageResult<UserListItemResponse>> pageUsers(UserPageQueryRequest request) {
-        return Result.success(userAppService.pageUsers(request));
-    }
+这体现了微服务间“通过接口拿数据，而不是直接跨库”的设计原则。
 
-    @PostMapping
-    public Result<Void> createUser(@RequestBody CreateUserRequest request) {
-        userAppService.createUser(request);
-        return Result.success();
-    }
+### 4.3 应用层
 
-    @GetMapping("/{userId}")
-    public Result<UserDetailResponse> getUserDetail(@PathVariable Long userId) {
-        return Result.success(userAppService.getUserDetail(userId));
-    }
+#### `AuthFacade`
 
-    @PutMapping("/{userId}")
-    public Result<Void> updateUser(@PathVariable Long userId,
-                                   @RequestBody UpdateUserRequest request) {
-        userAppService.updateUser(userId, request);
-        return Result.success();
-    }
+职责：
 
-    @PutMapping("/{userId}/status")
-    public Result<Void> updateStatus(@PathVariable Long userId,
-                                     @RequestBody UpdateUserStatusRequest request) {
-        userAppService.updateStatus(userId, request);
-        return Result.success();
-    }
+- 对认证相关流程做一层薄封装
+- 保持 Controller 更轻
 
-    @PostMapping("/{userId}/reset-password")
-    public Result<Void> resetPassword(@PathVariable Long userId,
-                                      @RequestBody ResetPasswordRequest request) {
-        userAppService.resetPassword(userId, request);
-        return Result.success();
-    }
-}
-```
+#### `UserFacade`
 
-------
+职责：
 
-# 六、Application 层完整骨架
+- 对用户管理相关流程做一层薄封装
+- 向 Controller 屏蔽应用服务的细节
 
-------
+#### `AuthAppService`
 
-## 1. AuthAppService.java
+职责：
 
-职责：登录流程与当前用户信息流程。
+- 编排登录流程
+- 编排当前用户查询流程
+- 编排登出流程
 
-```java
-package com.example.cae.user.application.service;
+当前登录流程包括：
 
-import com.example.cae.common.exception.BizException;
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.domain.repository.UserRepository;
-import com.example.cae.user.domain.service.PasswordDomainService;
-import com.example.cae.user.infrastructure.security.JwtTokenService;
-import com.example.cae.user.interfaces.request.LoginRequest;
-import com.example.cae.user.interfaces.response.CurrentUserResponse;
-import com.example.cae.user.interfaces.response.LoginResponse;
-import com.example.cae.user.application.assembler.UserAssembler;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+1. 校验用户名和密码是否为空。
+2. 根据用户名查询用户。
+3. 检查用户状态是否启用。
+4. 校验密码是否匹配。
+5. 根据 `roleId` 查询角色。
+6. 生成 Token。
+7. 组装登录响应。
 
-@Service
-@RequiredArgsConstructor
-public class AuthAppService {
+#### `UserAppService`
 
-    private final UserRepository userRepository;
-    private final PasswordDomainService passwordDomainService;
-    private final JwtTokenService jwtTokenService;
-    private final UserAssembler userAssembler;
+职责：
 
-    public LoginResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername());
-        if (user == null) {
-            throw new BizException("用户名或密码错误");
-        }
-
-        if (!user.isEnabled()) {
-            throw new BizException("用户已被禁用");
-        }
-
-        boolean matched = passwordDomainService.matches(request.getPassword(), user.getPassword());
-        if (!matched) {
-            throw new BizException("用户名或密码错误");
-        }
-
-        String token = jwtTokenService.generateToken(user);
-        return new LoginResponse(token, "Bearer");
-    }
-
-    public CurrentUserResponse getCurrentUser(Long userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new BizException("用户不存在");
-        }
-        return userAssembler.toCurrentUserResponse(user);
-    }
-}
-```
-
-------
-
-## 2. UserAppService.java
-
-职责：用户管理流程。
-
-```java
-package com.example.cae.user.application.service;
-
-import com.example.cae.common.exception.BizException;
-import com.example.cae.common.response.PageResult;
-import com.example.cae.user.application.assembler.UserAssembler;
-import com.example.cae.user.domain.model.Role;
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.domain.repository.RoleRepository;
-import com.example.cae.user.domain.repository.UserRepository;
-import com.example.cae.user.domain.service.PasswordDomainService;
-import com.example.cae.user.domain.service.UserDomainService;
-import com.example.cae.user.interfaces.request.*;
-import com.example.cae.user.interfaces.response.UserDetailResponse;
-import com.example.cae.user.interfaces.response.UserListItemResponse;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-import java.util.List;
-
-@Service
-@RequiredArgsConstructor
-public class UserAppService {
-
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
-    private final UserDomainService userDomainService;
-    private final PasswordDomainService passwordDomainService;
-    private final UserAssembler userAssembler;
-
-    public PageResult<UserListItemResponse> pageUsers(UserPageQueryRequest request) {
-        PageResult<User> page = userRepository.page(request);
-        List<UserListItemResponse> records = page.getRecords()
-                .stream()
-                .map(userAssembler::toListItemResponse)
-                .toList();
-        return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
-    }
-
-    public void createUser(CreateUserRequest request) {
-        userDomainService.checkUsernameUnique(request.getUsername());
-
-        Role role = roleRepository.findById(request.getRoleId());
-        if (role == null) {
-            throw new BizException("角色不存在");
-        }
-
-        User user = userAssembler.toUser(request);
-        user.setPassword(passwordDomainService.encode(request.getPassword()));
-        user.enable();
-        userRepository.save(user);
-    }
-
-    public UserDetailResponse getUserDetail(Long userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new BizException("用户不存在");
-        }
-        return userAssembler.toDetailResponse(user);
-    }
-
-    public void updateUser(Long userId, UpdateUserRequest request) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new BizException("用户不存在");
-        }
-
-        user.setRealName(request.getRealName());
-        user.setRoleId(request.getRoleId());
-        userRepository.update(user);
-    }
-
-    public void updateStatus(Long userId, UpdateUserStatusRequest request) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new BizException("用户不存在");
-        }
-
-        if (request.getStatus() != null && request.getStatus() == 1) {
-            user.enable();
-        } else {
-            user.disable();
-        }
-
-        userRepository.update(user);
-    }
-
-    public void resetPassword(Long userId, ResetPasswordRequest request) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            throw new BizException("用户不存在");
-        }
-
-        user.resetPassword(passwordDomainService.encode(request.getNewPassword()));
-        userRepository.update(user);
-    }
-}
-```
-
-------
-
-## 3. Facade 层说明
-
-`user-service` 这里其实 **可以先不强制使用 facade**。
-如果你想和其他服务风格完全一致，可以预留：
-
-- `AuthFacade`
-- `UserFacade`
-
-但初期完全可以不写实现，把复杂度控制住。
-
-------
-
-## 4. UserAssembler.java
-
-职责：对象转换。
-
-```java
-package com.example.cae.user.application.assembler;
-
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.infrastructure.persistence.entity.UserPO;
-import com.example.cae.user.interfaces.request.CreateUserRequest;
-import com.example.cae.user.interfaces.response.CurrentUserResponse;
-import com.example.cae.user.interfaces.response.UserDetailResponse;
-import com.example.cae.user.interfaces.response.UserListItemResponse;
-import org.springframework.stereotype.Component;
-
-@Component
-public class UserAssembler {
-
-    public User toUser(CreateUserRequest request) {
-        User user = new User();
-        user.setUsername(request.getUsername());
-        user.setRealName(request.getRealName());
-        user.setRoleId(request.getRoleId());
-        return user;
-    }
-
-    public CurrentUserResponse toCurrentUserResponse(User user) {
-        CurrentUserResponse response = new CurrentUserResponse();
-        response.setUserId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setRealName(user.getRealName());
-        response.setRoleCode(user.getRoleCode());
-        return response;
-    }
-
-    public UserListItemResponse toListItemResponse(User user) {
-        UserListItemResponse response = new UserListItemResponse();
-        response.setUserId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setRealName(user.getRealName());
-        response.setRoleId(user.getRoleId());
-        response.setRoleCode(user.getRoleCode());
-        response.setStatus(user.getStatus());
-        return response;
-    }
-
-    public UserDetailResponse toDetailResponse(User user) {
-        UserDetailResponse response = new UserDetailResponse();
-        response.setUserId(user.getId());
-        response.setUsername(user.getUsername());
-        response.setRealName(user.getRealName());
-        response.setRoleId(user.getRoleId());
-        response.setRoleCode(user.getRoleCode());
-        response.setStatus(user.getStatus());
-        return response;
-    }
-
-    public User fromPO(UserPO po) {
-        if (po == null) {
-            return null;
-        }
-        User user = new User();
-        user.setId(po.getId());
-        user.setUsername(po.getUsername());
-        user.setPassword(po.getPassword());
-        user.setRealName(po.getRealName());
-        user.setRoleId(po.getRoleId());
-        user.setStatus(po.getStatus());
-        return user;
-    }
-
-    public UserPO toPO(User user) {
-        if (user == null) {
-            return null;
-        }
-        UserPO po = new UserPO();
-        po.setId(user.getId());
-        po.setUsername(user.getUsername());
-        po.setPassword(user.getPassword());
-        po.setRealName(user.getRealName());
-        po.setRoleId(user.getRoleId());
-        po.setStatus(user.getStatus());
-        return po;
-    }
-}
-```
-
-------
-
-# 七、Domain 层完整骨架
-
-------
-
-## 1. User.java
-
-这是用户聚合根。
-
-```java
-package com.example.cae.user.domain.model;
-
-import lombok.Data;
-
-import java.time.LocalDateTime;
-
-@Data
-public class User {
-    private Long id;
-    private String username;
-    private String password;
-    private String realName;
-    private Long roleId;
-    private String roleCode;
-    private Integer status;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    public void enable() {
-        this.status = 1;
-    }
-
-    public void disable() {
-        this.status = 0;
-    }
-
-    public boolean isEnabled() {
-        return this.status != null && this.status == 1;
-    }
-
-    public void resetPassword(String encodedPassword) {
-        this.password = encodedPassword;
-    }
-}
-```
-
-------
-
-## 2. Role.java
-
-```java
-package com.example.cae.user.domain.model;
-
-import lombok.Data;
-
-import java.time.LocalDateTime;
-
-@Data
-public class Role {
-    private Long id;
-    private String roleCode;
-    private String roleName;
-    private LocalDateTime createdAt;
-}
-```
-
-------
-
-## 3. UserStatusEnum.java
-
-虽然状态也可以直接用 `1/0`，但建议加一个本地枚举。
-
-```java
-package com.example.cae.user.domain.enums;
-
-public enum UserStatusEnum {
-    DISABLED(0),
-    ENABLED(1);
-
-    private final Integer code;
-
-    UserStatusEnum(Integer code) {
-        this.code = code;
-    }
-
-    public Integer getCode() {
-        return code;
-    }
-}
-```
-
-------
-
-## 4. UserRepository.java
-
-```java
-package com.example.cae.user.domain.repository;
-
-import com.example.cae.common.response.PageResult;
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.interfaces.request.UserPageQueryRequest;
-
-public interface UserRepository {
-    User findById(Long userId);
-    User findByUsername(String username);
-    void save(User user);
-    void update(User user);
-    PageResult<User> page(UserPageQueryRequest request);
-}
-```
-
-------
-
-## 5. RoleRepository.java
-
-```java
-package com.example.cae.user.domain.repository;
-
-import com.example.cae.user.domain.model.Role;
-
-public interface RoleRepository {
-    Role findById(Long roleId);
-}
-```
-
-------
-
-## 6. UserDomainService.java
-
-职责：用户相关规则。
-
-```java
-package com.example.cae.user.domain.service;
-
-import com.example.cae.common.exception.BizException;
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.domain.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-@Service
-@RequiredArgsConstructor
-public class UserDomainService {
-
-    private final UserRepository userRepository;
-
-    public void checkUsernameUnique(String username) {
-        User user = userRepository.findByUsername(username);
-        if (user != null) {
-            throw new BizException("用户名已存在");
-        }
-    }
-}
-```
-
-------
-
-## 7. PasswordDomainService.java
-
-```java
-package com.example.cae.user.domain.service;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
-@Service
-@RequiredArgsConstructor
-public class PasswordDomainService {
-
-    private final com.example.cae.user.infrastructure.security.PasswordEncoderService passwordEncoderService;
-
-    public String encode(String rawPassword) {
-        return passwordEncoderService.encode(rawPassword);
-    }
-
-    public boolean matches(String rawPassword, String encodedPassword) {
-        return passwordEncoderService.matches(rawPassword, encodedPassword);
-    }
-}
-```
-
-------
-
-# 八、Infrastructure 层完整骨架
-
-------
-
-## 1. persistence/entity
-
-### UserPO.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.entity;
-
-import lombok.Data;
-
-import java.time.LocalDateTime;
-
-@Data
-public class UserPO {
-    private Long id;
-    private String username;
-    private String password;
-    private String realName;
-    private Long roleId;
-    private Integer status;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-}
-```
-
-------
-
-### RolePO.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.entity;
-
-import lombok.Data;
-
-import java.time.LocalDateTime;
-
-@Data
-public class RolePO {
-    private Long id;
-    private String roleCode;
-    private String roleName;
-    private LocalDateTime createdAt;
-}
-```
-
-------
-
-## 2. mapper
-
-### UserMapper.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.example.cae.user.infrastructure.persistence.entity.UserPO;
-import org.apache.ibatis.annotations.Mapper;
-
-@Mapper
-public interface UserMapper extends BaseMapper<UserPO> {
-}
-```
-
-------
-
-### RoleMapper.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.mapper;
-
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.example.cae.user.infrastructure.persistence.entity.RolePO;
-import org.apache.ibatis.annotations.Mapper;
-
-@Mapper
-public interface RoleMapper extends BaseMapper<RolePO> {
-}
-```
-
-------
-
-## 3. repository impl
-
-### UserRepositoryImpl.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.repository;
-
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.example.cae.common.response.PageResult;
-import com.example.cae.user.application.assembler.UserAssembler;
-import com.example.cae.user.domain.model.User;
-import com.example.cae.user.domain.repository.UserRepository;
-import com.example.cae.user.infrastructure.persistence.entity.UserPO;
-import com.example.cae.user.infrastructure.persistence.mapper.UserMapper;
-import com.example.cae.user.interfaces.request.UserPageQueryRequest;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
-
-import java.util.List;
-
-@Repository
-@RequiredArgsConstructor
-public class UserRepositoryImpl implements UserRepository {
-
-    private final UserMapper userMapper;
-    private final UserAssembler userAssembler;
-
-    @Override
-    public User findById(Long userId) {
-        UserPO po = userMapper.selectById(userId);
-        return userAssembler.fromPO(po);
-    }
-
-    @Override
-    public User findByUsername(String username) {
-        LambdaQueryWrapper<UserPO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserPO::getUsername, username).last("limit 1");
-        UserPO po = userMapper.selectOne(wrapper);
-        return userAssembler.fromPO(po);
-    }
-
-    @Override
-    public void save(User user) {
-        userMapper.insert(userAssembler.toPO(user));
-    }
-
-    @Override
-    public void update(User user) {
-        userMapper.updateById(userAssembler.toPO(user));
-    }
-
-    @Override
-    public PageResult<User> page(UserPageQueryRequest request) {
-        // 第一版先简化实现，不接入 MP 分页对象也可以
-        List<UserPO> list = userMapper.selectList(new LambdaQueryWrapper<>());
-        List<User> users = list.stream().map(userAssembler::fromPO).toList();
-        return PageResult.of((long) users.size(),
-                request.getPageNum() == null ? 1L : request.getPageNum().longValue(),
-                request.getPageSize() == null ? 10L : request.getPageSize().longValue(),
-                users);
-    }
-}
-```
-
-------
-
-### RoleRepositoryImpl.java
-
-```java
-package com.example.cae.user.infrastructure.persistence.repository;
-
-import com.example.cae.user.domain.model.Role;
-import com.example.cae.user.domain.repository.RoleRepository;
-import com.example.cae.user.infrastructure.persistence.entity.RolePO;
-import com.example.cae.user.infrastructure.persistence.mapper.RoleMapper;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Repository;
-
-@Repository
-@RequiredArgsConstructor
-public class RoleRepositoryImpl implements RoleRepository {
-
-    private final RoleMapper roleMapper;
-
-    @Override
-    public Role findById(Long roleId) {
-        RolePO po = roleMapper.selectById(roleId);
-        if (po == null) {
-            return null;
-        }
-        Role role = new Role();
-        role.setId(po.getId());
-        role.setRoleCode(po.getRoleCode());
-        role.setRoleName(po.getRoleName());
-        role.setCreatedAt(po.getCreatedAt());
-        return role;
-    }
-}
-```
-
-------
-
-## 4. security
-
-### JwtTokenService.java
-
-职责：发 token。
-
-```java
-package com.example.cae.user.infrastructure.security;
-
-import com.example.cae.common.utils.JwtUtil;
-import com.example.cae.user.domain.model.User;
-import org.springframework.stereotype.Service;
-
-@Service
-public class JwtTokenService {
-
-    public String generateToken(User user) {
-        return JwtUtil.generateToken(user.getId(), user.getRoleCode());
-    }
-}
-```
-
-------
-
-### PasswordEncoderService.java
-
-```java
-package com.example.cae.user.infrastructure.security;
-
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.stereotype.Service;
-
-@Service
-public class PasswordEncoderService {
-
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-
-    public String encode(String rawPassword) {
-        return encoder.encode(rawPassword);
-    }
-
-    public boolean matches(String rawPassword, String encodedPassword) {
-        return encoder.matches(rawPassword, encodedPassword);
-    }
-}
-```
-
-------
-
-# 九、support / config 层骨架
-
-------
-
-## 1. UserQueryBuilder.java
-
-如果后面分页筛选逻辑复杂，可以抽这个类。第一版可以先空壳。
-
-```java
-package com.example.cae.user.support;
-
-import org.springframework.stereotype.Component;
-
-@Component
-public class UserQueryBuilder {
-}
-```
-
-------
-
-## 2. UserApplication.java
-
-```java
-package com.example.cae.user;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class UserApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(UserApplication.class, args);
-    }
-}
-```
-
-------
-
-## 3. UserServiceConfig.java
-
-```java
-package com.example.cae.user.config;
-
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class UserServiceConfig {
-}
-```
-
-------
-
-## 4. MybatisPlusConfig.java
-
-```java
-package com.example.cae.user.config;
-
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class MybatisPlusConfig {
-}
-```
-
-------
-
-# 十、最小可运行实现顺序
-
-不要一次把 `user-service` 写得太大，按这个顺序最稳。
-
-## 第一批：登录最小闭环
-
-先建：
-
-- `User`
-- `AuthController`
-- `AuthAppService`
-- `UserRepository`
-- `UserRepositoryImpl`
-- `UserMapper`
-- `JwtTokenService`
-- `PasswordEncoderService`
-
-先做到：
-
-- 登录
-- 返回 Bearer token
-- `/api/auth/me`
-
-这和你整个系统先跑认证闭环的思路一致。
-
-------
-
-## 第二批：用户管理
-
-再建：
-
-- `UserController`
-- `UserAppService`
-- `UserAssembler`
-- `Role`
-- `RoleRepository`
-- `RoleRepositoryImpl`
-
-做到：
-
-- 用户分页
+- 用户分页查询
 - 创建用户
-- 更新用户
-- 启停用户
-
-------
-
-## 第三批：补密码和细节
-
-再建：
-
-- `ResetPasswordRequest`
-- `PasswordDomainService`
-- `UserDomainService`
-
-做到：
-
+- 查询详情
+- 更新用户资料
+- 更新用户状态
 - 重置密码
-- 用户名唯一校验
-- 用户禁用校验
+- 生成内部用户基础信息响应
 
-------
+它是当前 `user-service` 里最主要的业务编排层。
 
-# 十一、你现在最该先建的 10 个类
+### 4.4 领域层
 
-如果你要立刻开工，我建议 `user-service` 先建这 10 个：
+#### `User`
 
-1. `UserApplication`
-2. `AuthController`
-3. `UserController`
-4. `AuthAppService`
-5. `UserAppService`
-6. `User`
-7. `UserRepository`
-8. `UserRepositoryImpl`
-9. `UserMapper`
-10. `JwtTokenService`
+职责：
 
-这 10 个类一出来，`user-service` 的主骨架就有了。
+- 表达用户领域对象
+- 承载启用、禁用、重置密码等基础领域行为
 
-------
+当前已内聚的方法有：
 
-# 十二、最终建议
+- `enable()`
+- `disable()`
+- `isEnabled()`
+- `resetPassword()`
 
-`user-service` 最重要的不是“结构复杂”，而是“边界清楚”。
+#### `Role`
 
-你现在这版骨架已经把边界处理得比较干净了：
+职责：
 
-- `AuthController / AuthAppService` 专门管登录
-- `UserController / UserAppService` 专门管用户管理
-- `UserDomainService` 只处理规则
-- `PasswordEncoderService` 只处理密码
-- `JwtTokenService` 只负责发 token
-- `RepositoryImpl` 只负责落库
+- 表达角色领域对象
+- 当前主要承载 `id / roleCode / roleName`
 
-这就是比较规范、易于开发、后面也不容易乱的 `user-service` 结构，而且和你当前修订后的整体后端设计完全一致。
+#### `UserStatusEnum`
 
+职责：
+
+- 统一表达用户状态码语义
+
+不过当前主流程里仍更多直接使用 `0 / 1` 进行判断，枚举使用深度还比较浅。
+
+#### `UserRepository`
+
+职责：
+
+- 定义用户数据访问抽象
+- 向上层提供 `findById / findByUsername / save / update / page / count`
+
+#### `RoleRepository`
+
+职责：
+
+- 定义角色数据访问抽象
+- 当前只提供按 ID 查询
+
+#### `UserDomainService`
+
+职责：
+
+- 承载用户领域规则
+- 当前主要实现“用户名唯一性检查”
+
+#### `PasswordDomainService`
+
+职责：
+
+- 对密码编码与匹配做领域封装
+- 避免上层直接依赖具体加密实现
+
+### 4.5 基础设施层
+
+#### `UserMapper`
+
+职责：
+
+- 对 `sys_user` 表执行查询、插入、更新、分页和计数操作
+- 使用 MyBatis 注解 SQL 实现动态查询
+
+#### `RoleMapper`
+
+职责：
+
+- 对角色表执行按 ID 查询
+
+#### `UserRepositoryImpl`
+
+职责：
+
+- 将 `UserRepository` 领域接口落地为数据库实现
+- 完成 `PO <-> Domain` 转换
+
+#### `RoleRepositoryImpl`
+
+职责：
+
+- 将 `RoleRepository` 落地为数据库实现
+
+#### `JwtTokenService`
+
+职责：
+
+- 封装 Token 生成逻辑
+- 当前底层直接调用 `common-lib` 中的 `JwtUtil`
+
+#### `PasswordEncoderService`
+
+职责：
+
+- 封装密码编码与匹配实现
+- 当前采用 `SHA-256`
+
+这个类是当前服务最需要在文档中说明“原型版边界”的部分之一。
+
+### 4.6 组装层
+
+#### `UserAssembler`
+
+职责：
+
+- 将领域对象组装成不同响应对象
+- 将创建用户请求转换为领域对象
+
+当前采用静态方法形式，主要负责：
+
+- 登录响应组装
+- 当前用户响应组装
+- 用户详情响应组装
+- 用户创建响应组装
+- 用户列表项组装
+
+## 5. 核心业务流程
+
+### 5.1 登录流程
+
+```text
+客户端 -> AuthController
+      -> AuthFacade
+      -> AuthAppService
+      -> UserRepository.findByUsername
+      -> PasswordEncoderService.matches
+      -> RoleRepository.findById
+      -> JwtTokenService.generateToken
+      -> LoginResponse
+```
+
+这是 `user-service` 最核心的认证流程。
+
+### 5.2 当前用户查询流程
+
+```text
+客户端 -> gateway-service 完成鉴权并透传 X-User-Id
+      -> AuthController
+      -> AuthFacade
+      -> AuthAppService
+      -> UserRepository.findById
+      -> RoleRepository.findById
+      -> CurrentUserResponse
+```
+
+这里体现了当前系统中“网关负责入口鉴权，user-service 负责用户数据读取”的职责分离。
+
+### 5.3 用户管理流程
+
+```text
+UserController
+  -> UserFacade
+  -> UserAppService
+  -> UserDomainService / PasswordDomainService
+  -> UserRepository / RoleRepository
+  -> Response
+```
+
+### 5.4 内部用户查询流程
+
+```text
+其他微服务 -> /internal/users/{id}
+         -> InternalUserController
+         -> UserFacade
+         -> UserAppService
+         -> UserRepository
+         -> InternalUserBasicResponse
+```
+
+## 6. 核心设计
+
+### 6.1 设计一：认证与用户管理合并在一个服务内
+
+当前项目没有把认证中心再单独拆成 `auth-service`，而是将登录、当前用户、用户管理统一放在 `user-service` 中。
+
+这样做的原因是：
+
+- 对本科毕设原型平台来说，实现复杂度更可控；
+- 用户规模与权限模型较简单；
+- 仍然能够体现微服务拆分，而不会把认证体系做得过重。
+
+### 6.2 设计二：网关负责入口鉴权，用户服务负责登录签发
+
+当前系统将认证流程拆成两段：
+
+1. `user-service` 负责用户名密码登录和 Token 生成。
+2. `gateway-service` 负责后续请求的 Token 校验和用户头透传。
+
+这种设计有两个好处：
+
+- `user-service` 专注认证源数据；
+- 网关统一拦截后，业务服务无需重复校验前端 Token。
+
+### 6.3 设计三：角色模型保持简单
+
+当前系统只保留基础角色概念，核心角色为：
+
+- `ADMIN`
+- `USER`
+
+没有继续实现复杂的 RBAC 权限点、菜单权限、资源权限等体系。
+
+这是有意为之，因为当前平台更关注任务调度原型，而不是完整权限中台。
+
+### 6.4 设计四：通过内部接口向其他服务暴露用户主数据
+
+当前 `user-service` 提供内部接口查询基础用户信息，而不是让其他服务直接访问用户库。
+
+这符合微服务设计原则：
+
+- 数据归属清晰
+- 服务间通过接口通信
+- 避免跨库耦合
+
+### 6.5 设计五：密码与 Token 实现先满足原型可用
+
+当前密码与 Token 实现都采用了较简化方案：
+
+- 密码：`SHA-256`
+- Token：`JwtUtil` 中的简化 Base64 方案
+
+这样做的目的不是追求生产级安全，而是优先完成“可演示、可联调、可答辩”的认证闭环。
+
+## 7. 架构难点与解决方案
+
+### 7.1 难点一：如何在不过度复杂的前提下完成认证闭环
+
+问题：
+
+- 如果直接引入完整 JWT、刷新令牌、黑名单、会话失效等机制，工程复杂度会显著上升；
+- 如果完全没有 Token 机制，又无法体现前后端分离与统一鉴权架构。
+
+当前解决方案：
+
+- 登录时由 `user-service` 发放简化 Token；
+- 业务访问时由网关统一校验；
+- `logout` 暂时保持无状态空操作。
+
+这个方案完成了原型闭环，也控制了实现复杂度。
+
+### 7.2 难点二：如何避免用户服务和网关职责重叠
+
+问题：
+
+- 用户服务和网关都与认证有关，很容易边界不清。
+
+当前解决方案：
+
+- `user-service` 只负责登录签发与用户信息查询；
+- `gateway-service` 只负责后续访问时的 Token 校验与 Header 透传。
+
+这样边界比较清晰，不会重复造轮子。
+
+### 7.3 难点三：如何让其他服务使用用户数据又不跨库
+
+问题：
+
+- 任务服务等其他模块经常需要用户名、真实姓名等基础信息；
+- 如果直接跨库读取，会破坏微服务边界。
+
+当前解决方案：
+
+- 由 `user-service` 提供 `/internal/users/{id}` 内部接口；
+- 其他服务通过接口获取最小必要用户信息。
+
+### 7.4 难点四：如何兼顾“标准分层”和“实现简洁”
+
+问题：
+
+- 用户服务本身业务不复杂，如果分层过度，代码会显得很重；
+- 如果完全不分层，又不利于论文写作和后续维护。
+
+当前解决方案：
+
+- 采用标准分层结构；
+- Facade、Service、Repository 各司其职；
+- 领域服务只保留必要规则，不人为制造复杂领域模型。
+
+这种深度比较适合本科毕设项目。
+
+## 8. 关键技术手段
+
+### 8.1 Spring Boot 分层服务
+
+用于实现：
+
+- Controller 接口暴露
+- 应用服务编排
+- 组件注入
+
+### 8.2 MyBatis 注解 SQL
+
+用于实现：
+
+- 用户查询
+- 用户分页
+- 用户计数
+- 用户更新
+
+当前采用注解 SQL 而不是 XML，结构较轻，便于项目原型开发。
+
+### 8.3 Token 统一封装
+
+通过 `JwtTokenService` 和 `common-lib` 中的 `JwtUtil` 实现 Token 生成与解析。
+
+虽然当前不是生产级 JWT，但已经形成了统一的 Token 通路。
+
+### 8.4 密码编码封装
+
+通过 `PasswordEncoderService` 与 `PasswordDomainService` 对密码编码与匹配进行封装，避免密码处理散落在业务代码中。
+
+### 8.5 统一错误码与统一返回体
+
+借助 `common-lib` 中的：
+
+- `ErrorCodeConstants`
+- `BizException`
+- `Result`
+- `PageResult`
+
+实现统一的错误处理与接口响应格式。
+
+## 9. 当前实现的优点
+
+- 认证、当前用户、用户管理、内部用户查询职责完整。
+- 结构清晰，分层标准，适合论文和答辩讲解。
+- 已与网关鉴权模式形成清晰协作关系。
+- 已具备用户分页、创建、更新、启停、重置密码等基础管理能力。
+- 已提供内部用户查询接口，符合微服务数据边界原则。
+
+## 10. 当前实现的局限与边界
+
+### 10.1 Token 方案是原型版，不是生产级 JWT
+
+当前 `JwtUtil` 实际是简化的 Base64 编码载荷，没有：
+
+- 签名
+- 过期时间
+- 刷新机制
+- 吊销机制
+
+因此文档中应明确写为“统一 Token 原型方案”，而不是“完整 JWT 安全体系”。
+
+### 10.2 密码加密方案偏基础版
+
+当前使用 `SHA-256`，且 `matches()` 兼容了“明文等于数据库值”的过渡判断。
+
+这说明当前实现更偏向原型可用和兼容已有数据，而不是生产级密码安全方案。
+
+### 10.3 权限模型较简化
+
+当前只实现角色级别的基础控制，没有继续扩展为：
+
+- 菜单权限
+- 操作权限点
+- 资源级授权
+- 组织级权限
+
+这对当前项目范围来说是合理的，但需要在文档中说明边界。
+
+### 10.4 登出是无状态空实现
+
+由于当前是无状态 Token 模式，`logout` 没有服务端失效逻辑。
+
+这意味着它更多是接口语义保留，而不是完整会话注销机制。
+
+## 11. 对本科毕设的价值
+
+从本科毕设角度看，`user-service` 的价值主要体现在：
+
+1. 支撑整个系统的统一登录与身份识别。
+2. 体现微服务架构下“用户主数据独立服务”的设计思想。
+3. 为网关统一鉴权和下游业务访问提供身份基础。
+4. 通过内部接口体现服务间调用而非跨库访问。
+
+虽然它不是平台里最复杂的服务，但它是系统能够形成完整访问闭环的基础模块。
+
+## 12. 答辩时可采用的表述
+
+可以将该模块概括为：
+
+> `user-service` 负责平台用户认证与用户基础数据管理，提供登录、当前用户信息查询、用户管理和内部用户信息查询等能力。系统采用“用户服务签发 Token、网关统一校验 Token”的协作模式，实现了认证闭环，同时通过内部接口向其他微服务提供用户基础信息，保证了数据边界清晰和服务职责分离。
+
+## 13. 后续可扩展方向
+
+在不改变当前原型定位的前提下，后续可扩展：
+
+- 将简化 Token 升级为生产级 JWT
+- 将密码方案升级为 BCrypt 或 Argon2
+- 增加 Token 过期、刷新、注销失效机制
+- 增加登录失败限制和安全审计
+- 扩展更细粒度的权限模型
+
+这些内容应作为扩展能力，而不是当前首版已实现内容。
+
+## 14. 当前结论
+
+`user-service` 当前已经完成了本科毕设原型平台所需的基础职责：
+
+- 可以完成登录与身份识别
+- 可以支撑当前用户信息查询
+- 可以完成用户管理
+- 可以通过内部接口向其他服务提供用户基础数据
+
+从实现深度看，它属于“结构规范、功能完整、安全能力基础版”的用户服务；从项目整体看，它已经足够支撑当前平台的认证与用户管理闭环。
