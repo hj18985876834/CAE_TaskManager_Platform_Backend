@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: gateway-service
+  codec:
+    max-in-memory-size: ${GATEWAY_MAX_IN_MEMORY_SIZE:10MB}
   cloud:
     gateway:
       discovery:

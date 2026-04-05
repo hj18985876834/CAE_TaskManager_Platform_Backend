@@ -11,6 +11,10 @@ spring:
     name: task-service
   messages:
     encoding: UTF-8
+  servlet:
+    multipart:
+      max-file-size: ${TASK_MAX_FILE_SIZE:2048MB}
+      max-request-size: ${TASK_MAX_REQUEST_SIZE:2048MB}
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:task_db}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=GMT%2B8
     username: ${DB_USERNAME:root}
