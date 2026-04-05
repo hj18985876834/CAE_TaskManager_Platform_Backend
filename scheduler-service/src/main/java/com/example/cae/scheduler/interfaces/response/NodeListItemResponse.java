@@ -10,6 +10,7 @@ public class NodeListItemResponse {
 	private String nodeName;
 	private String host;
 	private String status;
+	private Integer enabled;
 	private Integer runningCount;
 	private Integer maxConcurrency;
 	private BigDecimal cpuUsage;
@@ -62,6 +63,14 @@ public class NodeListItemResponse {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(Integer enabled) {
+		this.enabled = enabled;
 	}
 
 	public Integer getRunningCount() {

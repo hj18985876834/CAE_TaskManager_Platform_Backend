@@ -3,7 +3,9 @@ package com.example.cae.task.interfaces.internal;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
+import com.example.cae.task.interfaces.request.NodeOfflineTasksRequest;
 import com.example.cae.task.interfaces.request.TaskNodeMarkRequest;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,5 +46,10 @@ public class InternalTaskDispatchController {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
 		taskDispatchManager.markDispatched(taskId, effectiveNodeId);
 		return Result.success();
+	}
+
+	@PostMapping("/node-offline/fail")
+	public Result<Integer> markNodeOfflineTasksFailed(@Valid @RequestBody NodeOfflineTasksRequest request) {
+		return Result.success(taskDispatchManager.markNodeOfflineTasksFailed(request.getNodeId(), request.getReason()));
 	}
 }

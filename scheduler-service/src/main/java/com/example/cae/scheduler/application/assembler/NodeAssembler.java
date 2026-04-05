@@ -14,6 +14,7 @@ public final class NodeAssembler {
 		node.setNodeCode(request.getNodeCode());
 		node.setNodeName(request.getNodeName());
 		node.setHost(request.getHost());
+		node.setEnabled(1);
 		node.setMaxConcurrency(request.getMaxConcurrency());
 		return node;
 	}
@@ -26,6 +27,7 @@ public final class NodeAssembler {
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
 		response.setStatus(node.getStatus());
+		response.setEnabled(node.getEnabled());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
 		response.setCpuUsage(node.getCpuUsage());
@@ -42,6 +44,7 @@ public final class NodeAssembler {
 		node.setHost(po.getHost());
 		node.setNodeToken(po.getNodeToken());
 		node.setStatus(po.getStatus());
+		node.setEnabled(po.getEnabled());
 		node.setMaxConcurrency(po.getMaxConcurrency());
 		node.setRunningCount(po.getRunningCount());
 		node.setCpuUsage(po.getCpuUsage());
@@ -60,6 +63,7 @@ public final class NodeAssembler {
 		po.setHost(node.getHost());
 		po.setNodeToken(node.getNodeToken());
 		po.setStatus(node.getStatus());
+		po.setEnabled(node.getEnabled());
 		po.setMaxConcurrency(node.getMaxConcurrency());
 		po.setRunningCount(node.getRunningCount());
 		po.setCpuUsage(node.getCpuUsage());

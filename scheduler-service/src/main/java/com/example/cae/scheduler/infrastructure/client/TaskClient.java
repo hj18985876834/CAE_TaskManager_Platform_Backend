@@ -10,4 +10,6 @@ public interface TaskClient {
 	void markTaskScheduled(Long taskId, Long nodeId);
 
 	void markTaskDispatched(Long taskId, Long nodeId);
+
+	void markNodeOfflineTasksFailed(Long nodeId, String reason);
 }

@@ -45,6 +45,11 @@ public class NodeSolverCapabilityRepositoryImpl implements NodeSolverCapabilityR
 		nodeSolverCapabilityMapper.batchInsertWithDetails(nodeId, poList);
 	}
 
+	@Override
+	public void update(NodeSolverCapability capability) {
+		nodeSolverCapabilityMapper.updateById(toPO(capability));
+	}
+
 	private NodeSolverCapability fromPO(NodeSolverCapabilityPO po) {
 		NodeSolverCapability capability = new NodeSolverCapability();
 		capability.setId(po.getId());
@@ -58,6 +63,8 @@ public class NodeSolverCapabilityRepositoryImpl implements NodeSolverCapabilityR
 
 	private NodeSolverCapabilityPO toPO(NodeSolverCapability capability) {
 		NodeSolverCapabilityPO po = new NodeSolverCapabilityPO();
+		po.setId(capability.getId());
+		po.setNodeId(capability.getNodeId());
 		po.setSolverId(capability.getSolverId());
 		po.setSolverVersion(capability.getSolverVersion());
 		po.setEnabled(capability.getEnabled());

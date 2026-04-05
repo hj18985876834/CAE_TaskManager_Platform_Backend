@@ -57,4 +57,13 @@ public class TaskClientStub implements TaskClient {
 		request.put("nodeId", nodeId);
 		restTemplate.postForEntity(url, request, Result.class);
 	}
+
+	@Override
+	public void markNodeOfflineTasksFailed(Long nodeId, String reason) {
+		String url = taskServiceBaseUrl + "/internal/tasks/node-offline/fail";
+		java.util.Map<String, Object> request = new java.util.HashMap<>();
+		request.put("nodeId", nodeId);
+		request.put("reason", reason);
+		restTemplate.postForEntity(url, request, Result.class);
+	}
 }

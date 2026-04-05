@@ -115,6 +115,19 @@ public interface TaskMapper {
 	@Select("SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt FROM sim_task WHERE status = #{status} AND deleted_flag = 0 ORDER BY priority DESC, COALESCE(submit_time, created_at) ASC, id ASC")
 	List<TaskPO> selectByStatus(String status);
 
+	@Select({
+		"<script>",
+		"SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt",
+		"FROM sim_task",
+		"WHERE deleted_flag = 0",
+		"AND node_id = #{nodeId}",
+		"AND status IN",
+		"<foreach collection='statuses' item='status' open='(' separator=',' close=')'>#{status}</foreach>",
+		"ORDER BY id ASC",
+		"</script>"
+	})
+	List<TaskPO> selectByNodeIdAndStatuses(@Param("nodeId") Long nodeId, @Param("statuses") List<String> statuses);
+
 	@Select("SELECT COUNT(1) FROM sim_task WHERE deleted_flag = 0")
 	long countAll();
 

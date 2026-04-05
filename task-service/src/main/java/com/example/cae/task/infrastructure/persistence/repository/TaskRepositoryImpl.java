@@ -65,6 +65,11 @@ public class TaskRepositoryImpl implements TaskRepository {
 	}
 
 	@Override
+	public List<Task> listByNodeIdAndStatuses(Long nodeId, List<String> statuses) {
+		return taskMapper.selectByNodeIdAndStatuses(nodeId, statuses).stream().map(taskAssembler::fromPO).toList();
+	}
+
+	@Override
 	public long countAll() {
 		return taskMapper.countAll();
 	}

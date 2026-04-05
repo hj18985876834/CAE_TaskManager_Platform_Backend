@@ -3,6 +3,7 @@ package com.example.cae.task.application.manager;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskFileDTO;
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
@@ -18,9 +19,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class TaskDispatchManager {
+	private static final Set<String> NODE_OFFLINE_AFFECTED_STATUSES = Set.of(
+			TaskStatusEnum.SCHEDULED.name(),
+			TaskStatusEnum.DISPATCHED.name(),
+			TaskStatusEnum.RUNNING.name()
+	);
+
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
@@ -68,6 +76,23 @@ public class TaskDispatchManager {
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
+	}
+
+	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
+		if (nodeId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
+		}
+		String effectiveReason = reason == null || reason.isBlank()
+				? "node offline, task terminated by scheduler"
+				: reason;
+		List<Task> affectedTasks = taskRepository.listByNodeIdAndStatuses(nodeId, List.copyOf(NODE_OFFLINE_AFFECTED_STATUSES));
+		for (Task task : affectedTasks) {
+			task.setFailType(FailTypeEnum.NODE_OFFLINE.name());
+			task.setFailMessage(effectiveReason);
+			taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+			taskRepository.update(task);
+		}
+		return affectedTasks.size();
 	}
 
 	private TaskDTO toTaskDTO(Task task) {

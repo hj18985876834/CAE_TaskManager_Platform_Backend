@@ -10,6 +10,7 @@ public class ComputeNode {
 	private String host;
 	private String nodeToken;
 	private String status;
+	private Integer enabled;
 	private Integer maxConcurrency;
 	private Integer runningCount;
 	private BigDecimal cpuUsage;
@@ -37,8 +38,20 @@ public class ComputeNode {
 		return "ONLINE".equals(this.status);
 	}
 
+	public boolean isEnabled() {
+		return this.enabled != null && this.enabled == 1;
+	}
+
+	public void enable() {
+		this.enabled = 1;
+	}
+
+	public void disable() {
+		this.enabled = 0;
+	}
+
 	public boolean canDispatch() {
-		return isOnline() && this.runningCount != null && this.maxConcurrency != null && this.runningCount < this.maxConcurrency;
+		return isOnline() && isEnabled() && this.runningCount != null && this.maxConcurrency != null && this.runningCount < this.maxConcurrency;
 	}
 
 	public Long getId() {
@@ -87,6 +100,14 @@ public class ComputeNode {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(Integer enabled) {
+		this.enabled = enabled;
 	}
 
 	public Integer getMaxConcurrency() {
@@ -145,4 +166,3 @@ public class ComputeNode {
 		this.updatedAt = updatedAt;
 	}
 }
-

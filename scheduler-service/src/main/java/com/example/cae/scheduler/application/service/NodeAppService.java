@@ -13,6 +13,7 @@ import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeSolverStatusRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
@@ -20,14 +21,18 @@ import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class NodeAppService {
@@ -57,17 +62,20 @@ public class NodeAppService {
 			node.markOnline();
 			node.setLastHeartbeatTime(LocalDateTime.now());
 			computeNodeRepository.update(node);
-			nodeSolverCapabilityRepository.replaceNodeCapabilities(node.getId(), request.getSolverIds());
+			nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
+					mergeCapabilities(node.getId(), request.getSolverIds(), null));
 			return node.getId();
 		}
 
 		ComputeNode node = NodeAssembler.toNode(request);
 		node.setNodeToken(generateNodeToken(node.getNodeCode()));
 		node.markOnline();
+		node.enable();
 		node.setRunningCount(0);
 		node.setLastHeartbeatTime(LocalDateTime.now());
 		computeNodeRepository.save(node);
-		nodeSolverCapabilityRepository.replaceNodeCapabilities(node.getId(), request.getSolverIds());
+		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
+				mergeCapabilities(node.getId(), request.getSolverIds(), null));
 		return node.getId();
 	}
 
@@ -80,8 +88,7 @@ public class NodeAppService {
 		registerRequest.setSolverIds(extractSolverIds(request));
 
 		Long nodeId = registerNode(registerRequest);
-		List<NodeSolverCapability> capabilities = toCapabilities(nodeId, request);
-		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(nodeId, capabilities);
+		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(nodeId, mergeCapabilities(nodeId, null, request));
 		return nodeId;
 	}
 
@@ -121,16 +128,25 @@ public class NodeAppService {
 	}
 
 	public void updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request) {
-		if (nodeId == null || request == null || request.getStatus() == null || request.getStatus().isBlank()) {
+		if (nodeId == null || request == null || request.getEnabled() == null) {
 			throw new BizException(ErrorCodeConstants.INVALID_NODE_STATUS_REQUEST, "invalid node status request");
 		}
-		String status = request.getStatus().trim().toUpperCase();
-		if (!Set.of("ONLINE", "OFFLINE", "DISABLED").contains(status)) {
-			throw new BizException(ErrorCodeConstants.UNSUPPORTED_NODE_STATUS, "unsupported node status");
-		}
 		ComputeNode node = computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
-		node.setStatus(status);
+		node.setEnabled(request.getEnabled());
 		computeNodeRepository.update(node);
+	}
+
+	public void updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
+		if (nodeId == null || solverId == null || request == null || request.getEnabled() == null) {
+			throw new BizException(ErrorCodeConstants.INVALID_NODE_STATUS_REQUEST, "invalid node solver status request");
+		}
+		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		NodeSolverCapability capability = nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
+				.filter(item -> solverId.equals(item.getSolverId()))
+				.findFirst()
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NOT_FOUND, "node solver capability not found"));
+		capability.setEnabled(request.getEnabled());
+		nodeSolverCapabilityRepository.update(capability);
 	}
 
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
@@ -152,6 +168,9 @@ public class NodeAppService {
 	public void markNodeOffline(String nodeCode) {
 		computeNodeRepository.findByNodeCode(nodeCode).ifPresent(node -> {
 			node.markOffline();
+			node.setRunningCount(0);
+			node.setCpuUsage(BigDecimal.ZERO);
+			node.setMemoryUsage(BigDecimal.ZERO);
 			computeNodeRepository.update(node);
 		});
 	}
@@ -226,6 +245,7 @@ public class NodeAppService {
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
 		response.setStatus(node.getStatus());
+		response.setEnabled(node.getEnabled());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
 		response.setCpuUsage(node.getCpuUsage());
@@ -272,20 +292,43 @@ public class NodeAppService {
 				.toList();
 	}
 
-	private List<NodeSolverCapability> toCapabilities(Long nodeId, NodeAgentRegisterRequest request) {
-		if (request == null || request.getSolvers() == null || request.getSolvers().isEmpty()) {
+	private List<NodeSolverCapability> mergeCapabilities(Long nodeId, List<Long> solverIds, NodeAgentRegisterRequest request) {
+		List<NodeSolverCapability> existingCapabilities = nodeSolverCapabilityRepository.listByNodeId(nodeId);
+		var existingBySolverId = existingCapabilities.stream()
+				.filter(item -> item.getSolverId() != null)
+				.collect(Collectors.toMap(NodeSolverCapability::getSolverId, Function.identity(), (left, right) -> left));
+
+		if (request != null && request.getSolvers() != null && !request.getSolvers().isEmpty()) {
+			return request.getSolvers().stream()
+					.filter(item -> item != null && item.getSolverId() != null)
+					.map(item -> {
+						NodeSolverCapability existing = existingBySolverId.get(item.getSolverId());
+						NodeSolverCapability capability = new NodeSolverCapability();
+						capability.setNodeId(nodeId);
+						capability.setSolverId(item.getSolverId());
+						capability.setSolverVersion(item.getSolverVersion());
+						capability.setEnabled(existing == null || existing.getEnabled() == null ? 1 : existing.getEnabled());
+						return capability;
+					})
+					.sorted(Comparator.comparing(NodeSolverCapability::getSolverId))
+					.toList();
+		}
+
+		if (solverIds == null || solverIds.isEmpty()) {
 			return List.of();
 		}
-		return request.getSolvers().stream()
-				.filter(item -> item != null && item.getSolverId() != null)
-				.map(item -> {
+		return solverIds.stream()
+				.filter(solverId -> solverId != null)
+				.map(solverId -> {
+					NodeSolverCapability existing = existingBySolverId.get(solverId);
 					NodeSolverCapability capability = new NodeSolverCapability();
 					capability.setNodeId(nodeId);
-					capability.setSolverId(item.getSolverId());
-					capability.setSolverVersion(item.getSolverVersion());
-					capability.setEnabled(1);
+					capability.setSolverId(solverId);
+					capability.setSolverVersion(existing == null ? null : existing.getSolverVersion());
+					capability.setEnabled(existing == null || existing.getEnabled() == null ? 1 : existing.getEnabled());
 					return capability;
 				})
+				.sorted(Comparator.comparing(NodeSolverCapability::getSolverId))
 				.toList();
 	}
 }

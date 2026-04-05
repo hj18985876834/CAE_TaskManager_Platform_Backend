@@ -12,4 +12,6 @@ public interface NodeSolverCapabilityRepository {
 	void replaceNodeCapabilities(Long nodeId, List<Long> solverIds);
 
 	void replaceNodeCapabilitiesWithDetails(Long nodeId, List<NodeSolverCapability> capabilities);
+
+	void update(NodeSolverCapability capability);
 }

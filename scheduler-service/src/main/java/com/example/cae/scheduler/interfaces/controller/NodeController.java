@@ -4,6 +4,7 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.facade.NodeFacade;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeSolverStatusRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
@@ -41,8 +42,17 @@ public class NodeController {
 	}
 
 	@PostMapping("/{nodeId}/status")
-	public Result<Void> updateNodeStatus(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId, @Valid @RequestBody UpdateNodeStatusRequest request) {
+	public Result<Void> updateNodeStatus(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId,
+										 @Valid @RequestBody UpdateNodeStatusRequest request) {
 		nodeFacade.updateNodeStatus(nodeId, request);
+		return Result.success();
+	}
+
+	@PostMapping("/{nodeId}/solvers/{solverId}/status")
+	public Result<Void> updateNodeSolverStatus(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId,
+											   @PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId,
+											   @Valid @RequestBody UpdateNodeSolverStatusRequest request) {
+		nodeFacade.updateNodeSolverStatus(nodeId, solverId, request);
 		return Result.success();
 	}
 

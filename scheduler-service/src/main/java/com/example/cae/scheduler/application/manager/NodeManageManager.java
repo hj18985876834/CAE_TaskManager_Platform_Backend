@@ -6,6 +6,7 @@ import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
+import com.example.cae.scheduler.interfaces.request.UpdateNodeSolverStatusRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
@@ -50,6 +51,10 @@ public class NodeManageManager {
 		nodeAppService.updateNodeStatus(nodeId, request);
 	}
 
+	public void updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
+		nodeAppService.updateNodeSolverStatus(nodeId, solverId, request);
+	}
+
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
 		return nodeAppService.listNodeSolvers(nodeId);
 	}
@@ -58,4 +63,3 @@ public class NodeManageManager {
 		return nodeAppService.getNodeToken(nodeId);
 	}
 }
-

@@ -11,6 +11,7 @@ public class NodePageQueryRequest {
 	private Integer pageSize;
 	private String nodeName;
 	private String status;
+	private Integer enabled;
 	private String solverId;
 
 	public Integer getPageNum() {
@@ -43,6 +44,14 @@ public class NodePageQueryRequest {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(Integer enabled) {
+		this.enabled = enabled;
 	}
 
 	public String getSolverId() {
