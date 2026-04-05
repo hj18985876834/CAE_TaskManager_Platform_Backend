@@ -62,6 +62,7 @@ public class TaskAssembler {
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
+		response.setCanRetry(canRetry(task));
 		response.setParams(parseJsonMap(task.getParamsJson()));
 		response.setFailType(task.getFailType());
 		response.setFailMessage(task.getFailMessage());
@@ -82,6 +83,7 @@ public class TaskAssembler {
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
+		response.setCanRetry(canRetry(task));
 		response.setSubmitTime(task.getSubmitTime());
 		response.setStartTime(task.getStartTime());
 		response.setEndTime(task.getEndTime());
@@ -102,6 +104,14 @@ public class TaskAssembler {
 			// keep query responses resilient even if stored params are malformed.
 		}
 		return Map.of();
+	}
+
+	private boolean canRetry(Task task) {
+		if (task == null || task.getStatus() == null) {
+			return false;
+		}
+		return TaskStatusEnum.FAILED.name().equals(task.getStatus())
+				|| TaskStatusEnum.TIMEOUT.name().equals(task.getStatus());
 	}
 
 	public TaskPO toPO(Task task) {

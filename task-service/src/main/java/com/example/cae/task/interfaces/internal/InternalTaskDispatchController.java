@@ -49,7 +49,7 @@ public class InternalTaskDispatchController {
 		return Result.success();
 	}
 
-	@PostMapping("/{taskId}/mark-failed")
+	@PostMapping("/{taskId}/dispatch-failed")
 	public Result<Void> markFailed(@PathVariable("taskId") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
 		taskDispatchManager.markFailed(taskId, request.getFailType(), request.getReason());
 		return Result.success();

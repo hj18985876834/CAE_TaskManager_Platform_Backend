@@ -1,8 +1,6 @@
 package com.example.cae.task.application.service;
 
 import com.example.cae.task.application.manager.TaskLifecycleManager;
-import com.example.cae.task.application.manager.TaskPriorityManager;
-import com.example.cae.task.application.manager.TaskRetryManager;
 import com.example.cae.task.application.manager.TaskValidationManager;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskRequest;
@@ -18,17 +16,11 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class TaskCommandAppService {
 	private final TaskLifecycleManager taskLifecycleManager;
-	private final TaskPriorityManager taskPriorityManager;
-	private final TaskRetryManager taskRetryManager;
 	private final TaskValidationManager taskValidationManager;
 
 	public TaskCommandAppService(TaskLifecycleManager taskLifecycleManager,
-								 TaskPriorityManager taskPriorityManager,
-								 TaskRetryManager taskRetryManager,
 								 TaskValidationManager taskValidationManager) {
 		this.taskLifecycleManager = taskLifecycleManager;
-		this.taskPriorityManager = taskPriorityManager;
-		this.taskRetryManager = taskRetryManager;
 		this.taskValidationManager = taskValidationManager;
 	}
 
@@ -61,10 +53,10 @@ public class TaskCommandAppService {
 	}
 
 	public void adjustPriority(Long taskId, UpdateTaskPriorityRequest request, Long adminUserId) {
-		taskPriorityManager.adjustPriority(taskId, request.getPriority(), adminUserId);
+		taskLifecycleManager.adjustPriority(taskId, request.getPriority(), adminUserId);
 	}
 
 	public TaskSubmitResponse retryTask(Long taskId, Long adminUserId, String reason) {
-		return taskRetryManager.retryTask(taskId, adminUserId, reason);
+		return taskLifecycleManager.retryTask(taskId, reason, adminUserId);
 	}
 }

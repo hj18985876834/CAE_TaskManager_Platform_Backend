@@ -8,9 +8,11 @@ import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.application.assembler.TaskAssembler;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskFile;
+import com.example.cae.task.domain.model.TaskStatusHistory;
 import com.example.cae.task.domain.service.TaskDomainService;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
+import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
 import com.example.cae.task.infrastructure.client.SolverClient;
@@ -37,6 +39,7 @@ import java.util.Objects;
 public class TaskLifecycleManager {
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
+	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
 	private final TaskDomainService taskDomainService;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final TaskValidationDomainService taskValidationDomainService;
@@ -49,6 +52,7 @@ public class TaskLifecycleManager {
 
 	public TaskLifecycleManager(TaskRepository taskRepository,
 								TaskFileRepository taskFileRepository,
+								TaskStatusHistoryRepository taskStatusHistoryRepository,
 								TaskDomainService taskDomainService,
 								TaskStatusDomainService taskStatusDomainService,
 								TaskValidationDomainService taskValidationDomainService,
@@ -60,6 +64,7 @@ public class TaskLifecycleManager {
 								TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
+		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
 		this.taskDomainService = taskDomainService;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.taskValidationDomainService = taskValidationDomainService;
@@ -179,6 +184,43 @@ public class TaskLifecycleManager {
 		taskRepository.update(task);
 	}
 
+	public void adjustPriority(Long taskId, Integer priority, Long adminUserId) {
+		Task task = loadTask(taskId);
+		if (task.isFinished()) {
+			throw new BizException(ErrorCodeConstants.TASK_PRIORITY_UPDATE_NOT_ALLOWED, "finished task priority cannot be adjusted");
+		}
+
+		Integer oldPriority = task.getPriority() == null ? 0 : task.getPriority();
+		Integer newPriority = priority == null ? 0 : priority;
+		task.adjustPriority(newPriority);
+		taskRepository.update(task);
+
+		TaskStatusHistory history = new TaskStatusHistory();
+		history.setTaskId(task.getId());
+		history.setFromStatus(task.getStatus());
+		history.setToStatus(task.getStatus());
+		history.setChangeReason("priority adjusted: " + oldPriority + " -> " + newPriority);
+		history.setOperatorType(OperatorTypeEnum.ADMIN.name());
+		history.setOperatorId(adminUserId);
+		taskStatusHistoryRepository.save(history);
+	}
+
+	public TaskSubmitResponse retryTask(Long taskId, String reason, Long adminUserId) {
+		Task task = loadTask(taskId);
+		if (!TaskStatusEnum.FAILED.name().equals(task.getStatus()) && !TaskStatusEnum.TIMEOUT.name().equals(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_RETRY_NOT_ALLOWED, "only failed or timeout tasks can be retried");
+		}
+
+		String effectiveReason = reason == null || reason.isBlank() ? "admin retried task" : reason;
+		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.ADMIN.name(), adminUserId);
+		taskRepository.update(task);
+
+		TaskSubmitResponse response = new TaskSubmitResponse();
+		response.setTaskId(task.getId());
+		response.setStatus(task.getStatus());
+		return response;
+	}
+
 	public void discardTask(Long taskId, Long userId, String reason) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		if (!taskDomainService.canDiscard(task)) {
@@ -265,11 +307,15 @@ public class TaskLifecycleManager {
 	}
 
 	private Task loadAndCheckOwner(Long taskId, Long userId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = loadTask(taskId);
 		if (!task.isOwner(userId)) {
 			throw new BizException(ErrorCodeConstants.FORBIDDEN, "no permission");
 		}
 		return task;
+	}
+
+	private Task loadTask(Long taskId) {
+		return taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 	}
 
 	private void validateArchiveUpload(Task task, MultipartFile file, UploadConstraint constraint) {
