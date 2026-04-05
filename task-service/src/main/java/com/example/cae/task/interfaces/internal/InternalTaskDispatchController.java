@@ -3,6 +3,7 @@ package com.example.cae.task.interfaces.internal;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
+import com.example.cae.task.interfaces.request.InternalTaskFailRequest;
 import com.example.cae.task.interfaces.request.NodeOfflineTasksRequest;
 import com.example.cae.task.interfaces.request.TaskNodeMarkRequest;
 import jakarta.validation.Valid;
@@ -45,6 +46,12 @@ public class InternalTaskDispatchController {
 							  @RequestParam(value = "nodeId", required = false) Long nodeId) {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
 		taskDispatchManager.markDispatched(taskId, effectiveNodeId);
+		return Result.success();
+	}
+
+	@PostMapping("/{taskId}/mark-failed")
+	public Result<Void> markFailed(@PathVariable("taskId") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
+		taskDispatchManager.markFailed(taskId, request.getFailType(), request.getReason());
 		return Result.success();
 	}
 

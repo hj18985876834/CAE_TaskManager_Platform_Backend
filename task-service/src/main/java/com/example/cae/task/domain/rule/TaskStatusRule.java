@@ -18,6 +18,8 @@ public class TaskStatusRule {
 		TRANSFER_MAP.put("SCHEDULED", Set.of("DISPATCHED", "FAILED"));
 		TRANSFER_MAP.put("DISPATCHED", Set.of("RUNNING", "FAILED"));
 		TRANSFER_MAP.put("RUNNING", Set.of("SUCCESS", "FAILED", "TIMEOUT", "CANCELED"));
+		TRANSFER_MAP.put("FAILED", Set.of("QUEUED"));
+		TRANSFER_MAP.put("TIMEOUT", Set.of("QUEUED"));
 	}
 
 	public boolean canTransfer(String fromStatus, String toStatus) {

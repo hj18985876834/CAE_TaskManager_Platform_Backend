@@ -11,5 +11,7 @@ public interface TaskClient {
 
 	void markTaskDispatched(Long taskId, Long nodeId);
 
+	void markTaskFailed(Long taskId, String failType, String reason);
+
 	void markNodeOfflineTasksFailed(Long nodeId, String reason);
 }

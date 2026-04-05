@@ -40,6 +40,11 @@ public class Task {
 	}
 
 	public void submit() {
+		this.nodeId = null;
+		this.failType = null;
+		this.failMessage = null;
+		this.startTime = null;
+		this.endTime = null;
 		this.status = TaskStatusEnum.QUEUED.name();
 		this.submitTime = LocalDateTime.now();
 	}

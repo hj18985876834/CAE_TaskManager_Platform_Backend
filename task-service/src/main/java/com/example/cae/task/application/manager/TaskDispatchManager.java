@@ -78,6 +78,14 @@ public class TaskDispatchManager {
 		taskRepository.update(task);
 	}
 
+	public void markFailed(Long taskId, String failType, String reason) {
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		task.setFailType(failType);
+		task.setFailMessage(reason);
+		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), reason, OperatorTypeEnum.SYSTEM.name(), null);
+		taskRepository.update(task);
+	}
+
 	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");

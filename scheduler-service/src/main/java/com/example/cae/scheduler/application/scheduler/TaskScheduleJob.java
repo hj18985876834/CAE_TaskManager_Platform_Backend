@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.application.scheduler;
 
+import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
@@ -26,15 +27,21 @@ public class TaskScheduleJob {
 		List<TaskDTO> pendingTasks = taskClient.listPendingTasks(20);
 		for (TaskDTO task : pendingTasks) {
 			Long nodeId = null;
+			boolean taskMarkedScheduled = false;
 			try {
 				nodeId = taskScheduleManager.schedule(task);
 				taskClient.markTaskScheduled(task.getTaskId(), nodeId);
+				taskMarkedScheduled = true;
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				taskClient.markTaskDispatched(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
 			} catch (Exception ex) {
 				if (nodeId != null) {
 					taskScheduleManager.releaseNodeReservation(nodeId);
+				}
+				if (taskMarkedScheduled && task != null && task.getTaskId() != null) {
+					taskClient.markTaskFailed(task.getTaskId(), FailTypeEnum.DISPATCH_ERROR.name(),
+							ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage());
 				}
 				taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
 			}

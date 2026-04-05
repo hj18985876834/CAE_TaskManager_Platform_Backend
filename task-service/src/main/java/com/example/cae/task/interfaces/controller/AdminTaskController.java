@@ -4,9 +4,11 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.application.service.TaskQueryAppService;
+import com.example.cae.task.interfaces.request.RetryTaskRequest;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -41,5 +43,12 @@ public class AdminTaskController {
 									   @RequestHeader("X-User-Id") @Positive(message = "X-User-Id must be greater than 0") Long adminUserId) {
 		taskCommandAppService.adjustPriority(taskId, request, adminUserId);
 		return Result.success();
+	}
+
+	@PostMapping("/{taskId}/retry")
+	public Result<TaskSubmitResponse> retryTask(@PathVariable("taskId") @Positive(message = "taskId must be greater than 0") Long taskId,
+												@Valid @RequestBody(required = false) RetryTaskRequest request,
+												@RequestHeader("X-User-Id") @Positive(message = "X-User-Id must be greater than 0") Long adminUserId) {
+		return Result.success(taskCommandAppService.retryTask(taskId, adminUserId, request == null ? null : request.getReason()));
 	}
 }

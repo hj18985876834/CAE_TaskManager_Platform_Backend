@@ -347,7 +347,8 @@ CREATE TABLE compute_node (
     node_name VARCHAR(100) NOT NULL COMMENT '节点名称',
     node_token VARCHAR(255) NOT NULL COMMENT '节点凭证',
     host VARCHAR(100) NOT NULL COMMENT 'IP或主机名',
-    status VARCHAR(20) NOT NULL COMMENT 'ONLINE / OFFLINE / DISABLED',
+    status VARCHAR(20) NOT NULL COMMENT 'ONLINE / OFFLINE',
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许参与调度',
     max_concurrency INT NOT NULL DEFAULT 1 COMMENT '最大并发任务数',
     running_count INT NOT NULL DEFAULT 0 COMMENT '当前运行任务数',
     cpu_usage DECIMAL(5,2) DEFAULT 0.00 COMMENT 'CPU占用率',
@@ -359,8 +360,9 @@ CREATE TABLE compute_node (
     UNIQUE KEY uk_node_code (node_code),
     UNIQUE KEY uk_node_token (node_token),
     KEY idx_status (status),
+    KEY idx_enabled (enabled),
     KEY idx_last_heartbeat_time (last_heartbeat_time),
-    KEY idx_status_running_count (status, running_count)
+    KEY idx_status_enabled_running_count (status, enabled, running_count)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计算节点表';
 
 -- -----------------------------
@@ -372,7 +374,7 @@ CREATE TABLE node_solver_capability (
     node_id BIGINT NOT NULL COMMENT '节点ID',
     solver_id BIGINT NOT NULL COMMENT '求解器ID',
     solver_version VARCHAR(50) DEFAULT NULL COMMENT '节点安装版本',
-    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否可用',
+    enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许该节点以此求解器参与调度',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_node_solver (node_id, solver_id),
@@ -400,9 +402,9 @@ CREATE TABLE schedule_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='调度记录表';
 
 -- 初始化调度域数据
-INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, max_concurrency, running_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
-(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, 'ONLINE', 4, 1, 23.50, 41.20, NOW(), NOW(), NOW()),
-(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, 'OFFLINE', 2, 0, 0.00, 0.00, NOW(), NOW(), NOW());
+INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, enabled, max_concurrency, running_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
+(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, 'ONLINE', 1, 4, 1, 23.50, 41.20, NOW(), NOW(), NOW()),
+(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, 'OFFLINE', 0, 2, 0, 0.00, 0.00, NOW(), NOW(), NOW());
 
 INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enabled, created_at) VALUES
 (1, 1, 1, 'v10', 1, NOW()),

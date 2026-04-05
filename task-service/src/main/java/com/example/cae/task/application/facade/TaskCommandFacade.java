@@ -2,6 +2,7 @@ package com.example.cae.task.application.facade;
 
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.request.RetryTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
@@ -50,5 +51,9 @@ public class TaskCommandFacade {
 
 	public void adjustPriority(Long taskId, UpdateTaskPriorityRequest request, Long adminUserId) {
 		taskCommandAppService.adjustPriority(taskId, request, adminUserId);
+	}
+
+	public TaskSubmitResponse retryTask(Long taskId, RetryTaskRequest request, Long adminUserId) {
+		return taskCommandAppService.retryTask(taskId, adminUserId, request == null ? null : request.getReason());
 	}
 }
