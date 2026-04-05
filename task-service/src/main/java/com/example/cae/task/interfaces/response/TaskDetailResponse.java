@@ -18,6 +18,7 @@ public class TaskDetailResponse {
 	private Long nodeId;
 	private String nodeName;
 	private Boolean canRetry;
+	private String queueReason;
 	private Map<String, Object> params;
 	private String failType;
 	private String failMessage;
@@ -135,6 +136,14 @@ public class TaskDetailResponse {
 
 	public void setCanRetry(Boolean canRetry) {
 		this.canRetry = canRetry;
+	}
+
+	public String getQueueReason() {
+		return queueReason;
+	}
+
+	public void setQueueReason(String queueReason) {
+		this.queueReason = queueReason;
 	}
 
 	public Map<String, Object> getParams() {

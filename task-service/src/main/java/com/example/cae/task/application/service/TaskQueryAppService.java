@@ -26,7 +26,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class TaskQueryAppService {
@@ -63,14 +65,20 @@ public class TaskQueryAppService {
 	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
 		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageMyTasks(request, userId);
-		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).map(this::enrichTaskListItem).toList();
+		Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache = new HashMap<>();
+		List<TaskListItemResponse> records = page.getRecords().stream()
+				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueSnapshotCache))
+				.toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
 	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
 		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageAdminTasks(request);
-		List<TaskListItemResponse> records = page.getRecords().stream().map(taskAssembler::toListItemResponse).map(this::enrichTaskListItem).toList();
+		Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache = new HashMap<>();
+		List<TaskListItemResponse> records = page.getRecords().stream()
+				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueSnapshotCache))
+				.toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
@@ -150,7 +158,7 @@ public class TaskQueryAppService {
 		return response;
 	}
 
-	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response) {
+	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response, Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
 		try {
 			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
 		} catch (Exception ignored) {
@@ -163,6 +171,7 @@ public class TaskQueryAppService {
 			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		} catch (Exception ignored) {
 		}
+		response.setQueueReason(resolveQueueReason(response.getSolverId(), response.getStatus(), queueSnapshotCache));
 		return response;
 	}
 
@@ -179,6 +188,32 @@ public class TaskQueryAppService {
 			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		} catch (Exception ignored) {
 		}
+		response.setQueueReason(resolveQueueReason(response.getSolverId(), response.getStatus(), new HashMap<>()));
 		return response;
+	}
+
+	private String resolveQueueReason(Long solverId, String status, Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
+		if (!TaskStatusEnum.QUEUED.name().equalsIgnoreCase(status)) {
+			return null;
+		}
+		try {
+			SchedulerClient.QueueNodeSnapshot snapshot = queueSnapshotCache.computeIfAbsent(
+					solverId,
+					key -> schedulerClient.getQueueNodeSnapshot(key)
+			);
+			int dispatchableNodeCount = snapshot.getDispatchableNodeCount() == null ? 0 : snapshot.getDispatchableNodeCount();
+			if (dispatchableNodeCount <= 0) {
+				int onlineEnabledCapableNodeCount = snapshot.getOnlineEnabledCapableNodeCount() == null
+						? 0
+						: snapshot.getOnlineEnabledCapableNodeCount();
+				if (onlineEnabledCapableNodeCount <= 0) {
+					return "暂无满足条件的可用节点";
+				}
+				return "候选节点当前满载，等待资源释放";
+			}
+			return "前方仍有更高优先级或更早提交任务";
+		} catch (Exception ignored) {
+			return "排队中，等待调度器处理";
+		}
 	}
 }

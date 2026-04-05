@@ -46,6 +46,46 @@ public class SchedulerClient {
 		return String.valueOf(map.get("nodeName"));
 	}
 
+	public QueueNodeSnapshot getQueueNodeSnapshot(Long solverId) {
+		if (solverId == null) {
+			return QueueNodeSnapshot.empty();
+		}
+		QueueNodeSnapshot snapshot = new QueueNodeSnapshot();
+		snapshot.setDispatchableNodeCount(fetchDispatchableNodeCount(solverId));
+		snapshot.setOnlineEnabledCapableNodeCount(fetchOnlineEnabledCapableNodeCount(solverId));
+		return snapshot;
+	}
+
+	@SuppressWarnings("unchecked")
+	private int fetchDispatchableNodeCount(Long solverId) {
+		String availableUrl = UriComponentsBuilder
+				.fromHttpUrl(schedulerServiceBaseUrl + "/internal/nodes/available")
+				.queryParam("solverId", solverId)
+				.toUriString();
+		Result<Object> availableResult = restTemplate.getForObject(availableUrl, Result.class);
+		if (availableResult == null || !(availableResult.getData() instanceof List<?> records)) {
+			return 0;
+		}
+		return (int) records.stream().filter(Map.class::isInstance).count();
+	}
+
+	@SuppressWarnings("unchecked")
+	private int fetchOnlineEnabledCapableNodeCount(Long solverId) {
+		String onlineUrl = UriComponentsBuilder
+				.fromHttpUrl(schedulerServiceBaseUrl + "/api/nodes")
+				.queryParam("status", "ONLINE")
+				.queryParam("enabled", 1)
+				.queryParam("solverId", solverId)
+				.queryParam("pageNum", 1)
+				.queryParam("pageSize", 1)
+				.toUriString();
+		Result<Object> result = restTemplate.getForObject(onlineUrl, Result.class);
+		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
+			return 0;
+		}
+		return toInteger(pageMap.get("total")) == null ? 0 : toInteger(pageMap.get("total"));
+	}
+
 	@SuppressWarnings("unchecked")
 	public NodeSummary getOnlineNodeSummary() {
 		String url = UriComponentsBuilder
@@ -139,6 +179,34 @@ public class SchedulerClient {
 
 		public void setAvgNodeLoad(BigDecimal avgNodeLoad) {
 			this.avgNodeLoad = avgNodeLoad;
+		}
+	}
+
+	public static class QueueNodeSnapshot {
+		private Integer dispatchableNodeCount;
+		private Integer onlineEnabledCapableNodeCount;
+
+		public static QueueNodeSnapshot empty() {
+			QueueNodeSnapshot snapshot = new QueueNodeSnapshot();
+			snapshot.setDispatchableNodeCount(0);
+			snapshot.setOnlineEnabledCapableNodeCount(0);
+			return snapshot;
+		}
+
+		public Integer getDispatchableNodeCount() {
+			return dispatchableNodeCount;
+		}
+
+		public void setDispatchableNodeCount(Integer dispatchableNodeCount) {
+			this.dispatchableNodeCount = dispatchableNodeCount;
+		}
+
+		public Integer getOnlineEnabledCapableNodeCount() {
+			return onlineEnabledCapableNodeCount;
+		}
+
+		public void setOnlineEnabledCapableNodeCount(Integer onlineEnabledCapableNodeCount) {
+			this.onlineEnabledCapableNodeCount = onlineEnabledCapableNodeCount;
 		}
 	}
 }

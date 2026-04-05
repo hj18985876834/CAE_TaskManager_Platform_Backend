@@ -16,6 +16,7 @@ public class TaskListItemResponse {
 	private Long nodeId;
 	private String nodeName;
 	private Boolean canRetry;
+	private String queueReason;
 	private LocalDateTime submitTime;
 	private LocalDateTime startTime;
 	private LocalDateTime endTime;
@@ -122,6 +123,14 @@ public class TaskListItemResponse {
 
 	public void setCanRetry(Boolean canRetry) {
 		this.canRetry = canRetry;
+	}
+
+	public String getQueueReason() {
+		return queueReason;
+	}
+
+	public void setQueueReason(String queueReason) {
+		this.queueReason = queueReason;
 	}
 
 	public LocalDateTime getSubmitTime() {
