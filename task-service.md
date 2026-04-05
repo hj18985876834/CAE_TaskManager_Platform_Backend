@@ -396,6 +396,8 @@ task-service/
 * `validateTask(Long taskId)`
 * `submitTask(Long taskId)`
 * `cancelTask(Long taskId)`
+* `adjustPriority(Long taskId)`
+* `retryTask(Long taskId)`
 
 ---
 
@@ -481,6 +483,8 @@ task-service/
 * `validateTask(Long taskId, Long userId)`
 * `submitTask(Long taskId, Long userId)`
 * `cancelTask(Long taskId, Long userId)`
+* `adjustPriority(Long taskId, Integer priority, Long adminId)`
+* `retryTask(Long taskId, String reason, Long adminId)`
 
 ---
 
@@ -495,6 +499,9 @@ task-service/
 * `getTaskDetail(Long taskId, Long userId, String roleCode)`
 * `getTaskStatusHistory(Long taskId, Long userId, String roleCode)`
 * `getTaskFiles(Long taskId, Long userId, String roleCode)`
+
+补充要求：
+* 查询层统一派生 `canRetry`、`queueReason` 等前端直接消费字段，避免前端自行硬编码任务状态判断
 
 ---
 
@@ -528,6 +535,8 @@ task-service/
 * `createTask(CreateTaskRequest request, Long userId)`
 * `submitTask(Long taskId, Long userId)`
 * `cancelTask(Long taskId, Long userId)`
+* `adjustPriority(Long taskId, Integer priority, Long adminId)`
+* `retryTask(Long taskId, String reason, Long adminId)`
 * `markScheduled(Long taskId, Long nodeId)`
 * `markDispatched(Long taskId, Long nodeId)`
 * `markRunning(Long taskId)`
@@ -1423,6 +1432,14 @@ public class TaskCommandAppService {
     public void cancelTask(Long taskId, Long userId, String reason) {
         taskLifecycleManager.cancelTask(taskId, userId, reason);
     }
+
+    public void adjustPriority(Long taskId, Integer priority, Long adminId) {
+        taskLifecycleManager.adjustPriority(taskId, priority, adminId);
+    }
+
+    public TaskSubmitResponse retryTask(Long taskId, String reason, Long adminId) {
+        return taskLifecycleManager.retryTask(taskId, reason, adminId);
+    }
 }
 ```
 
@@ -1526,6 +1543,10 @@ public class TaskLifecycleManager {
     public void submitTask(Long taskId, Long userId) { ... }
 
     public void cancelTask(Long taskId, Long userId, String reason) { ... }
+
+    public void adjustPriority(Long taskId, Integer priority, Long adminId) { ... }
+
+    public TaskSubmitResponse retryTask(Long taskId, String reason, Long adminId) { ... }
 
     public void markScheduled(Long taskId, Long nodeId) { ... }
 
