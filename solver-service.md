@@ -1,271 +1,1068 @@
-# solver-service 模块分析文档
+# solver-service 模块说明文档
 
-## 1. 模块定位
+## 1. 文档目的
 
-`solver-service` 是平台中的求解器配置中心，负责描述“平台支持哪些求解器、每类求解器有哪些任务模板、每个模板需要哪些输入文件与参数规则”。
+这份文档继续沿用 `user-service` 的说明方式，不只介绍“这个模块是干什么的”，而是把 `solver-service` 拆到“模块根目录 -> 分层目录 -> 代码文件”的粒度，方便下面几类工作：
 
-在当前项目中，它承担的核心职责主要有五类：
+- 快速定位某个接口对应哪个文件
+- 理清求解器定义、模板、文件规则、上传规范之间的关系
+- 写论文、模块设计说明、答辩稿时区分“设计目标”和“当前真实实现”
+- 后续改代码时知道先去哪个文件夹看
 
-- 求解器定义管理
-- 模板管理
-- 文件规则管理
-- 上传规范生成
-- 面向其他微服务的模板与求解器内部查询
+分析范围以 `solver-service/src/main/java` 与 `solver-service/src/main/resources` 为主，不把 `target/` 编译产物作为设计分析对象。
 
-它不负责实际执行仿真任务，也不负责任务状态流转与调度决策。它更像是整个平台的“元数据与规则中心”。
+---
 
-这也是当前系统扩展性的关键所在：当平台要接入新的求解器或新的任务类型时，优先修改的是 `solver-service` 中的配置与模板，而不是去改任务主链路或调度主链路。
+## 2. 模块定位
 
-## 2. 模块在系统中的作用
+`solver-service` 是平台中的“求解器配置中心”和“规则元数据中心”，它负责回答下面几个问题：
 
-从系统整体看，`solver-service` 主要解决以下问题：
+1. 平台当前支持哪些求解器。
+2. 每个求解器下面有哪些可选任务模板。
+3. 每个模板要求上传哪些输入文件。
+4. 每个模板的执行命令模板、参数模式、超时时间、结果解析器是什么。
+5. 任务创建和任务校验时，其他服务该去哪里拿这些元数据。
 
-1. 平台能支持哪些求解器，由谁统一维护。
-2. 某个求解器支持哪些任务模板与任务类型，由谁统一定义。
-3. 某个模板需要哪些输入文件、文件命名规则、是否必填、排序顺序，由谁统一管理。
-4. 前端在用户选定模板后，如何得到上传说明与参数说明。
-5. `task-service` 在任务校验时，如何获取模板详情、参数模式和文件规则。
+因此，`solver-service` 在系统中的定位不是执行服务，而是“配置中心型服务”。
 
-因此，`solver-service` 在系统中起到的是“规则驱动入口”和“求解配置基础设施”的作用。
+它主要负责四类对象：
 
-## 3. 当前实现架构
+- `SolverDefinition`：求解器定义
+- `SolverTaskProfile`：求解器任务模板
+- `SolverProfileFileRule`：模板文件规则
+- `UploadSpecResponse`：面向前端和任务服务生成的上传规范
 
-### 3.1 技术栈
+它不负责：
 
-- Spring Boot
-- 分层架构：`interfaces / application / domain / infrastructure`
-- MyBatis 注解 Mapper
-- `common-lib` 中的错误码、返回体与跨服务 DTO
+- 不直接执行仿真任务
+- 不负责任务状态流转
+- 不做节点调度
+- 不做结果回传
 
-### 3.2 当前目录结构
+简单说：
 
-当前代码结构如下：
+- `user-service` 解决“谁在用系统”
+- `solver-service` 解决“系统支持什么求解器和规则”
+- `task-service` 解决“任务如何创建与流转”
+- `scheduler-service` 解决“任务分配给谁执行”
+
+---
+
+## 3. 模块根目录与源码入口
+
+模块根目录是：
 
 ```text
 solver-service/
-└── src/main/java/com/example/cae/solver/
-    ├── SolverApplication.java
-    ├── application/
-    │   ├── assembler/
-    │   │   ├── FileRuleAssembler.java
-    │   │   ├── ProfileAssembler.java
-    │   │   └── SolverAssembler.java
-    │   ├── facade/
-    │   │   ├── ProfileFacade.java
-    │   │   └── SolverFacade.java
-    │   └── service/
-    │       ├── FileRuleAppService.java
-    │       ├── ProfileAppService.java
-    │       ├── SolverAppService.java
-    │       └── UploadSpecAppService.java
-    ├── config/
-    │   └── SolverServiceConfig.java
-    ├── domain/
-    │   ├── model/
-    │   │   ├── SolverDefinition.java
-    │   │   ├── SolverProfileFileRule.java
-    │   │   └── SolverTaskProfile.java
-    │   ├── repository/
-    │   │   ├── FileRuleRepository.java
-    │   │   ├── ProfileRepository.java
-    │   │   └── SolverRepository.java
-    │   └── service/
-    │       ├── ProfileRuleDomainService.java
-    │       └── SolverDomainService.java
-    ├── infrastructure/
-    │   ├── persistence/
-    │   │   ├── entity/
-    │   │   │   ├── SolverDefinitionPO.java
-    │   │   │   ├── SolverProfileFileRulePO.java
-    │   │   │   └── SolverTaskProfilePO.java
-    │   │   ├── mapper/
-    │   │   │   ├── SolverDefinitionMapper.java
-    │   │   │   ├── SolverProfileFileRuleMapper.java
-    │   │   │   └── SolverTaskProfileMapper.java
-    │   │   └── repository/
-    │   │       ├── FileRuleRepositoryImpl.java
-    │   │       ├── ProfileRepositoryImpl.java
-    │   │       └── SolverRepositoryImpl.java
-    │   └── support/
-    │       ├── ProfileRuleValidator.java
-    │       └── UploadSpecBuilder.java
-    ├── interfaces/
-    │   ├── controller/
-    │   │   ├── FileRuleController.java
-    │   │   ├── ProfileController.java
-    │   │   └── SolverController.java
-    │   ├── internal/
-    │   │   ├── InternalProfileController.java
-    │   │   └── InternalSolverController.java
-    │   ├── request/
-    │   │   ├── CreateFileRuleRequest.java
-    │   │   ├── CreateProfileRequest.java
-    │   │   ├── CreateSolverRequest.java
-    │   │   ├── ProfilePageQueryRequest.java
-    │   │   ├── SolverPageQueryRequest.java
-    │   │   ├── UpdateFileRuleRequest.java
-    │   │   ├── UpdateProfileRequest.java
-    │   │   ├── UpdateProfileStatusRequest.java
-    │   │   ├── UpdateSolverRequest.java
-    │   │   └── UpdateSolverStatusRequest.java
-    │   └── response/
-    │       ├── FileRuleCreateResponse.java
-    │       ├── FileRuleResponse.java
-    │       ├── InternalProfileDetailResponse.java
-    │       ├── ProfileCreateResponse.java
-    │       ├── ProfileDetailResponse.java
-    │       ├── ProfileListItemResponse.java
-    │       ├── SolverCreateResponse.java
-    │       ├── SolverDetailResponse.java
-    │       ├── SolverListItemResponse.java
-    │       ├── SolverTaskOptionResponse.java
-    │       └── UploadSpecResponse.java
-    └── support/
-        └── SolverQueryBuilder.java
 ```
 
-这个结构和 `solver-service` 的定位是匹配的：它不是执行型服务，而是规则配置型服务，因此重点落在模型、规则与数据组装上。
+当前最重要的几个位置是：
 
-## 4. 各部分功能与职责
+- `solver-service/pom.xml`
+- `solver-service/src/main/java/com/example/cae/solver/`
+- `solver-service/src/main/resources/application.yml`
 
-### 4.1 启动与配置层
+不作为设计分析重点的目录：
 
-#### `SolverApplication`
+```text
+solver-service/target/
+```
 
-职责：
+`target/` 下的是编译产物，不应该写成源码层设计内容。
 
-- 启动 `solver-service`
-- 扫描各层组件
+---
 
-#### `SolverServiceConfig`
+## 4. 分层与文件夹映射
 
-当前为轻量配置承载类，主要提供基础 Spring 配置容器。
+| 分层 | 对应文件夹 | 作用 |
+| --- | --- | --- |
+| 启动入口层 | `solver-service/src/main/java/com/example/cae/solver/` | Spring Boot 启动入口 |
+| 配置层 | `solver-service/src/main/java/com/example/cae/solver/config/` | Spring 与 MyBatis 相关配置 |
+| 接口层 | `solver-service/src/main/java/com/example/cae/solver/interfaces/` | 对外接口、内部接口、请求对象、响应对象 |
+| 应用层 | `solver-service/src/main/java/com/example/cae/solver/application/` | 业务编排、Facade、对象组装 |
+| 领域层 | `solver-service/src/main/java/com/example/cae/solver/domain/` | 领域模型、仓储抽象、领域规则、枚举 |
+| 基础设施层 | `solver-service/src/main/java/com/example/cae/solver/infrastructure/` | 持久化实现、规则构造辅助类 |
+| 支撑层 | `solver-service/src/main/java/com/example/cae/solver/support/` | 预留的查询构造辅助类 |
+| 资源配置层 | `solver-service/src/main/resources/` | 端口、数据库连接等运行配置 |
 
-### 4.2 接口层
+如果只想快速找代码，可以按下面记：
 
-#### `SolverController`
+- 看 REST 接口：`interfaces/controller`
+- 看内部接口：`interfaces/internal`
+- 看 DTO：`interfaces/request`、`interfaces/response`
+- 看“求解器/模板/文件规则”主流程：`application/service`
+- 看领域规则：`domain/service`
+- 看数据库访问：`infrastructure/persistence`
+- 看上传规范构造：`infrastructure/support/UploadSpecBuilder`
 
-职责：
+---
 
-- 求解器分页查询
-- 求解器详情查询
-- 求解器创建
-- 求解器更新
-- 求解器启停
-- 查询某求解器下的模板列表
-- 查询某求解器可用于任务创建的模板选项
+## 5. 模块结构总览
 
-这里的“任务选项”接口很重要，它把模板选择能力向任务创建前台或任务服务调用方暴露出来。
+当前模块源码结构如下：
 
-#### `ProfileController`
+```text
+solver-service/
+├── pom.xml
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/example/cae/solver/
+│       │       ├── SolverApplication.java
+│       │       ├── application/
+│       │       │   ├── assembler/
+│       │       │   │   ├── FileRuleAssembler.java
+│       │       │   │   ├── ProfileAssembler.java
+│       │       │   │   └── SolverAssembler.java
+│       │       │   ├── facade/
+│       │       │   │   ├── ProfileFacade.java
+│       │       │   │   └── SolverFacade.java
+│       │       │   └── service/
+│       │       │       ├── FileRuleAppService.java
+│       │       │       ├── ProfileAppService.java
+│       │       │       ├── SolverAppService.java
+│       │       │       └── UploadSpecAppService.java
+│       │       ├── config/
+│       │       │   ├── MybatisPlusConfig.java
+│       │       │   └── SolverServiceConfig.java
+│       │       ├── domain/
+│       │       │   ├── enums/
+│       │       │   │   ├── RuleFileTypeEnum.java
+│       │       │   │   └── SolverExecModeEnum.java
+│       │       │   ├── model/
+│       │       │   │   ├── SolverDefinition.java
+│       │       │   │   ├── SolverProfileFileRule.java
+│       │       │   │   └── SolverTaskProfile.java
+│       │       │   ├── repository/
+│       │       │   │   ├── FileRuleRepository.java
+│       │       │   │   ├── ProfileRepository.java
+│       │       │   │   └── SolverRepository.java
+│       │       │   └── service/
+│       │       │       ├── ProfileRuleDomainService.java
+│       │       │       └── SolverDomainService.java
+│       │       ├── infrastructure/
+│       │       │   ├── persistence/
+│       │       │   │   ├── entity/
+│       │       │   │   │   ├── SolverDefinitionPO.java
+│       │       │   │   │   ├── SolverProfileFileRulePO.java
+│       │       │   │   │   └── SolverTaskProfilePO.java
+│       │       │   │   ├── mapper/
+│       │       │   │   │   ├── SolverDefinitionMapper.java
+│       │       │   │   │   ├── SolverProfileFileRuleMapper.java
+│       │       │   │   │   └── SolverTaskProfileMapper.java
+│       │       │   │   └── repository/
+│       │       │   │       ├── FileRuleRepositoryImpl.java
+│       │       │   │       ├── ProfileRepositoryImpl.java
+│       │       │   │       └── SolverRepositoryImpl.java
+│       │       │   └── support/
+│       │       │       ├── CommandTemplateResolver.java
+│       │       │       ├── ProfileRuleValidator.java
+│       │       │       └── UploadSpecBuilder.java
+│       │       ├── interfaces/
+│       │       │   ├── controller/
+│       │       │   │   ├── FileRuleController.java
+│       │       │   │   ├── ProfileController.java
+│       │       │   │   └── SolverController.java
+│       │       │   ├── internal/
+│       │       │   │   ├── InternalProfileController.java
+│       │       │   │   └── InternalSolverController.java
+│       │       │   ├── request/
+│       │       │   │   ├── CreateFileRuleRequest.java
+│       │       │   │   ├── CreateProfileRequest.java
+│       │       │   │   ├── CreateSolverRequest.java
+│       │       │   │   ├── ProfilePageQueryRequest.java
+│       │       │   │   ├── SolverPageQueryRequest.java
+│       │       │   │   ├── UpdateFileRuleRequest.java
+│       │       │   │   ├── UpdateProfileRequest.java
+│       │       │   │   ├── UpdateProfileStatusRequest.java
+│       │       │   │   ├── UpdateSolverRequest.java
+│       │       │   │   └── UpdateSolverStatusRequest.java
+│       │       │   └── response/
+│       │       │       ├── FileRuleCreateResponse.java
+│       │       │       ├── FileRuleResponse.java
+│       │       │       ├── InternalProfileDetailResponse.java
+│       │       │       ├── ProfileCreateResponse.java
+│       │       │       ├── ProfileDetailResponse.java
+│       │       │       ├── ProfileListItemResponse.java
+│       │       │       ├── SolverCreateResponse.java
+│       │       │       ├── SolverDetailResponse.java
+│       │       │       ├── SolverListItemResponse.java
+│       │       │       ├── SolverTaskOptionResponse.java
+│       │       │       └── UploadSpecResponse.java
+│       │       └── support/
+│       │           └── SolverQueryBuilder.java
+│       └── resources/
+│           └── application.yml
+└── target/
+```
 
-职责：
+---
 
-- 模板分页查询
-- 模板详情查询
-- 模板创建
-- 模板更新
-- 模板启停
-- 查询模板上传规范
-- 查询模板文件规则列表
+## 6. 根目录文件说明
 
-这是当前 `solver-service` 最核心的控制器之一。
+### 6.1 `solver-service/pom.xml`
 
-#### `FileRuleController`
+作用：
 
-职责：
+- 声明 `solver-service` 是父工程子模块。
+- 引入 Web、校验、MyBatis、MySQL 和 `common-lib` 依赖。
+- 配置 Spring Boot 打包。
 
-- 为模板新增文件规则
-- 修改文件规则
-- 删除文件规则
+当前关键依赖：
 
-它体现了“文件规则围绕模板管理”的设计思路。
+- `spring-boot-starter-web`
+- `spring-boot-starter-validation`
+- `mybatis-plus-spring-boot3-starter`
+- `mysql-connector-j`
+- `common-lib`
 
-#### `InternalSolverController`
+说明：
 
-职责：
+- 和 `user-service` 一样，虽然引入了 MyBatis-Plus starter，但当前实现以 MyBatis 注解 SQL 为主。
 
-- 向其他微服务暴露求解器详情内部接口 `/internal/solvers/{solverId}`
+### 6.2 `solver-service/src/main/resources/application.yml`
 
-#### `InternalProfileController`
+作用：
 
-职责：
+- 配置服务名、端口、编码和数据源。
 
-- 向其他微服务暴露模板详情内部接口 `/internal/profiles/{profileId}`
-- 返回模板核心字段与对应文件规则
+当前关键配置：
 
-这两个内部接口主要服务于 `task-service` 的任务创建与校验流程。
+- 服务名：`solver-service`
+- 默认端口：`8082`
+- 数据库：`solver_db`
 
-### 4.3 应用层
+这意味着 `solver-service` 当前采用独立服务、独立数据库的微服务方式。
 
-#### `SolverFacade`
+---
 
-职责：
+## 7. 启动入口层
 
-- 对求解器相关流程做一层薄封装
-- 保持 Controller 轻量
+### 7.1 对应文件夹
 
-#### `ProfileFacade`
+```text
+solver-service/src/main/java/com/example/cae/solver/
+```
 
-职责：
+### 7.2 文件说明
 
-- 统一编排模板、文件规则、上传规范相关应用服务
+#### `SolverApplication.java`
 
-它实际上是当前模板域的应用层入口。
+作用：
 
-#### `SolverAppService`
+- `solver-service` 的 Spring Boot 启动入口。
+- 使用 `@SpringBootApplication(scanBasePackages = "com.example.cae")` 统一扫描组件。
 
-职责：
+定位意义：
 
-- 编排求解器分页、详情、创建、更新、启停
-- 编排求解器下模板查询与任务选项查询
+- 服务启动问题、Bean 扫描问题、自动装配问题，首先从这里看。
 
-#### `ProfileAppService`
+---
 
-职责：
+## 8. 配置层
 
-- 编排模板分页、详情、创建、更新、启停
-- 查询模板文件规则列表
+### 8.1 对应文件夹
 
-#### `FileRuleAppService`
+```text
+solver-service/src/main/java/com/example/cae/solver/config/
+```
 
-职责：
+### 8.2 文件说明
 
-- 编排文件规则新增、修改、删除
-- 校验文件规则基本合法性
-- 检查模板存在性与规则冲突
+#### `SolverServiceConfig.java`
 
-#### `UploadSpecAppService`
+作用：
 
-职责：
+- 当前是空的 `@Configuration` 配置类。
 
-- 根据模板与文件规则生成上传规范响应
-- 确保模板已启用
+状态判断：
 
-这是当前系统里前端上传引导与任务输入校验的桥梁服务。
+- 主要起预留配置承载作用。
+- 当前没有额外显式 Bean 定义。
 
-### 4.4 领域层
+#### `MybatisPlusConfig.java`
 
-#### `SolverDefinition`
+作用：
 
-职责：
+- 当前也是空的 `@Configuration` 配置类。
 
-- 表达求解器定义
-- 承载启用、禁用等基础行为
+状态判断：
 
-它描述的是“平台支持什么求解器”这一层。
+- 文件名说明原本预期承载 MyBatis-Plus 的增强配置。
+- 当前没有分页插件、拦截器等具体内容。
 
-#### `SolverTaskProfile`
+文档建议：
 
-职责：
+- 不要写成“已完成 MyBatis-Plus 高级配置”。
 
-- 表达某求解器下的具体任务模板
-- 承载启停、超时修改等行为
+---
 
-它描述的是“这个求解器支持什么任务类型、如何上传、如何构造命令、如何解析结果”。
+## 9. 接口层
 
-当前核心字段包括：
+### 9.1 对应文件夹
 
+```text
+solver-service/src/main/java/com/example/cae/solver/interfaces/
+```
+
+该目录分成：
+
+- `controller/`
+- `internal/`
+- `request/`
+- `response/`
+
+---
+
+### 9.2 对外控制器目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/interfaces/controller/
+```
+
+#### `SolverController.java`
+
+作用：
+
+- 管理“求解器定义”相关接口。
+- 根路径是 `/api/solvers`。
+
+当前接口：
+
+- `GET /api/solvers`
+- `GET /api/solvers/{solverId}`
+- `POST /api/solvers`
+- `PUT /api/solvers/{solverId}`
+- `PUT /api/solvers/{solverId}/status`
+- `POST /api/solvers/{solverId}/status`
+- `GET /api/solvers/{solverId}/profiles`
+- `GET /api/solvers/{solverId}/task-options`
+
+各方法作用：
+
+- `pageSolvers(...)`：求解器分页
+- `getSolverDetail(...)`：求解器详情
+- `createSolver(...)`：新建求解器
+- `updateSolver(...)`：更新求解器元数据
+- `updateSolverStatus(...)`：更新求解器启停状态
+- `updateSolverStatusPost(...)`：兼容式 POST 状态接口
+- `getSolverProfiles(...)`：查看某求解器下的全部模板
+- `getSolverTaskOptions(...)`：查看某求解器下可用于任务创建的模板选项
+
+关键说明：
+
+- 这里同时提供 `PUT` 和 `POST` 两种状态变更接口，属于兼容式接口设计。
+
+#### `ProfileController.java`
+
+作用：
+
+- 管理“模板”相关接口。
+- 根路径是 `/api/profiles`。
+
+当前接口：
+
+- `GET /api/profiles`
+- `GET /api/profiles/{profileId}`
+- `POST /api/profiles`
+- `PUT /api/profiles/{profileId}`
+- `PUT /api/profiles/{profileId}/status`
+- `POST /api/profiles/{profileId}/status`
+- `GET /api/profiles/{profileId}/upload-spec`
+- `GET /api/profiles/{profileId}/file-rules`
+
+各方法作用：
+
+- `pageProfiles(...)`：模板分页
+- `getProfileDetail(...)`：模板详情
+- `createProfile(...)`：创建模板
+- `updateProfile(...)`：更新模板元数据
+- `updateProfileStatus(...)`：更新模板启停状态
+- `updateProfileStatusPost(...)`：兼容式 POST 状态接口
+- `getUploadSpec(...)`：生成模板上传规范
+- `getFileRules(...)`：查询模板文件规则列表
+
+#### `FileRuleController.java`
+
+作用：
+
+- 管理“模板文件规则”接口。
+- 根路径是 `/api`，但实际路径组合后分别挂在：
+  - `/api/profiles/{profileId}/file-rules`
+  - `/api/file-rules/{id}`
+
+当前接口：
+
+- `POST /api/profiles/{profileId}/file-rules`
+- `PUT /api/file-rules/{id}`
+- `DELETE /api/file-rules/{id}`
+
+各方法作用：
+
+- `createFileRule(...)`：给模板新增文件规则
+- `updateFileRule(...)`：修改规则
+- `deleteFileRule(...)`：删除规则
+
+---
+
+### 9.3 内部接口目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/interfaces/internal/
+```
+
+#### `InternalSolverController.java`
+
+作用：
+
+- 对其他微服务暴露内部求解器详情接口。
+- 根路径是 `/internal/solvers`。
+
+当前接口：
+
+- `GET /internal/solvers/{solverId}`
+
+返回：
+
+- 直接复用 `SolverDetailResponse`。
+
+说明：
+
+- 当前没有单独定义 “内部求解器 DTO”，而是直接复用外部详情响应对象。
+
+#### `InternalProfileController.java`
+
+作用：
+
+- 对其他微服务暴露内部模板详情接口。
+- 根路径是 `/internal/profiles`。
+
+当前接口：
+
+- `GET /internal/profiles/{profileId}`
+
+实际行为：
+
+1. 先通过 `profileFacade.getProfileDetail(profileId)` 查模板详情。
+2. 再通过 `profileFacade.getFileRules(profileId)` 查文件规则。
+3. 手动组装成 `InternalProfileDetailResponse`。
+
+说明：
+
+- 它没有直接返回 `ProfileDetailResponse`，而是生成内部专用返回对象。
+- 这样做更适合给 `task-service` 做任务校验时使用。
+
+---
+
+### 9.4 请求对象目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/interfaces/request/
+```
+
+#### `CreateSolverRequest.java`
+
+作用：
+
+- 创建求解器请求体。
+
+主要字段：
+
+- `solverCode`
+- `solverName`
+- `version`
+- `execMode`
+- `execPath`
+- `enabled`
+- `description`
+- `remark`
+
+注意点：
+
+- 同时存在 `description` 和 `remark` 两个字段。
+- 当前实现会优先使用 `description`，回退到 `remark`。
+
+#### `UpdateSolverRequest.java`
+
+作用：
+
+- 更新求解器请求体。
+
+字段与创建类似，但不包含 `solverCode` 和 `enabled`。
+
+#### `UpdateSolverStatusRequest.java`
+
+作用：
+
+- 更新求解器启停状态请求体。
+
+核心字段：
+
+- `enabled`
+
+#### `CreateProfileRequest.java`
+
+作用：
+
+- 创建模板请求体。
+
+主要字段：
+
+- `solverId`
+- `profileCode`
+- `taskType`
+- `profileName`
+- `uploadMode`
+- `commandTemplate`
+- `paramsSchema`
+- `paramsSchemaJson`
+- `parserName`
+- `timeoutSeconds`
+- `enabled`
+- `description`
+
+注意点：
+
+- `paramsSchema` 和 `paramsSchemaJson` 同时存在。
+- 当前实现会优先使用 `paramsSchema`，否则回退到 `paramsSchemaJson`。
+
+#### `UpdateProfileRequest.java`
+
+作用：
+
+- 更新模板请求体。
+
+主要字段与创建类似，但不包含 `solverId`、`profileCode`、`enabled`。
+
+#### `UpdateProfileStatusRequest.java`
+
+作用：
+
+- 更新模板启停状态请求体。
+
+核心字段：
+
+- `enabled`
+
+#### `CreateFileRuleRequest.java`
+
+作用：
+
+- 创建模板文件规则请求体。
+
+主要字段：
+
+- `fileKey`
+- `pathPattern`
+- `fileNamePattern`
+- `fileType`
+- `requiredFlag`
+- `sortOrder`
+- `description`
+- `remark`
+- `ruleJson`
+
+注意点：
+
+- 同样存在 `description` 和 `remark` 两个兼容字段。
+
+#### `UpdateFileRuleRequest.java`
+
+作用：
+
+- 更新文件规则请求体。
+
+字段与创建类似，但不包含 `fileKey`。
+
+#### `SolverPageQueryRequest.java`
+
+作用：
+
+- 求解器分页查询条件对象。
+
+主要字段：
+
+- `pageNum`
+- `pageSize`
+- `solverCode`
+- `solverName`
+- `enabled`
+
+#### `ProfilePageQueryRequest.java`
+
+作用：
+
+- 模板分页查询条件对象。
+
+主要字段：
+
+- `pageNum`
+- `pageSize`
+- `solverId`
+- `taskType`
+- `profileCode`
+- `enabled`
+
+---
+
+### 9.5 响应对象目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/interfaces/response/
+```
+
+这一层的类主要承载对外或对内返回结构。
+
+#### `SolverListItemResponse.java`
+
+作用：
+
+- 求解器分页列表中的单条记录。
+
+#### `SolverDetailResponse.java`
+
+作用：
+
+- 求解器详情返回对象，包含执行模式、执行路径、启停状态、描述等。
+
+说明：
+
+- 当前同时包含 `description` 和 `remark` 风格字段。
+
+#### `SolverCreateResponse.java`
+
+作用：
+
+- 创建求解器后的最小结果对象。
+
+#### `ProfileListItemResponse.java`
+
+作用：
+
+- 模板分页列表中的单条记录。
+
+包含：
+
+- 模板标识
+- 所属求解器
+- 任务类型
+- 上传模式
+- 命令模板
+- 参数模式
+- 解析器
+- 超时时间
+- 启停状态
+
+#### `ProfileDetailResponse.java`
+
+作用：
+
+- 模板详情对象。
+
+特点：
+
+- 包含 `fileRules` 字段，表示模板详情会一并带出文件规则列表。
+
+#### `ProfileCreateResponse.java`
+
+作用：
+
+- 创建模板后的返回对象。
+
+#### `FileRuleResponse.java`
+
+作用：
+
+- 文件规则详情/列表返回对象。
+
+特点：
+
+- 同时存在 `id` 和 `ruleId`
+- 同时存在 `description` 和 `remark`
+
+这属于接口兼容式冗余字段设计。
+
+#### `FileRuleCreateResponse.java`
+
+作用：
+
+- 创建文件规则后的返回对象。
+
+#### `SolverTaskOptionResponse.java`
+
+作用：
+
+- 面向任务创建阶段的模板选项返回对象。
+
+只保留：
+
+- `profileId`
+- `taskType`
+- `profileName`
+
+#### `UploadSpecResponse.java`
+
+作用：
+
+- 模板上传规范返回对象。
+
+这是 `solver-service` 中最重要的响应结构之一，主要给前端和 `task-service` 使用。
+
+包含：
+
+- 模板基本信息
+- 参数模式
+- 上传模式
+- 文件规则总表
+- 必选文件列表
+- 可选文件列表
+- `ArchiveRule` 压缩包规范
+
+#### `InternalProfileDetailResponse.java`
+
+作用：
+
+- 内部模板详情返回对象。
+
+用途：
+
+- 主要供 `task-service` 做模板校验和任务准备时使用。
+
+---
+
+## 10. 应用层
+
+### 10.1 对应文件夹
+
+```text
+solver-service/src/main/java/com/example/cae/solver/application/
+```
+
+该层分为：
+
+- `assembler/`
+- `facade/`
+- `service/`
+
+---
+
+### 10.2 Assembler 目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/application/assembler/
+```
+
+#### `SolverAssembler.java`
+
+作用：
+
+- 在 `CreateSolverRequest`、`SolverDefinition`、`SolverDefinitionPO`、求解器响应对象之间做转换。
+
+关键方法：
+
+- `toSolver(...)`
+- `toListItemResponse(...)`
+- `toDetailResponse(...)`
+- `toCreateResponse(...)`
+- `fromPO(...)`
+- `toPO(...)`
+
+实现细节：
+
+- `resolveDescription(...)` 会优先取 `description`，回退到 `remark`，最终都落到领域对象的 `remark` 字段。
+
+#### `ProfileAssembler.java`
+
+作用：
+
+- 在模板请求、模板领域对象、模板 PO、模板响应之间做转换。
+
+关键方法：
+
+- `toProfile(...)`
+- `toListItemResponse(...)`
+- `toDetailResponse(...)`
+- `toCreateResponse(...)`
+- `toTaskOptionResponse(...)`
+- `fromPO(...)`
+- `toPO(...)`
+
+实现细节：
+
+- `resolveParamsSchema(...)` 会把 `paramsSchema` / `paramsSchemaJson` 统一落到领域对象的 `paramsSchemaJson` 字段中。
+
+#### `FileRuleAssembler.java`
+
+作用：
+
+- 在文件规则请求、领域对象、PO、响应对象之间做转换。
+
+关键方法：
+
+- `toRule(...)`
+- `toResponse(...)`
+- `toCreateResponse(...)`
+- `fromPO(...)`
+- `toPO(...)`
+
+实现细节：
+
+- 也有 `description` / `remark` 的兼容合并逻辑。
+
+---
+
+### 10.3 Facade 目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/application/facade/
+```
+
+#### `SolverFacade.java`
+
+作用：
+
+- 对求解器相关应用服务做薄封装。
+
+当前方法：
+
+- `pageSolvers(...)`
+- `getSolverDetail(...)`
+- `createSolver(...)`
+- `updateSolver(...)`
+- `updateSolverStatus(...)`
+- `getSolverTaskOptions(...)`
+- `getSolverProfiles(...)`
+
+#### `ProfileFacade.java`
+
+作用：
+
+- 对模板、文件规则、上传规范相关能力做统一封装。
+
+当前方法：
+
+- `pageProfiles(...)`
+- `getProfileDetail(...)`
+- `createProfile(...)`
+- `updateProfile(...)`
+- `updateProfileStatus(...)`
+- `getFileRules(...)`
+- `buildUploadSpec(...)`
+- `createFileRule(...)`
+- `updateFileRule(...)`
+- `deleteFileRule(...)`
+
+说明：
+
+- 这是当前 `solver-service` 里最像“模板域入口”的类。
+
+---
+
+### 10.4 应用服务目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/application/service/
+```
+
+#### `SolverAppService.java`
+
+作用：
+
+- 编排“求解器定义”相关主流程。
+
+当前主要方法：
+
+- `pageSolvers(...)`
+- `getSolverDetail(...)`
+- `createSolver(...)`
+- `updateSolver(...)`
+- `updateSolverStatus(...)`
+- `getSolverTaskOptions(...)`
+- `getSolverProfiles(...)`
+
+关键行为：
+
+- 创建求解器时先做 `solverCode` 唯一性校验。
+- 默认启用，除非请求明确传 `enabled = 0`。
+- 查询任务选项时，实际取的是该求解器下启用状态的模板。
+
+实现细节：
+
+- `updateSolver(...)` 中若 `description` 非空，则优先写入描述；否则才用 `remark`。
+
+#### `ProfileAppService.java`
+
+作用：
+
+- 编排“模板”相关主流程。
+
+当前主要方法：
+
+- `pageProfiles(...)`
+- `getProfileDetail(...)`
+- `createProfile(...)`
+- `updateProfile(...)`
+- `updateProfileStatus(...)`
+- `getFileRules(...)`
+
+关键行为：
+
+- 创建模板前先校验对应求解器存在且已启用。
+- 同一求解器下的 `profileCode` 必须唯一。
+- 获取模板详情时，会把文件规则列表一并组装进去。
+
+实现细节：
+
+- `updateProfile(...)` 会把 `paramsSchema` 或 `paramsSchemaJson` 统一写入 `paramsSchemaJson`。
+
+#### `FileRuleAppService.java`
+
+作用：
+
+- 编排“模板文件规则”相关流程。
+
+当前主要方法：
+
+- `createFileRule(...)`
+- `updateFileRule(...)`
+- `deleteFileRule(...)`
+
+关键行为：
+
+- 创建规则前校验模板存在。
+- 调用 `ProfileRuleValidator` 做基础字段检查。
+- 调用 `ProfileRuleDomainService.checkRuleConflict` 防止同一模板下 `fileKey` 冲突。
+
+需要注意：
+
+- `deleteFileRule(...)` 当前直接按 ID 删除，没有先做存在性校验。
+
+#### `UploadSpecAppService.java`
+
+作用：
+
+- 为指定模板生成上传规范。
+
+当前主要方法：
+
+- `buildUploadSpec(Long profileId)`
+
+关键流程：
+
+1. 查询模板。
+2. 校验模板已启用。
+3. 查询该模板全部文件规则。
+4. 调用 `UploadSpecBuilder.build(...)` 组装上传规范。
+
+---
+
+## 11. 领域层
+
+### 11.1 对应文件夹
+
+```text
+solver-service/src/main/java/com/example/cae/solver/domain/
+```
+
+该层包含：
+
+- `enums/`
+- `model/`
+- `repository/`
+- `service/`
+
+---
+
+### 11.2 枚举目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/domain/enums/
+```
+
+#### `RuleFileTypeEnum.java`
+
+作用：
+
+- 定义文件规则类型枚举：
+  - `FILE`
+  - `DIR`
+  - `ZIP`
+
+当前状态：
+
+- 已定义，但当前请求校验并没有严格按枚举值校验。
+
+#### `SolverExecModeEnum.java`
+
+作用：
+
+- 定义求解器执行模式枚举：
+  - `LOCAL`
+  - `CONTAINER`
+
+当前状态：
+
+- 已定义，但当前请求侧也没有做强约束。
+
+---
+
+### 11.3 领域模型目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/domain/model/
+```
+
+#### `SolverDefinition.java`
+
+作用：
+
+- 表达求解器定义领域对象。
+
+主要字段：
+
+- `id`
+- `solverCode`
+- `solverName`
+- `version`
+- `execMode`
+- `execPath`
+- `enabled`
+- `remark`
+
+领域行为：
+
+- `enable()`
+- `disable()`
+- `isEnabled()`
+
+#### `SolverTaskProfile.java`
+
+作用：
+
+- 表达模板领域对象。
+
+主要字段：
+
+- `id`
+- `solverId`
 - `profileCode`
 - `taskType`
 - `profileName`
@@ -274,17 +1071,26 @@ solver-service/
 - `paramsSchemaJson`
 - `parserName`
 - `timeoutSeconds`
+- `enabled`
+- `description`
 
-#### `SolverProfileFileRule`
+领域行为：
 
-职责：
+- `enable()`
+- `disable()`
+- `isEnabled()`
+- `changeTimeout(...)`
 
-- 表达模板关联的文件规则
-- 区分是否必需
-- 提供基于模式的文件名匹配能力
+#### `SolverProfileFileRule.java`
 
-当前核心字段包括：
+作用：
 
+- 表达模板文件规则领域对象。
+
+主要字段：
+
+- `id`
+- `profileId`
 - `fileKey`
 - `pathPattern`
 - `fileNamePattern`
@@ -292,406 +1098,562 @@ solver-service/
 - `requiredFlag`
 - `sortOrder`
 - `ruleJson`
+- `remark`
 
-#### `SolverRepository / ProfileRepository / FileRuleRepository`
+领域行为：
 
-职责：
+- `isRequired()`
+- `matches(String fileName)`
 
-- 定义求解器、模板、文件规则的数据访问抽象
+说明：
 
-#### `SolverDomainService`
+- `matches(...)` 当前只基于 `fileNamePattern` 做简单通配匹配。
 
-职责：
+---
 
-- 维护求解器领域规则
-- 当前主要用于校验 `solverCode` 唯一性
+### 11.4 仓储抽象目录
 
-#### `ProfileRuleDomainService`
-
-职责：
-
-- 维护模板与文件规则相关领域规则
-- 校验模板编码唯一性
-- 校验模板是否启用
-- 校验文件规则是否冲突
-
-它是当前模板规则域的核心领域服务。
-
-### 4.5 基础设施层
-
-#### `SolverDefinitionMapper`
-
-职责：
-
-- 操作 `solver_definition` 相关数据
-- 提供求解器查询、分页、计数、插入、更新能力
-
-#### `SolverTaskProfileMapper`
-
-职责：
-
-- 操作 `solver_task_profile` 相关数据
-- 提供模板查询、分页、按求解器查询、按启用状态查询等能力
-
-#### `SolverProfileFileRuleMapper`
-
-职责：
-
-- 操作 `solver_profile_file_rule` 相关数据
-- 提供文件规则查询、插入、更新、删除能力
-
-#### `SolverRepositoryImpl / ProfileRepositoryImpl / FileRuleRepositoryImpl`
-
-职责：
-
-- 将领域仓储接口落地为数据库实现
-- 完成 `PO <-> Domain` 转换
-
-#### `UploadSpecBuilder`
-
-职责：
-
-- 将模板与文件规则组装为统一上传规范
-- 输出 `requiredFiles / optionalFiles / fileRules`
-- 构造归档上传规则 `archiveRule`
-
-这是当前实现里非常关键的“规则翻译层”。
-
-#### `ProfileRuleValidator`
-
-职责：
-
-- 做文件规则创建与更新时的基础字段校验
-
-它与领域服务分工不同：
-
-- `ProfileRuleValidator` 负责请求参数完整性；
-- `ProfileRuleDomainService` 负责业务语义冲突。
-
-### 4.6 组装层
-
-#### `SolverAssembler`
-
-职责：
-
-- 负责求解器领域对象和响应对象之间的转换
-
-#### `ProfileAssembler`
-
-职责：
-
-- 负责模板领域对象和响应对象之间的转换
-
-#### `FileRuleAssembler`
-
-职责：
-
-- 负责文件规则领域对象和响应对象之间的转换
-
-这些 Assembler 让控制器与仓储都不直接操作复杂 DTO 细节。
-
-## 5. 核心业务流程
-
-### 5.1 求解器管理流程
+对应文件夹：
 
 ```text
-SolverController
-  -> SolverFacade
-  -> SolverAppService
-  -> SolverDomainService
-  -> SolverRepository
-  -> Response
+solver-service/src/main/java/com/example/cae/solver/domain/repository/
 ```
 
-### 5.2 模板管理流程
+#### `SolverRepository.java`
+
+作用：
+
+- 定义求解器仓储抽象。
+
+主要方法：
+
+- `findById(...)`
+- `findBySolverCode(...)`
+- `save(...)`
+- `update(...)`
+- `page(...)`
+- `count(...)`
+
+#### `ProfileRepository.java`
+
+作用：
+
+- 定义模板仓储抽象。
+
+主要方法：
+
+- `findById(...)`
+- `findBySolverIdAndProfileCode(...)`
+- `save(...)`
+- `update(...)`
+- `page(...)`
+- `count(...)`
+- `listEnabledBySolverId(...)`
+- `listBySolverId(...)`
+
+#### `FileRuleRepository.java`
+
+作用：
+
+- 定义文件规则仓储抽象。
+
+主要方法：
+
+- `findById(...)`
+- `save(...)`
+- `update(...)`
+- `delete(...)`
+- `listByProfileId(...)`
+
+---
+
+### 11.5 领域服务目录
+
+对应文件夹：
 
 ```text
-ProfileController
-  -> ProfileFacade
-  -> ProfileAppService
-  -> SolverRepository / ProfileRepository / FileRuleRepository
-  -> Response
+solver-service/src/main/java/com/example/cae/solver/domain/service/
 ```
 
-### 5.3 文件规则管理流程
+#### `SolverDomainService.java`
+
+作用：
+
+- 承载求解器领域规则。
+
+当前规则：
+
+- `solverCode` 不能为空
+- `solverCode` 必须唯一
+
+主要方法：
+
+- `checkSolverCodeUnique(String solverCode)`
+
+#### `ProfileRuleDomainService.java`
+
+作用：
+
+- 承载模板和文件规则相关领域规则。
+
+当前主要方法：
+
+- `buildUploadSpec(...)`
+- `checkProfileCodeUnique(...)`
+- `checkProfileEnabled(...)`
+- `checkRuleConflict(...)`
+
+实际使用情况：
+
+- `checkProfileCodeUnique(...)`、`checkProfileEnabled(...)`、`checkRuleConflict(...)` 正在被应用层使用。
+- `buildUploadSpec(...)` 当前并没有成为上传规范主构造入口，真正负责组装的是 `UploadSpecBuilder`。
+
+这一点在文档里建议写清楚，避免把它写成“当前上传规范就是由领域服务直接生成”。
+
+---
+
+## 12. 基础设施层
+
+### 12.1 对应文件夹
 
 ```text
-FileRuleController
-  -> ProfileFacade
-  -> FileRuleAppService
-  -> ProfileRuleValidator
-  -> ProfileRuleDomainService
-  -> FileRuleRepository
-  -> Response
+solver-service/src/main/java/com/example/cae/solver/infrastructure/
 ```
 
-### 5.4 上传规范生成流程
+它分为：
+
+- `persistence/`
+- `support/`
+
+---
+
+### 12.2 持久化目录
+
+对应文件夹：
 
 ```text
-ProfileController
-  -> ProfileFacade
-  -> UploadSpecAppService
-  -> ProfileRepository
-  -> FileRuleRepository
-  -> ProfileRuleDomainService.checkProfileEnabled
-  -> UploadSpecBuilder
-  -> UploadSpecResponse
+solver-service/src/main/java/com/example/cae/solver/infrastructure/persistence/
 ```
 
-### 5.5 内部模板查询流程
+#### 12.2.1 `entity/`
+
+对应文件夹：
 
 ```text
-task-service 等其他服务
-  -> /internal/profiles/{profileId}
-  -> InternalProfileController
-  -> ProfileFacade
-  -> ProfileAppService.getProfileDetail
-  -> ProfileFacade.getFileRules
-  -> InternalProfileDetailResponse
+solver-service/src/main/java/com/example/cae/solver/infrastructure/persistence/entity/
 ```
 
-这条链路在当前系统中非常重要，因为任务校验就是建立在模板元数据之上的。
+##### `SolverDefinitionPO.java`
 
-## 6. 核心设计
+作用：
 
-### 6.1 设计一：把求解器配置、模板配置和文件规则集中到一个服务
+- `solver_definition` 表的持久化对象。
 
-当前系统没有把“求解器中心”“模板中心”“规则中心”再拆成多个服务，而是统一放在 `solver-service` 中。
+##### `SolverTaskProfilePO.java`
 
-这样做的原因是：
+作用：
 
-- 它们本身强相关，天然属于同一配置域；
-- 拆太细会增加跨服务通信复杂度；
-- 对本科毕设原型平台来说，集中管理更利于实现和讲解。
+- `solver_task_profile` 表的持久化对象。
 
-### 6.2 设计二：模板是连接求解器和任务的核心对象
+##### `SolverProfileFileRulePO.java`
 
-在当前架构中，真正连接“求解器”和“任务”的不是求解器本身，而是模板 `SolverTaskProfile`。
+作用：
 
-模板承载了以下关键内容：
+- `solver_profile_file_rule` 表的持久化对象。
 
-- 任务类型
-- 上传模式
-- 参数模式
-- 命令模板
-- 结果解析器
-- 超时时间
+#### 12.2.2 `mapper/`
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/infrastructure/persistence/mapper/
+```
+
+##### `SolverDefinitionMapper.java`
+
+作用：
+
+- 负责 `solver_definition` 表的查询、插入、更新和分页。
+
+主要方法：
+
+- `selectById(...)`
+- `selectBySolverCode(...)`
+- `insert(...)`
+- `updateById(...)`
+- `selectPage(...)`
+- `count(...)`
+
+实现细节：
+
+- 数据库中的 `description` 字段被映射到 PO 的 `remark` 字段。
+
+##### `SolverTaskProfileMapper.java`
+
+作用：
+
+- 负责 `solver_task_profile` 表的查询、插入、更新和分页。
+
+主要方法：
+
+- `selectById(...)`
+- `selectBySolverIdAndProfileCode(...)`
+- `insert(...)`
+- `updateById(...)`
+- `selectPage(...)`
+- `count(...)`
+- `selectEnabledBySolverId(...)`
+- `selectBySolverId(...)`
+
+##### `SolverProfileFileRuleMapper.java`
+
+作用：
+
+- 负责 `solver_profile_file_rule` 表的查询、插入、更新、删除和按模板列表查询。
+
+主要方法：
+
+- `selectById(...)`
+- `insert(...)`
+- `updateById(...)`
+- `deleteById(...)`
+- `selectByProfileId(...)`
+
+#### 12.2.3 `repository/`
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/infrastructure/persistence/repository/
+```
+
+##### `SolverRepositoryImpl.java`
+
+作用：
+
+- `SolverRepository` 的数据库实现。
+
+职责：
+
+- 调用 `SolverDefinitionMapper`
+- 使用 `SolverAssembler` 做领域对象与 PO 转换
+- 实现分页、保存、更新、按编码/按 ID 查询
+
+##### `ProfileRepositoryImpl.java`
+
+作用：
+
+- `ProfileRepository` 的数据库实现。
+
+职责：
+
+- 调用 `SolverTaskProfileMapper`
+- 使用 `ProfileAssembler` 做转换
+- 实现分页、保存、更新、按编码查询、按求解器列出模板
+
+##### `FileRuleRepositoryImpl.java`
+
+作用：
+
+- `FileRuleRepository` 的数据库实现。
+
+职责：
+
+- 调用 `SolverProfileFileRuleMapper`
+- 使用 `FileRuleAssembler` 做转换
+- 实现规则查询、保存、更新、删除、按模板列出
+
+---
+
+### 12.3 基础设施辅助目录
+
+对应文件夹：
+
+```text
+solver-service/src/main/java/com/example/cae/solver/infrastructure/support/
+```
+
+#### `ProfileRuleValidator.java`
+
+作用：
+
+- 做文件规则创建/修改时的基础字段校验。
+
+当前方法：
+
+- `validateCreateRule(...)`
+- `validateUpdateRule(...)`
+
+特点：
+
+- 它不依赖 Bean Validation 注解结果，而是做一层手工补充校验。
+
+#### `UploadSpecBuilder.java`
+
+作用：
+
+- 真正负责把“模板 + 文件规则”组装成上传规范对象。
+
+关键行为：
+
+- 复制模板基本信息
+- 生成 `requiredFiles`
+- 生成 `optionalFiles`
+- 合并生成 `fileRules`
+- 构造 `ArchiveRule`
+
+非常关键的实现细节：
+
+- 当前压缩包规范固定为：
+  - `fileKey = input_archive`
+  - `allowSuffix = ["zip"]`
+  - `maxSizeMb = 2048`
 
 这意味着：
 
-- 新增求解器时，不只是新增一条求解器记录；
-- 真正让任务可创建、可校验、可执行的是模板。
+- 上传规范中的压缩包大小限制当前是写死在代码里的，不是动态配置。
 
-### 6.3 设计三：文件规则围绕模板管理
+#### `CommandTemplateResolver.java`
 
-文件规则不直接挂在求解器上，而是挂在模板上。
+作用：
 
-这样设计的原因是：
+- 用于把命令模板中的 `${key}` 占位符替换成实际参数值。
 
-- 同一个求解器可能对应多种任务类型；
-- 不同任务类型对输入文件要求可能完全不同；
-- 文件规则必须随着模板粒度变化，而不是随着求解器粒度变化。
+当前状态：
 
-### 6.4 设计四：上传规范由后端统一生成
+- 逻辑已实现。
+- 但当前模块内没有发现它被主流程直接调用。
 
-当前系统不是让前端硬编码上传要求，而是由后端根据模板和规则动态生成 `UploadSpecResponse`。
+所以更准确的说法是：
 
-这样做的好处是：
+- “已具备命令模板解析工具类”
+- 不是“执行流程已经全面接入命令模板解析”
 
-- 前端只负责展示，不负责维护规则逻辑；
-- 规则变更后，前端无需同步改代码；
-- `task-service` 也可以复用同一套模板规则做校验。
+---
 
-### 6.5 设计五：对其他服务暴露内部查询接口，而不是共享数据库
+## 13. 支撑层
 
-当前 `solver-service` 提供：
+### 13.1 对应文件夹
 
-- `/internal/solvers/{solverId}`
-- `/internal/profiles/{profileId}`
+```text
+solver-service/src/main/java/com/example/cae/solver/support/
+```
 
-用于向其他服务暴露元数据。
+### 13.2 文件说明
 
-这符合微服务架构中“服务拥有数据，其他服务通过接口访问”的原则。
+#### `SolverQueryBuilder.java`
 
-## 7. 架构难点与解决方案
+作用：
 
-### 7.1 难点一：如何让平台具备“新增求解器尽量少改代码”的能力
+- 当前是一个空的 `@Component`。
 
-问题：
+现状判断：
 
-- 如果每增加一个求解器都要改任务服务、调度服务、节点执行逻辑，扩展成本会很高。
+- 从命名上看，原本预期用于封装求解器查询条件构造逻辑。
+- 但当前分页 SQL 直接写在 Mapper 中，因此它仍是预留类。
 
-当前解决方案：
+---
 
-- 将求解器定义、模板、文件规则集中到 `solver-service`；
-- 通过模板字段描述执行方式与输入要求；
-- 让任务服务更多依赖模板元数据，而不是写死求解器逻辑。
+## 14. 与数据库表的对应关系
 
-这正是当前系统可扩展性的核心设计。
+结合数据库设计，`solver-service` 当前主要对应 3 张表：
 
-### 7.2 难点二：如何统一前端上传引导与后端校验依据
+### 14.1 `solver_definition`
 
-问题：
+主要对应代码：
 
-- 如果前端显示的上传说明和后端校验逻辑来自两套规则，很容易不一致。
+- `domain/model/SolverDefinition.java`
+- `infrastructure/persistence/entity/SolverDefinitionPO.java`
+- `infrastructure/persistence/mapper/SolverDefinitionMapper.java`
+- `infrastructure/persistence/repository/SolverRepositoryImpl.java`
 
-当前解决方案：
+### 14.2 `solver_task_profile`
 
-- 由 `solver-service` 统一生成 `UploadSpecResponse`；
-- 规则源头统一来自模板和文件规则表。
+主要对应代码：
 
-这样前端展示和后端校验至少具备同源基础。
+- `domain/model/SolverTaskProfile.java`
+- `infrastructure/persistence/entity/SolverTaskProfilePO.java`
+- `infrastructure/persistence/mapper/SolverTaskProfileMapper.java`
+- `infrastructure/persistence/repository/ProfileRepositoryImpl.java`
 
-### 7.3 难点三：如何在规则灵活性和实现复杂度之间平衡
+### 14.3 `solver_profile_file_rule`
 
-问题：
+主要对应代码：
 
-- 文件规则如果做得过于复杂，会引入规则引擎级别的实现成本；
-- 如果太简单，又难以表达不同模板的差异。
+- `domain/model/SolverProfileFileRule.java`
+- `infrastructure/persistence/entity/SolverProfileFileRulePO.java`
+- `infrastructure/persistence/mapper/SolverProfileFileRuleMapper.java`
+- `infrastructure/persistence/repository/FileRuleRepositoryImpl.java`
 
-当前解决方案：
+---
 
-- 规则层先采用 `fileKey / pathPattern / fileNamePattern / fileType / requiredFlag / sortOrder / ruleJson` 这样的轻量模型；
-- 用 `ruleJson` 预留后续扩展空间；
-- 当前主流程只做基础合法性检查与冲突检查。
+## 15. 核心调用链
 
-### 7.4 难点四：如何处理模板启停与规则生效范围
+### 15.1 求解器创建流程
 
-问题：
+```text
+SolverController.createSolver
+  -> SolverFacade.createSolver
+  -> SolverAppService.createSolver
+  -> SolverDomainService.checkSolverCodeUnique
+  -> SolverAssembler.toSolver
+  -> SolverRepository.save
+  -> SolverRepositoryImpl
+  -> SolverDefinitionMapper.insert
+  -> SolverAssembler.toCreateResponse
+```
 
-- 已存在的模板可能暂时不希望继续用于新任务创建；
-- 但历史任务记录仍然需要保留原模板信息。
+### 15.2 模板创建流程
 
-当前解决方案：
+```text
+ProfileController.createProfile
+  -> ProfileFacade.createProfile
+  -> ProfileAppService.createProfile
+  -> SolverRepository.findById
+  -> SolverDefinition.isEnabled
+  -> ProfileRuleDomainService.checkProfileCodeUnique
+  -> ProfileAssembler.toProfile
+  -> ProfileRepository.save
+  -> SolverTaskProfileMapper.insert
+  -> ProfileAssembler.toCreateResponse
+```
+
+### 15.3 文件规则创建流程
+
+```text
+FileRuleController.createFileRule
+  -> ProfileFacade.createFileRule
+  -> FileRuleAppService.createFileRule
+  -> ProfileRepository.findById
+  -> ProfileRuleValidator.validateCreateRule
+  -> FileRuleAssembler.toRule
+  -> ProfileRuleDomainService.checkRuleConflict
+  -> FileRuleRepository.save
+  -> SolverProfileFileRuleMapper.insert
+  -> FileRuleAssembler.toCreateResponse
+```
+
+### 15.4 上传规范生成流程
+
+```text
+ProfileController.getUploadSpec
+  -> ProfileFacade.buildUploadSpec
+  -> UploadSpecAppService.buildUploadSpec
+  -> ProfileRepository.findById
+  -> ProfileRuleDomainService.checkProfileEnabled
+  -> FileRuleRepository.listByProfileId
+  -> UploadSpecBuilder.build
+  -> UploadSpecResponse
+```
+
+### 15.5 模板内部详情查询流程
+
+```text
+InternalProfileController.getProfileDetail
+  -> ProfileFacade.getProfileDetail
+  -> ProfileAppService.getProfileDetail
+  -> ProfileRepository.findById
+  -> FileRuleRepository.listByProfileId
+  -> ProfileDetailResponse
+  -> 再次通过 ProfileFacade.getFileRules
+  -> 手动组装 InternalProfileDetailResponse
+```
 
-- 模板保留 `enabled` 状态；
-- 通过 `checkProfileEnabled()` 控制上传规范获取与任务选项查询；
-- 历史数据仍可通过详情接口查询。
+---
 
-这是一种典型的“软停用”策略。
+## 16. 设计文档与当前实现的对照
 
-## 8. 关键技术手段
+### 16.1 已经较好落地的部分
 
-### 8.1 分层架构
+- 求解器定义管理已经实现。
+- 模板管理已经实现。
+- 模板文件规则管理已经实现。
+- 上传规范生成已经实现。
+- 内部模板/求解器查询接口已经实现。
+- 求解器、模板、文件规则三层模型已经分开。
 
-通过 `controller / facade / service / domain / repository` 分层，清晰表达：
+### 16.2 当前是“简化实现”或“兼容式实现”的部分
 
-- 接口暴露
-- 流程编排
-- 领域规则
-- 数据访问
+- `description` / `remark` 双字段并存，本质上是兼容式入参与返回设计。
+- `paramsSchema` / `paramsSchemaJson` 双字段并存，也是兼容式设计。
+- 状态更新接口同时支持 `PUT` 和 `POST`。
+- 多个响应对象同时返回 `id` 和 `solverId/profileId/ruleId`。
 
-### 8.2 MyBatis 注解 SQL
+### 16.3 当前是“预留/未完全接入”的部分
 
-用于实现：
+- `MybatisPlusConfig.java`
+- `SolverServiceConfig.java` 中的扩展配置能力
+- `SolverQueryBuilder.java`
+- `CommandTemplateResolver.java` 在主执行链路中的接入
+- `ProfileRuleDomainService.buildUploadSpec(...)` 的实际使用
 
-- 求解器分页
-- 模板分页
-- 文件规则查询
-- 各类按条件查询
+### 16.4 当前代码中值得在论文里说明的实现细节
 
-注解 SQL 对当前原型项目来说足够轻量，易于维护。
+- 上传压缩包规范中的 `maxSizeMb = 2048` 当前写死在 `UploadSpecBuilder`。
+- 枚举 `RuleFileTypeEnum` 和 `SolverExecModeEnum` 已定义，但请求侧没有强制按枚举校验。
+- `FileRuleAppService.deleteFileRule(...)` 当前不先查存在性。
+- `InternalSolverController` 直接复用外部 `SolverDetailResponse`。
+- `InternalProfileController` 会二次调用 Facade 获取文件规则并手动组装内部 DTO。
 
-### 8.3 模板参数模式 `paramsSchemaJson`
+---
 
-通过 `paramsSchemaJson` 字段表达模板参数结构，使：
+## 17. 推荐的阅读顺序
 
-- 前端可动态生成参数表单
-- 后端可基于模式做参数校验
+如果是第一次看 `solver-service`，建议按下面顺序：
 
-这是一种典型的配置驱动设计手段。
+### 17.1 先看接口定义
 
-### 8.4 命令模板 `commandTemplate`
+1. `interfaces/controller/SolverController.java`
+2. `interfaces/controller/ProfileController.java`
+3. `interfaces/controller/FileRuleController.java`
+4. `interfaces/internal/InternalProfileController.java`
+5. `interfaces/internal/InternalSolverController.java`
 
-通过模板记录命令模板，而不是写死执行命令，为后续 `node-agent` 执行侧提供配置基础。
+### 17.2 再看主业务编排
 
-### 8.5 上传规范组装器 `UploadSpecBuilder`
+1. `application/facade/SolverFacade.java`
+2. `application/service/SolverAppService.java`
+3. `application/facade/ProfileFacade.java`
+4. `application/service/ProfileAppService.java`
+5. `application/service/FileRuleAppService.java`
+6. `application/service/UploadSpecAppService.java`
 
-用于：
+### 17.3 再看规则与模型
 
-- 把规则模型翻译成前端和任务服务可直接消费的响应结构
-- 按必填 / 非必填拆分文件列表
-- 增加归档上传规则
+1. `domain/model/SolverDefinition.java`
+2. `domain/model/SolverTaskProfile.java`
+3. `domain/model/SolverProfileFileRule.java`
+4. `domain/service/SolverDomainService.java`
+5. `domain/service/ProfileRuleDomainService.java`
 
-这是当前模块最有代表性的技术实现之一。
+### 17.4 最后看数据库实现
 
-## 9. 当前实现的优点
+1. `domain/repository/*`
+2. `infrastructure/persistence/repository/*`
+3. `infrastructure/persistence/mapper/*`
+4. `application/assembler/*`
 
-- 求解器、模板、文件规则三层模型已经建立清楚。
-- 已形成上传规范生成能力，不只是简单 CRUD。
-- 已对外暴露内部接口，能支撑任务服务校验链路。
-- 已将模板参数模式、命令模板、解析器、超时等关键执行元数据纳入模型。
-- 规则冲突检查、模板启用校验等核心领域规则已有落地。
+---
 
-## 10. 当前实现的局限与边界
+## 18. 当前结论
 
-### 10.1 仍是配置中心原型，不是完整规则引擎
+`solver-service` 当前已经形成了一个结构比较清晰的“求解器配置中心型服务”，它把求解器定义、模板定义、文件规则和上传规范四块能力拆分得比较明确，已经能够稳定支撑前端任务创建阶段和 `task-service` 的任务校验阶段。
 
-当前虽然有 `ruleJson` 和参数模式，但还没有演进成真正的规则引擎或可视化 DSL 平台。
+从代码结构看，它的分层比 `user-service` 稍复杂，但仍然比较规范：
 
-### 10.2 `execMode` 只是配置字段，尚未完全打通执行层
+- 接口层负责暴露求解器、模板、文件规则相关接口
+- 应用层负责业务编排与对象组装
+- 领域层负责表达模型与规则
+- 基础设施层负责数据库访问和上传规范辅助构建
 
-当前求解器与模板里已经有：
+从实现成熟度看，它属于：
 
-- `execMode`
-- `commandTemplate`
-- `parserName`
+- 元数据管理能力已基本完整
+- 与任务主链路的协作接口已形成
+- 规则校验和配置构造能力已可用
+- 部分工具类与配置类仍停留在预留阶段
 
-但 `execMode` 在整体项目中仍主要停留在配置层，尚未完全形成“本地进程执行 / 容器执行”两种完整运行模式。
+因此，在论文或设计文档里比较准确的表述应该是：
 
-### 10.3 上传规则仍以基础表达为主
+> `solver-service` 已实现平台求解器定义、任务模板、模板文件规则及上传规范生成等核心能力，作为平台中的规则与元数据中心，为前端任务创建和 task-service 模板校验提供统一配置来源；当前实现重点满足原型平台的可配置性与可扩展性需求，在执行模式约束、动态配置能力和部分工具类接入深度方面仍保留后续增强空间。
 
-当前规则主要覆盖：
-
-- 路径模式
-- 文件名模式
-- 文件类型
-- 是否必填
-- 排序
-
-更复杂的跨文件依赖、条件规则、版本兼容约束等尚未展开。
-
-### 10.4 参数模式当前主要作为透传元数据
-
-`paramsSchemaJson` 已经进入模板模型和上传规范响应，但更深层的参数模式驱动校验和前端自动表单能力，还需要其他模块配合才能完全体现。
-
-## 11. 对本科毕设的价值
-
-从本科毕设角度看，`solver-service` 的价值非常高，主要体现在：
-
-1. 它说明系统不是“写死流程”的任务平台，而是可扩展的多求解器平台。
-2. 它把新增求解器、模板和输入规则抽象成可配置模型，体现了良好的可扩展性设计。
-3. 它为任务创建、任务校验和节点执行提供统一元数据来源，是整个系统配置驱动思想的核心体现。
-
-因此，在答辩时，`solver-service` 是非常值得重点讲解的模块之一。
-
-## 12. 答辩时可采用的表述
-
-可以将该模块概括为：
-
-> `solver-service` 负责平台中求解器、任务模板与输入文件规则的统一管理，是系统的求解配置中心。系统通过模板化方式描述任务类型、参数模式、命令模板、结果解析器和输入规则，并由该服务动态生成上传规范，供前端引导用户上传、供任务服务执行校验，从而实现多求解器场景下的配置驱动扩展能力。
-
-## 13. 后续可扩展方向
-
-后续在不改变当前架构前提下，可继续扩展：
-
-- 更复杂的参数模式校验机制
-- 更细的文件规则语义
-- 规则可视化编辑能力
-- 真实的命令模板解析器
-- 模板版本化
-- 模板导入导出
-
-这些都应作为扩展能力，而不是当前首版已实现能力。
-
-## 14. 当前结论
-
-`solver-service` 当前已经完成了本科毕设原型平台所需的关键职责：
-
-- 可以统一管理求解器定义
-- 可以统一管理任务模板
-- 可以统一管理模板文件规则
-- 可以生成上传规范
-- 可以通过内部接口向任务服务提供模板元数据
-
-从系统价值看，它是当前平台实现“多求解器扩展能力”的核心模块；从实现深度看，它已经不是简单配置 CRUD，而是具备规则组织与元数据组装能力的配置中心原型。

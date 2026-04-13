@@ -1,683 +1,1532 @@
-# scheduler-service 模块分析文档
+# scheduler-service 模块说明文档
 
-## 1. 模块定位
+## 1. 文档目的
 
-`scheduler-service` 是平台中的任务调度与计算节点管理服务，负责把 `task-service` 中已经进入队列的任务分配到合适的计算节点，并持续维护节点在线状态、负载信息与求解器能力信息。
+这份文档延续 `user-service.md`、`solver-service.md`、`task-service.md` 的写法，不只说明“调度服务是做什么的”，还要把 `scheduler-service` 拆到“模块根目录 -> 分层目录 -> 具体代码文件”的粒度，便于下面几类工作直接定位：
 
-如果说 `task-service` 解决“任务生命周期如何流转”，那么 `scheduler-service` 解决的就是：
+- 写毕业论文中的模块设计说明时，能快速对应到真实代码目录；
+- 联调节点注册、心跳、调度、节点管理时，知道应该看哪个类；
+- 分析 `compute_node`、`node_solver_capability`、`schedule_record` 三张表时，知道各自落在哪个仓储与 Mapper；
+- 区分“设计文档中的目标能力”和“当前代码已经落地的能力”；
+- 后续继续改造调度策略、节点鉴权、失败补偿、多实例调度时，知道从哪里接着做。
 
-- 当前有哪些节点可用
-- 哪些节点支持某个求解器
-- 某个排队任务应派发到哪个节点
-- 节点掉线后如何补偿任务状态
-- 如何向平台提供节点与调度记录查询能力
+分析范围以 `scheduler-service/src/main/java` 与 `scheduler-service/src/main/resources` 为主，`target/` 这类编译产物不作为设计分析对象。
 
-因此，`scheduler-service` 在整个系统中扮演的是“资源感知型调度中心”和“节点状态中心”的角色。
+---
 
-## 2. 模块在系统中的作用
+## 2. 模块定位
 
-从系统协作关系看，`scheduler-service` 主要解决以下问题：
+`scheduler-service` 是整个平台中的“节点管理中心 + 调度编排中心”。
 
-1. 接收节点代理注册信息，建立节点主数据与求解器能力映射。
-2. 接收节点心跳，动态刷新节点状态、负载、运行并发数。
-3. 周期性扫描排队任务，执行节点筛选与调度分配。
-4. 调用 `node-agent` 下发任务，同时回写 `task-service` 的调度状态。
-5. 周期性检查长时间未心跳节点，并触发任务失败补偿。
-6. 对外提供节点查询、可用节点查询和调度记录查询能力。
-7. 对内提供节点 Token 校验、运行数调整和节点侧取消转发能力。
+它主要回答四类问题：
 
-它连接了 `task-service` 和 `node-agent`，是任务真正进入执行阶段前的关键枢纽。
+1. 当前有哪些计算节点接入平台，它们是否在线、是否启用、负载怎样；
+2. 每个节点支持哪些求解器能力，这些能力当前是否允许参与调度；
+3. 待调度任务应该被分配到哪个节点；
+4. 每次调度成功或失败时，系统如何留下可审计的调度记录。
 
-## 3. 当前实现架构
+从整个平台分工看：
 
-### 3.1 技术栈
+- `user-service` 负责“谁在使用系统”；
+- `solver-service` 负责“平台支持哪些求解器、模板和文件规则”；
+- `task-service` 负责“任务如何创建、校验、提交、流转、回传”；
+- `scheduler-service` 负责“任务应该派给哪个节点执行”；
+- `node-agent` 负责“节点如何真正执行任务并回传状态”。
 
-- Spring Boot
-- 分层架构：`interfaces / application / domain / infrastructure`
-- MyBatis Repository 持久化
-- `RestTemplate` 调用 `task-service` 和 `node-agent`
-- Spring 定时任务驱动调度轮询与离线检测
-- 策略模式封装调度算法
+所以，`scheduler-service` 不是一个简单 CRUD 服务，而是连接 `task-service` 和 `node-agent` 的控制面服务。
 
-### 3.2 当前目录结构
+---
 
-当前代码结构如下：
+## 3. 模块根目录与源码入口
+
+### 3.1 模块根目录
+
+模块根目录是：
 
 ```text
 scheduler-service/
-├─ src/main/java/com/example/cae/scheduler/
-│  ├─ SchedulerApplication.java
-│  ├─ config/
-│  │  ├─ SchedulerServiceConfig.java
-│  │  ├─ SchedulerRemoteServiceProperties.java
-│  │  ├─ SchedulingConfig.java
-│  │  └─ FeignClientConfig.java
-│  ├─ interfaces/
-│  │  ├─ controller/
-│  │  │  ├─ NodeController.java
-│  │  │  ├─ NodeAgentController.java
-│  │  │  └─ ScheduleController.java
-│  │  ├─ internal/
-│  │  │  ├─ NodeRegisterController.java
-│  │  │  ├─ NodeHeartbeatController.java
-│  │  │  └─ InternalSchedulerController.java
-│  │  ├─ request/
-│  │  └─ response/
-│  ├─ application/
-│  │  ├─ assembler/
-│  │  ├─ facade/
-│  │  ├─ manager/
-│  │  ├─ scheduler/
-│  │  └─ service/
-│  ├─ domain/
-│  │  ├─ enums/
-│  │  ├─ model/
-│  │  ├─ repository/
-│  │  ├─ service/
-│  │  └─ strategy/
-│  ├─ infrastructure/
-│  │  ├─ client/
-│  │  ├─ persistence/
-│  │  └─ support/
-│  └─ support/
-└─ src/main/resources/application.yml
 ```
 
-整体结构很清晰，围绕“节点管理”和“调度执行”两条主线展开。
+当前最重要的几个入口位置是：
 
-## 4. 各部分功能与职责
+- `scheduler-service/pom.xml`
+- `scheduler-service/src/main/java/com/example/cae/scheduler/`
+- `scheduler-service/src/main/resources/application.yml`
 
-### 4.1 接口层
+### 3.2 不需要作为设计分析重点的目录
 
-#### `NodeController`
+下面这些目录不属于源代码设计主体：
 
-负责平台侧节点管理接口，包括：
+```text
+scheduler-service/target/
+```
 
-- 节点分页查询
-- 节点详情查询
-- 启停节点
-- 启停节点上的某个求解器能力
-- 查询节点支持的求解器列表
+`target/` 是 Maven 编译产物，不应写进模块设计说明的“源码结构”部分。
 
-这部分主要面向前端管理端使用。
+---
 
-#### `NodeAgentController`
+## 4. 分层与文件夹映射
 
-负责面向节点代理的公开接口，包括：
+| 分层 | 对应文件夹 | 作用 |
+| --- | --- | --- |
+| 启动入口层 | `scheduler-service/src/main/java/com/example/cae/scheduler/` | Spring Boot 启动入口，开启定时调度 |
+| 配置层 | `scheduler-service/src/main/java/com/example/cae/scheduler/config/` | Spring Bean、远程地址、调度基础配置 |
+| 接口层 | `scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/` | 对外接口、内部接口、请求对象、响应对象 |
+| 应用层 | `scheduler-service/src/main/java/com/example/cae/scheduler/application/` | 调度编排、节点管理编排、Facade、Manager、定时任务 |
+| 领域层 | `scheduler-service/src/main/java/com/example/cae/scheduler/domain/` | 节点模型、能力模型、调度记录模型、规则与策略抽象 |
+| 基础设施层 | `scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/` | 数据持久化、远程调用、运行时支持组件 |
+| 支撑层 | `scheduler-service/src/main/java/com/example/cae/scheduler/support/` | 日志写入等预留的通用支撑组件 |
+| 资源配置层 | `scheduler-service/src/main/resources/` | 端口、数据库、远程服务地址等运行配置 |
 
-- 节点注册 `/api/node-agent/register`
-- 节点心跳 `/api/node-agent/heartbeat`
+如果只想快速定位代码，可以这样记：
 
-这是“节点动态状态”的起点。当前节点并不是靠人工静态维护，而是由节点代理主动注册并持续发送心跳来驱动状态刷新。
+- 看管理端和节点端接口：`interfaces/controller`
+- 看服务间内部接口：`interfaces/internal`
+- 看调度主流程：`application/scheduler`、`application/service`
+- 看节点注册和心跳：`application/service/NodeAppService`
+- 看选节点策略：`domain/strategy`
+- 看数据库表落地：`infrastructure/persistence`
+- 看对 `task-service` 和 `node-agent` 的调用：`infrastructure/client`
 
-#### `ScheduleController`
+---
 
-负责调度记录查询，包括：
+## 5. 模块级结构总览
 
-- 调度记录分页
-- 按任务查询调度记录
+当前源码结构如下：
 
-这让调度过程具备可追踪性，而不是仅在日志中体现。
+```text
+scheduler-service/
+├── src/main/java/com/example/cae/scheduler/
+│   ├── SchedulerApplication.java
+│   ├── config/
+│   │   ├── FeignClientConfig.java
+│   │   ├── SchedulerRemoteServiceProperties.java
+│   │   ├── SchedulerServiceConfig.java
+│   │   └── SchedulingConfig.java
+│   ├── interfaces/
+│   │   ├── controller/
+│   │   │   ├── NodeAgentController.java
+│   │   │   ├── NodeController.java
+│   │   │   └── ScheduleController.java
+│   │   ├── internal/
+│   │   │   ├── InternalSchedulerController.java
+│   │   │   ├── NodeHeartbeatController.java
+│   │   │   └── NodeRegisterController.java
+│   │   ├── request/
+│   │   └── response/
+│   ├── application/
+│   │   ├── assembler/
+│   │   ├── facade/
+│   │   ├── manager/
+│   │   ├── scheduler/
+│   │   └── service/
+│   ├── domain/
+│   │   ├── enums/
+│   │   ├── model/
+│   │   ├── repository/
+│   │   ├── service/
+│   │   └── strategy/
+│   ├── infrastructure/
+│   │   ├── client/
+│   │   │   └── impl/
+│   │   ├── persistence/
+│   │   │   ├── entity/
+│   │   │   ├── mapper/
+│   │   │   └── repository/
+│   │   └── support/
+│   └── support/
+│       └── ScheduleLogWriter.java
+└── src/main/resources/application.yml
+```
 
-#### `InternalSchedulerController`
+这个结构和调度服务的职责是匹配的。相对 `user-service` 这类偏标准管理服务，`scheduler-service` 明显多出：
 
-负责提供给其他服务的内部接口，包括：
+- `application/scheduler/`：定时调度和离线巡检；
+- `domain/strategy/`：调度策略抽象；
+- `infrastructure/client/`：与 `task-service`、`node-agent` 的双向调用；
+- `interfaces/internal/`：给内部服务调用的协作接口。
 
-- 查询某求解器的可用节点
-- 记录调度记录
-- 调整节点运行数
-- 转发取消任务到节点
-- 校验节点 Token
+---
 
-其中 `/internal/nodes/available` 还被 `task-service` 用于生成 `queueReason`，说明它不仅参与调度，也参与“排队原因解释”。
+## 6. 根目录文件说明
 
-#### `NodeRegisterController` 与 `NodeHeartbeatController`
+### 6.1 `scheduler-service/pom.xml`
 
-这两个控制器提供了更早期或更内部化的节点注册、心跳接口，体现出当前系统同时兼顾“节点代理直接接入”和“内部接口方式接入”的兼容思路。
+模块的 Maven 描述文件，作用包括：
 
-### 4.2 应用层
+- 声明当前模块是 `scheduler-service`；
+- 继承父工程 `cae-taskmanager-backend`；
+- 引入 `spring-boot-starter-web`；
+- 引入 `mybatis-plus-spring-boot3-starter`；
+- 引入 `mysql-connector-j`；
+- 引入共享模块 `common-lib`；
+- 配置 `spring-boot-maven-plugin` 打包为可运行 Jar。
 
-#### `NodeAppService`
+当前没有引入消息队列、服务发现、OpenFeign、分布式锁等依赖，这也直接反映了当前实现仍是“单实例轮询 + 同步 HTTP 调用”的基础版调度器。
 
-这是节点管理主服务，负责：
+### 6.2 `scheduler-service/src/main/resources/application.yml`
 
-- 注册新节点
-- 处理节点代理注册
-- 处理心跳
-- 更新节点启停状态
-- 更新节点求解器能力启停状态
-- 查询节点详情和能力列表
-- 标记节点离线
-- 查询在线节点和可用节点
-- 维护节点 `runningCount`
-- 生成和校验 `nodeToken`
+运行配置文件，主要定义：
 
-它是“节点状态中心”的核心实现。
+- 服务端口：默认 `8084`
+- 服务名：`scheduler-service`
+- 数据库连接：默认连接 `scheduler_db`
+- 远程任务服务地址：`cae.remote.task-base-url`
+- 节点代理访问协议：`cae.remote.node-agent-scheme`
 
-#### `ScheduleAppService`
+也就是说，调度器当前通过配置项直接拼接 `task-service` 和 `node-agent` 地址，而不是通过注册中心发现。
 
-这是调度主服务，负责：
+---
 
-- 执行调度算法选节点
-- 预占节点运行数
-- 记录调度成功与失败
-- 调用 `node-agent` 下发任务
-- 转发取消请求
-- 查询调度记录
+## 7. 启动入口层
 
-它是“调度中心”的核心实现。
+### 7.1 对应文件夹
 
-### 4.3 Manager 与 Facade 层
+启动入口层对应文件夹：
 
-#### `NodeManageManager` 与 `NodeFacade`
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/
+```
 
-负责对节点相关应用流程做进一步封装，让控制器保持更薄。这一层虽然不复杂，但使结构更规整，方便论文和答辩时表达分层设计。
+### 7.2 文件说明
 
-#### `TaskScheduleManager` 与 `ScheduleFacade`
+#### `SchedulerApplication.java`
 
-负责调度流程和调度记录查询的统一入口，屏蔽控制器对 `ScheduleAppService` 的直接依赖。
+这是调度服务的 Spring Boot 启动类，作用有两点：
 
-### 4.4 定时任务层
+- 启动整个 `scheduler-service`；
+- 通过 `@EnableScheduling` 开启 Spring 定时任务能力。
 
-#### `TaskScheduleJob`
+没有这个类，`TaskScheduleJob` 和 `NodeOfflineCheckJob` 都不会自动执行，所以它是调度主循环真正的启动入口。
 
-这是整个模块最关键的执行入口之一。它按固定周期执行：
+---
 
-1. 调用 `task-service` 拉取排队任务
-2. 根据调度策略选择节点
-3. 先在本地预占节点 `runningCount`
-4. 回写任务状态为 `SCHEDULED`
-5. 调用 `node-agent` 下发任务
-6. 成功后回写为 `DISPATCHED`
-7. 记录调度成功记录
-8. 如失败则释放节点预占并记录失败
+## 8. 配置层
 
-这说明当前项目的调度实现是“调度器主动轮询 + 同步派发”的模式。
+### 8.1 对应文件夹
 
-#### `NodeOfflineCheckJob`
+配置层对应文件夹：
 
-负责按固定周期执行节点离线检查。它会调用 `NodeHeartbeatChecker` 判断在线节点是否长时间没有心跳，若超时则：
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/config/
+```
 
-- 通知 `task-service` 将该节点影响的任务批量标记失败
-- 再将节点标记为离线
+### 8.2 文件说明
 
-这条链路是节点动态状态真正闭环的关键。
+#### `SchedulerServiceConfig.java`
 
-### 4.5 领域层
+作用：注册 `RestTemplate` Bean。
 
-#### `ComputeNode`
+当前调度服务所有跨服务调用都走这个 `RestTemplate`，包括：
 
-`ComputeNode` 是节点聚合根，承载了节点核心运行状态，包括：
+- 调 `task-service` 获取待调度任务；
+- 调 `task-service` 回写任务状态；
+- 调 `node-agent` 下发任务；
+- 调 `node-agent` 请求取消任务。
 
-- `status`
-- `enabled`
+这里还统一设置了：
+
+- 连接超时 `3000ms`
+- 读取超时 `10000ms`
+
+#### `SchedulerRemoteServiceProperties.java`
+
+作用：绑定远程服务配置项，前缀是 `cae.remote`。
+
+当前包含两个核心配置：
+
+- `taskBaseUrl`：`task-service` 基础地址
+- `nodeAgentScheme`：访问节点代理时默认使用的协议，如 `http`
+
+`NodeAgentClientStub` 和 `TaskClientStub` 都依赖它。
+
+#### `SchedulingConfig.java`
+
+作用：调度相关配置占位类。
+
+当前类是空实现，说明架构上预留了“集中放置调度器配置”的位置，但首版尚未放入线程池、策略切换、分布式锁等配置。
+
+#### `FeignClientConfig.java`
+
+作用：Feign 配置占位类。
+
+当前也是空实现。结合 `pom.xml` 可以看出，当前工程实际上并没有使用 OpenFeign，而是保留了将来切换到声明式远程调用的扩展点。
+
+---
+
+## 9. 接口层
+
+### 9.1 对应文件夹
+
+接口层对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/
+```
+
+它又分为四部分：
+
+- `controller/`：对外接口
+- `internal/`：内部服务接口
+- `request/`：请求对象
+- `response/`：响应对象
+
+### 9.2 对外控制器目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/controller/
+```
+
+#### `NodeController.java`
+
+管理员节点管理接口，对外暴露：
+
+- `GET /api/nodes`：分页查询节点
+- `GET /api/nodes/{nodeId}`：查看节点详情
+- `POST /api/nodes/{nodeId}/status`：启用/禁用节点
+- `POST /api/nodes/{nodeId}/solvers/{solverId}/status`：启用/禁用节点-求解器能力
+- `GET /api/nodes/{nodeId}/solvers`：查看节点支持的求解器能力
+
+这是“节点管理页面”最核心的控制器。
+
+#### `ScheduleController.java`
+
+调度记录查询接口，对外暴露：
+
+- `GET /api/schedules`：分页查询调度记录
+- `GET /api/tasks/{taskId}/schedules`：查看某个任务的全部调度记录
+
+这是“调度监控页面”的主要数据入口。
+
+#### `NodeAgentController.java`
+
+面向 `node-agent` 的公开接入接口，对外暴露：
+
+- `POST /api/node-agent/register`：节点注册
+- `POST /api/node-agent/heartbeat`：节点心跳
+
+它的两个关键职责是：
+
+- 节点首次接入时返回平台分配的 `nodeId` 与 `nodeToken`
+- 后续心跳时要求节点携带 `X-Node-Token` 请求头进行鉴权
+
+也就是说，当前节点接入已经不是“完全匿名上报”，而是“注册换 token，心跳带 token”。
+
+### 9.3 内部控制器目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/internal/
+```
+
+#### `NodeRegisterController.java`
+
+旧式内部节点注册接口：
+
+- `POST /internal/scheduler/nodes/register`
+
+它接收的是 `NodeRegisterRequest`，只上报 `solverIds`，不带版本信息。当前主链路已经更多走 `NodeAgentController`，但这个接口仍保留，适合兼容更简单的内部调用方式。
+
+#### `NodeHeartbeatController.java`
+
+旧式内部节点心跳接口：
+
+- `POST /internal/scheduler/nodes/heartbeat`
+
+和 `NodeAgentController` 相比，它不要求节点 token，更像是内部受信任调用接口。
+
+#### `InternalSchedulerController.java`
+
+这是调度服务给其他内部服务使用的协作接口，包含：
+
+- `GET /internal/nodes/available`：按求解器查询可用节点
+- `POST /internal/schedules`：写入调度记录
+- `POST /internal/nodes/{nodeId}/running-count`：调整节点运行任务数
+- `POST /internal/nodes/{nodeId}/cancel-task`：向节点发起取消任务
+- `GET /internal/nodes/{nodeId}/token/verify`：校验节点 token
+
+其中最关键的是最后一个接口。`task-service` 在接收 `node-agent` 状态回传时，会调用这里确认“当前回传者是否真的是绑定该任务的节点”。
+
+### 9.4 请求对象目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/request/
+```
+
+#### `NodePageQueryRequest.java`
+
+节点分页查询条件对象，包含：
+
+- 页码、页大小
+- 节点名
+- 在线状态
+- 启用状态
+- 求解器筛选条件
+
+这个类有一个很重要的辅助方法 `getSolverIdAsLong()`，它会把前端传来的字符串 `solverId` 转成 `Long`，并兼容：
+
+- `null`
+- 空字符串
+- `"undefined"`
+- `"null"`
+- 非法数字
+
+这说明当前实现已经考虑到了前端查询参数经常出现的“字符串脏值”问题。
+
+#### `SchedulePageQueryRequest.java`
+
+调度记录分页查询条件对象，包含：
+
+- 页码、页大小
+- `taskId`
+- `nodeId`
+- `scheduleStatus`
+- `strategyName`
+- `startTime`
+- `endTime`
+
+用于调度审计页面的筛选。
+
+#### `NodeRegisterRequest.java`
+
+内部节点注册请求对象，字段包括：
+
+- `nodeCode`
+- `nodeName`
+- `host`
 - `maxConcurrency`
-- `runningCount`
+- `solverIds`
+
+这是简化版节点注册模型，不带求解器版本。
+
+#### `NodeAgentRegisterRequest.java`
+
+节点代理公开注册请求对象，是当前更完整的注册模型，字段包括：
+
+- `nodeCode`
+- `nodeName`
+- `host`
+- `maxConcurrency`
+- `solvers`
+
+其中 `solvers` 是一个列表，每项是 `SolverItem`，包含：
+
+- `solverId`
+- `solverVersion`
+
+这正对应当前系统关于“节点负责上报事实能力，平台保存并授权调度”的实际实现。
+
+#### `NodeHeartbeatRequest.java`
+
+节点心跳请求对象，字段包括：
+
+- `nodeId`
 - `cpuUsage`
 - `memoryUsage`
-- `lastHeartbeatTime`
+- `runningCount`
+
+它只负责上报运行时负载，不负责修改求解器能力。
+
+#### `InternalScheduleRecordRequest.java`
+
+内部调度记录写入请求对象，字段包括：
+
+- `taskId`
+- `nodeId`
+- `strategyName`
+- `scheduleStatus`
+- `scheduleMessage`
+
+适合服务间主动补记调度审计信息。
+
+#### `NodeTaskCancelRequest.java`
+
+内部取消节点任务请求对象，字段包括：
+
+- `taskId`
+- `reason`
+
+用于把取消请求从调度服务继续传给具体节点代理。
+
+#### `UpdateNodeStatusRequest.java`
+
+节点启用状态修改请求对象，只包含：
+
+- `enabled`
+
+用于管理员控制 `compute_node.enabled`。
+
+#### `UpdateNodeSolverStatusRequest.java`
+
+节点-求解器能力启用状态修改请求对象，只包含：
+
+- `enabled`
+
+用于管理员控制 `node_solver_capability.enabled`。
+
+#### `UpdateRunningCountRequest.java`
+
+节点运行任务数调整请求对象，只包含：
+
+- `delta`
+
+供节点代理在任务开始/结束时调整占用数。
+
+### 9.5 响应对象目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/response/
+```
+
+#### `AvailableNodeResponse.java`
+
+返回给内部服务的“可用节点摘要”，字段包括：
+
+- 节点 ID、编码、名称
+- 主机地址
+- 当前运行数
+- 最大并发数
+
+#### `NodeAgentRegisterResponse.java`
+
+返回给节点代理的注册响应，字段包括：
+
+- `nodeId`
 - `nodeToken`
 
-并提供关键领域行为：
+这是节点后续心跳和任务回传鉴权的基础。
 
-- `markOnline()`
-- `markOffline()`
-- `refreshHeartbeat()`
-- `enable()`
-- `disable()`
-- `canDispatch()`
+#### `NodeDetailResponse.java`
 
-其中 `canDispatch()` 非常关键，它要求节点同时满足：
+节点详情响应对象，包含：
 
-- 在线
-- 启用
-- 当前运行数小于最大并发数
+- 节点基础信息
+- 在线状态和启用状态
+- 并发、CPU、内存、最近心跳
+- 节点支持的求解器能力列表
 
-这说明当前系统中的节点状态确实是动态调度状态，而不是数据库中的静态标签。
+#### `NodeListItemResponse.java`
 
-#### `NodeSolverCapability`
+节点列表页响应对象，提供列表页展示所需的节点基础状态与负载信息。
 
-负责描述节点支持哪些求解器以及对应版本、是否启用。  
-这是调度时“节点能不能跑这个任务”的核心依据。
+#### `NodeSolverResponse.java`
 
-#### `ScheduleRecord`
+节点某个求解器能力的摘要对象，字段包括：
 
-负责记录每次调度行为，包括：
+- `solverId`
+- `solverVersion`
+- `enabled`
 
+#### `ScheduleRecordResponse.java`
+
+调度记录响应对象，字段包括：
+
+- 调度记录 ID
 - 任务 ID
 - 节点 ID
 - 调度策略名
 - 调度状态
-- 调度消息
+- 调度说明
+- 创建时间
 
-它构成了调度过程的审计轨迹。
+---
 
-#### `NodeDomainService`
+## 10. 应用层
 
-负责节点领域规则，包括：
+### 10.1 对应文件夹
 
-- 注册请求合法性校验
-- 心跳请求合法性校验
-- 节点是否可派发判断
+应用层对应文件夹：
 
-#### `ScheduleDomainService`
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/
+```
 
-负责可调度节点过滤逻辑，即：
+这一层是调度服务真正的编排层，负责把“接口输入”“领域规则”“仓储操作”“远程调用”串成完整业务流程。
 
-- 先看节点是否在线、启用且未满载
-- 再看节点是否支持该求解器且能力启用
+### 10.2 组装器目录
 
-它把“节点资源状态”和“节点能力状态”合并为统一调度前置判断。
+对应文件夹：
 
-#### `ScheduleStrategy` 与 `FcfsLeastLoadStrategy`
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/assembler/
+```
 
-当前调度策略采用策略模式封装，实际实现为 `FcfsLeastLoadStrategy`。  
-当前策略核心特征是：
+#### `NodeAssembler.java`
 
-- 以可派发节点集合为输入
-- 优先选择 `runningCount` 更小的节点
-- 若并列，再比较 CPU 使用率
-- 再比较内存使用率
+负责节点对象转换，主要做三类转换：
 
-虽然类名叫 FCFS + Least Load，但从当前代码看，真正落实的是“在当前可调度任务列表顺序下，节点侧采用最小负载优先”。
+- `NodeRegisterRequest -> ComputeNode`
+- `ComputeNode -> NodeDetailResponse`
+- `ComputeNode <-> ComputeNodePO`
 
-### 4.6 基础设施层
+它让“接口对象、领域对象、持久化对象”之间保持解耦。
 
-#### `TaskClient` / `TaskClientStub`
+#### `ScheduleAssembler.java`
 
-负责和 `task-service` 交互，当前已支持：
+负责调度记录对象转换，主要做三类转换：
 
-- 拉取排队任务
-- 标记任务已调度
-- 标记任务已下发
+- `ScheduleRecord -> ScheduleRecordResponse`
+- 构造新的 `ScheduleRecord`
+- `ScheduleRecord <-> ScheduleRecordPO`
+
+`confirmScheduleSuccess()` 和 `recordScheduleFailure()` 最终都会通过它构造调度记录对象。
+
+### 10.3 Facade 目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/facade/
+```
+
+#### `NodeFacade.java`
+
+节点管理对外门面，负责把控制器请求统一转交给 `NodeManageManager`。
+
+它封装的主要能力包括：
+
+- 注册
+- 心跳
+- 节点分页
+- 节点详情
+- 节点启停
+- 节点求解器能力启停
+- 获取节点 token
+
+#### `ScheduleFacade.java`
+
+调度记录查询门面，负责把控制器请求统一转给 `TaskScheduleManager`。
+
+### 10.4 Manager 目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/manager/
+```
+
+#### `NodeManageManager.java`
+
+节点管理编排器，是 `NodeFacade` 和 `NodeAppService` 之间的一层轻量桥接。
+
+当前它的逻辑比较薄，主要是统一节点管理相关入口，方便后续把更复杂的跨服务协作、日志记录、补偿动作都收口到这里。
+
+#### `TaskScheduleManager.java`
+
+调度编排器，是 `ScheduleFacade`、`TaskScheduleJob` 与 `ScheduleAppService` 之间的桥接层。
+
+当前封装能力包括：
+
+- 选节点调度
+- 记录调度成功
+- 记录调度失败
+- 释放节点占位
+- 向节点发取消请求
+- 查询调度记录
+
+### 10.5 定时任务目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/scheduler/
+```
+
+#### `TaskScheduleJob.java`
+
+这是调度器主循环，是真正“让任务被派出去”的类。
+
+当前流程是：
+
+1. 每隔 `scheduler.task-schedule-interval-ms` 拉取一次待调度任务，默认 5 秒；
+2. 通过 `taskClient.listPendingTasks(20)` 一次拉最多 20 个 `QUEUED` 任务；
+3. 对每个任务调用 `taskScheduleManager.schedule(task)` 选节点；
+4. 调 `task-service` 将任务标记为 `SCHEDULED`；
+5. 调 `node-agent` 下发任务；
+6. 再调 `task-service` 把任务标记为 `DISPATCHED`；
+7. 写入调度成功记录。
+
+如果中间异常：
+
+- 若已占用节点，会释放 `runningCount`；
+- 若任务已经被标记为 `SCHEDULED`，会把任务写成 `FAILED`；
+- 无论如何都会记录一条调度失败记录。
+
+这说明当前实现已经有“占位释放”和“调度失败审计”，但还没有“自动重试调度”。
+
+#### `NodeOfflineCheckJob.java`
+
+节点离线巡检定时任务。
+
+默认每隔 `scheduler.node-offline-check-interval-ms` 执行一次，默认 15 秒。它会调用 `NodeHeartbeatChecker`，把超过 30 秒未上报心跳的节点判定为离线。
+
+### 10.6 应用服务目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/application/service/
+```
+
+#### `NodeAppService.java`
+
+这是节点管理主服务，也是本模块最重要的类之一。
+
+它负责：
+
+- 节点注册
+- 节点代理注册
+- 心跳处理
+- 节点分页与详情
+- 节点启停
+- 节点求解器能力启停
+- 可用节点筛选
+- `runningCount` 调整
+- 节点 token 获取与校验
+- 节点能力同步
+
+它里面最关键的方法如下。
+
+##### `registerNode(NodeRegisterRequest request)`
+
+处理内部简化版节点注册：
+
+- 若节点已存在，更新名称、主机、并发数；
+- 若没有 token，则补发 token；
+- 标记节点上线并刷新心跳时间；
+- 用 `replaceNodeCapabilitiesWithDetails()` 重建节点能力；
+- 若节点不存在，则新建节点并默认启用。
+
+##### `registerNodeFromAgent(NodeAgentRegisterRequest request)`
+
+处理 `node-agent` 的公开注册，这是当前主链路。
+
+它会先把代理上报对象转成 `NodeRegisterRequest` 完成基础节点注册，再用 `mergeCapabilities()` 按带版本的 `solvers` 列表重建能力表。
+
+这个方法的实现细节非常重要：
+
+- 节点实际上报 `solverId + solverVersion`；
+- 平台据此重建 `node_solver_capability`；
+- 如果该能力原本已有 `enabled` 状态，则会保留管理员原来的开关；
+- 如果某能力本次不再上报，则会因为“先删后插”被移除，避免脏数据残留。
+
+这和需求分析文档中的“两层责任”设计是一致的。
+
+##### `heartbeat(NodeHeartbeatRequest request, String nodeToken)`
+
+处理节点心跳：
+
+- 校验心跳字段合法性；
+- 按 `nodeId` 查节点；
+- 若传入 token，则校验 token；
+- 更新 CPU、内存、运行数、最近心跳时间；
+- 将节点重新标记为 `ONLINE`。
+
+心跳不会改求解器能力，只更新运行态信息。
+
+##### `pageNodes(NodePageQueryRequest request)`
+
+分页查询节点列表，调用 `computeNodeRepository.page()`，再转换成 `NodeListItemResponse`。
+
+##### `getNodeDetail(Long nodeId)`
+
+查询单个节点详情，并附带加载该节点的全部求解器能力。
+
+##### `updateNodeStatus(Long nodeId, UpdateNodeStatusRequest request)`
+
+修改 `compute_node.enabled`，控制节点整体是否允许参与调度。
+
+##### `updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request)`
+
+修改 `node_solver_capability.enabled`，控制某节点某求解器能力是否允许参与调度。
+
+##### `listAvailableNodes(Long solverId)`
+
+根据求解器 ID 返回可参与调度的节点。当前筛选条件是：
+
+- 节点在线
+- 节点整体启用
+- 节点未满载
+- 节点存在对应求解器能力
+- 该能力已启用
+
+##### `updateRunningCount(Long nodeId, Integer delta)`
+
+按增量调整节点当前运行任务数，供节点代理在任务开始/结束时上报。
+
+##### `getNodeToken(Long nodeId)` / `validateNodeToken(Long nodeId, String nodeToken)`
+
+提供节点 token 查询和校验能力，支撑任务回传鉴权链路。
+
+#### `ScheduleAppService.java`
+
+这是调度主服务，是本模块另一个核心类。
+
+它负责：
+
+- 按求解器筛选候选节点
+- 选择目标节点
+- 预占节点并发
+- 写调度成功/失败记录
+- 释放节点占位
+- 向节点发送取消任务请求
+- 分页查询调度记录
+
+关键方法如下。
+
+##### `scheduleTask(TaskDTO task)`
+
+这是“选节点”的主方法，流程是：
+
+1. 校验 `taskId`、`solverId` 是否存在；
+2. 读取所有 `ONLINE` 节点；
+3. 根据 `solverId` 读取对应的节点能力；
+4. 通过 `ScheduleDomainService.filterAvailableNodes()` 筛出满足条件的节点；
+5. 调 `ScheduleStrategy.selectNode()` 选择最终节点；
+6. 先把节点的 `runningCount + 1` 作为并发占位；
+7. 返回选中的 `nodeId`。
+
+这里有两个很关键的实现细节：
+
+- 调度服务本身只负责“选哪个节点”，不负责排序任务队列先后；任务顺序来自 `task-service` 的待调度接口；
+- 节点在真正下发前就会先占用并发，这样可以降低短时间内重复选中同一节点的概率。
+
+##### `confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage)`
+
+写入一条成功调度记录，策略名目前固定写 `FCFS_LEAST_LOAD`。
+
+##### `recordScheduleFailure(Long taskId, Long nodeId, String scheduleMessage)`
+
+写入一条失败调度记录。
+
+注意：这里允许 `nodeId` 为空，所以数据库中的 `schedule_record.node_id` 最好与代码保持一致，允许为空。
+
+##### `releaseNodeReservation(Long nodeId)`
+
+释放节点的并发占位，用于调度失败后的补偿。
+
+##### `cancelTaskOnNode(Long nodeId, Long taskId, String reason)`
+
+向指定节点代理发送取消任务请求。
+
+##### `recordSchedule(InternalScheduleRecordRequest request)`
+
+提供内部手工写调度记录的能力。
+
+##### `listByTaskId(Long taskId)` / `pageRecords(SchedulePageQueryRequest request)`
+
+调度记录查询能力。
+
+---
+
+## 11. 领域层
+
+### 11.1 对应文件夹
+
+领域层对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/
+```
+
+### 11.2 枚举目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/enums/
+```
+
+#### `ScheduleStatusEnum.java`
+
+定义调度状态枚举：
+
+- `SUCCESS`
+- `FAILED`
+
+当前这个枚举已经存在，但应用层写记录时仍主要直接写字符串常量，如 `"SUCCESS"`、`"FAILED"`、`"UNKNOWN"`，说明枚举还没有在整个模块里统一用起来。
+
+### 11.3 领域模型目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/model/
+```
+
+#### `ComputeNode.java`
+
+计算节点领域模型，对应 `compute_node` 表。
+
+核心字段包括：
+
+- 节点编码、名称、主机
+- 节点 token
+- 在线状态
+- 启用状态
+- 最大并发
+- 当前运行数
+- CPU、内存使用率
+- 最近心跳时间
+
+它还封装了几个很重要的领域行为：
+
+- `markOnline()`
+- `markOffline()`
+- `refreshHeartbeat(...)`
+- `enable()`
+- `disable()`
+- `canDispatch()`
+
+其中 `canDispatch()` 是当前判断“节点是否可继续接任务”的基础规则。
+
+#### `NodeSolverCapability.java`
+
+节点求解器能力领域模型，对应 `node_solver_capability` 表。
+
+核心字段包括：
+
+- `nodeId`
+- `solverId`
+- `solverVersion`
+- `enabled`
+
+它体现的是“这个节点具备某个求解器能力”，不是全局求解器定义本身。
+
+#### `ScheduleRecord.java`
+
+调度记录领域模型，对应 `schedule_record` 表。
+
+它只记录调度审计信息，不保存任务完整详情。核心字段包括：
+
+- `taskId`
+- `nodeId`
+- `strategyName`
+- `scheduleStatus`
+- `scheduleMessage`
+- `createdAt`
+
+### 11.4 仓储抽象目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/repository/
+```
+
+#### `ComputeNodeRepository.java`
+
+计算节点仓储抽象，定义：
+
+- 按 ID、节点编码、token 查询
+- 保存与更新
+- 分页查询
+- 按状态查询节点列表
+
+#### `NodeSolverCapabilityRepository.java`
+
+节点能力仓储抽象，定义：
+
+- 按节点查询能力
+- 按求解器查询能力
+- 按节点替换能力列表
+- 按节点带详情替换能力列表
+- 更新单条能力开关
+
+#### `ScheduleRecordRepository.java`
+
+调度记录仓储抽象，定义：
+
+- 保存调度记录
+- 分页查询调度记录
+- 按任务查询调度记录
+
+### 11.5 领域服务目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/service/
+```
+
+#### `NodeDomainService.java`
+
+节点领域规则服务，主要负责：
+
+- 校验注册请求是否合法
+- 校验心跳请求是否合法
+- 判断节点是否满足派发条件
+
+它把节点层面的“业务校验规则”从应用层里抽出来了。
+
+#### `ScheduleDomainService.java`
+
+调度领域规则服务，主要负责：
+
+- 根据求解器能力列表过滤出可参与某任务调度的节点
+
+这里体现的规则是：
+
+- 能力必须属于目标 `solverId`
+- 能力必须启用
+- 节点本身必须可派发
+
+### 11.6 调度策略目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/domain/strategy/
+```
+
+#### `ScheduleStrategy.java`
+
+调度策略接口，定义统一入口：
+
+- `ComputeNode selectNode(TaskDTO task, List<ComputeNode> nodes)`
+
+以后如果要扩展“优先级调度、标签调度、亲和性调度、失败重调度”，都应继续沿着这个抽象扩展。
+
+#### `FcfsLeastLoadStrategy.java`
+
+当前唯一落地的调度策略实现。
+
+它的实际行为是：
+
+- 在候选节点里，优先选 `runningCount` 最小的；
+- 若相同，再比较 CPU 使用率；
+- 若还相同，再比较内存使用率。
+
+需要注意两点：
+
+- 它并不负责队列的先来先服务，任务顺序来自 `task-service` 返回的 `QUEUED` 列表排序；
+- “FCFS” 更多体现为“任务列表按优先级和提交时间排序后被依次处理”，而不是这个类内部自己做任务排序。
+
+---
+
+## 12. 基础设施层
+
+### 12.1 对应文件夹
+
+基础设施层对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/
+```
+
+### 12.2 远程调用目录
+
+对应文件夹：
+
+```text
+scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/client/
+```
+
+#### `TaskClient.java`
+
+任务服务客户端抽象，定义：
+
+- 获取待调度任务
+- 标记任务为 `SCHEDULED`
+- 标记任务为 `DISPATCHED`
 - 标记任务调度失败
-- 节点离线时批量标记任务失败
+- 在节点离线时批量标记相关任务失败
 
-这是调度服务和任务服务的核心协作接口。
+#### `NodeAgentClient.java`
 
-#### `NodeAgentClient` / `NodeAgentClientStub`
+节点代理客户端抽象，定义：
 
-负责和节点代理通信，当前已支持：
+- 下发调度任务
+- 取消节点任务
 
-- 下发任务
-- 转发取消任务
+#### `impl/TaskClientStub.java`
 
-它会根据节点 `host` 拼装 node-agent 地址，并将调度所需元数据一并发送给节点侧。
+`TaskClient` 的当前实现，使用 `RestTemplate` 调用 `task-service`。
 
-#### 仓储层
+它对应的接口有：
 
-当前主要包括：
+- `GET /internal/tasks/queued`
+- `POST /internal/tasks/{taskId}/mark-scheduled`
+- `POST /internal/tasks/{taskId}/mark-dispatched`
+- `POST /internal/tasks/{taskId}/dispatch-failed`
+- `POST /internal/tasks/node-offline/fail`
 
-- `ComputeNodeRepository`
-- `NodeSolverCapabilityRepository`
-- `ScheduleRecordRepository`
+当前说明调度服务和任务服务的联动是“同步 HTTP 回写”，不是异步消息。
 
-这些仓储完成节点主数据、节点能力和调度记录的持久化。
+#### `impl/NodeAgentClientStub.java`
 
-其中 `NodeSolverCapabilityRepositoryImpl` 的一个重要特点是：
+`NodeAgentClient` 的当前实现，使用 `RestTemplate` 调用具体节点代理。
 
-- 节点重新注册时会整体替换能力集合
+它的关键职责包括：
 
-这意味着平台始终以节点最新上报的能力信息为准。
+- 根据 `nodeId` 先查出节点主机地址；
+- 自动拼出节点代理基础地址；
+- 调 `POST /internal/dispatch-task` 下发任务；
+- 调 `POST /internal/cancel-task` 取消任务；
+- 校验节点代理返回的 `accepted` 标志；
+- 若节点 host 为空或节点不存在，直接报错。
 
-#### 支撑组件
+它还会在下发时组装完整调度载荷，包括：
 
-当前还有一些支撑类：
+- `taskId`
+- `taskNo`
+- `solverId`
+- `solverCode`
+- `profileId`
+- `taskType`
+- `commandTemplate`
+- `parserName`
+- `timeoutSeconds`
+- `inputFiles`
+- `params`
 
-- `NodeHeartbeatChecker`：离线检测与补偿触发
-- `AvailableNodeSelector`：可派发节点过滤辅助
-- `NodeLoadCalculator`：负载评分预留能力
-- `ScheduleLogWriter`：调度日志输出辅助
+### 12.3 持久化目录
 
-其中 `NodeLoadCalculator` 目前更偏预留扩展点，当前实际调度主要还是由 `FcfsLeastLoadStrategy` 完成。
-
-## 5. 核心业务流程
-
-### 5.1 节点注册与发现流程
-
-```text
-node-agent 启动
-  -> 调用 /api/node-agent/register
-  -> NodeAgentController
-  -> NodeAppService.registerNodeFromAgent
-  -> NodeAppService.registerNode
-  -> 写入/更新 compute_node
-  -> 写入/替换 node_solver_capability
-  -> 生成或复用 nodeToken
-  -> 返回 nodeId + nodeToken
-```
-
-这个流程说明：
-
-- 节点发现不是写死在数据库里
-- 节点可以重复注册并刷新自身元数据
-- 平台会根据 `nodeCode` 识别已有节点并更新其主数据
-
-### 5.2 节点心跳与动态状态刷新流程
+对应文件夹：
 
 ```text
-node-agent 定期发送心跳
-  -> /api/node-agent/heartbeat
-  -> 携带 X-Node-Token
-  -> NodeAppService.heartbeat
-  -> 校验 nodeToken
-  -> 更新 cpuUsage / memoryUsage / runningCount / lastHeartbeatTime
-  -> 节点标记为 ONLINE
+scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/persistence/
 ```
 
-这条流程非常关键，因为它说明前端看到的节点状态、负载和运行数并不是纯静态数据库演示数据，而是会被节点持续刷新。
+#### 12.3.1 `entity/`
 
-### 5.3 节点离线检测与补偿流程
+##### `ComputeNodePO.java`
+
+`compute_node` 的持久化对象。
+
+##### `NodeSolverCapabilityPO.java`
+
+`node_solver_capability` 的持久化对象。
+
+##### `ScheduleRecordPO.java`
+
+`schedule_record` 的持久化对象。
+
+#### 12.3.2 `mapper/`
+
+##### `ComputeNodeMapper.java`
+
+计算节点 MyBatis Mapper，负责：
+
+- 按 ID/编码/token 查询节点
+- 插入节点
+- 更新节点
+- 分页查询节点
+- 按状态查询节点
+
+其中分页 SQL 支持按 `solverIdAsLong` 过滤已启用能力节点。
+
+##### `NodeSolverCapabilityMapper.java`
+
+节点能力 MyBatis Mapper，负责：
+
+- 按节点查能力
+- 按求解器查能力
+- 删除某节点全部能力
+- 批量插入节点能力
+- 批量插入带版本的节点能力
+- 更新单条能力的版本和启用状态
+
+当前“能力重建”采用的是“先删后插”策略。
+
+##### `ScheduleRecordMapper.java`
+
+调度记录 MyBatis Mapper，负责：
+
+- 插入调度记录
+- 分页查询调度记录
+- 按任务查调度记录
+
+#### 12.3.3 `repository/`
+
+##### `ComputeNodeRepositoryImpl.java`
+
+`ComputeNodeRepository` 的实现类，负责把：
+
+- `ComputeNodeMapper`
+- `NodeAssembler`
+
+组合起来，完成领域对象和持久化对象之间的双向转换。
+
+##### `NodeSolverCapabilityRepositoryImpl.java`
+
+`NodeSolverCapabilityRepository` 的实现类，负责：
+
+- 加载节点能力
+- 加载求解器能力
+- 替换节点全部能力
+- 带版本替换节点全部能力
+- 更新单条能力开关
+
+这是当前“节点上报能力 -> 平台重建 `node_solver_capability`”的真正落地点。
+
+##### `ScheduleRecordRepositoryImpl.java`
+
+`ScheduleRecordRepository` 的实现类，负责调度记录的保存和查询。
+
+### 12.4 运行支撑目录
+
+对应文件夹：
 
 ```text
-NodeOfflineCheckJob 定时运行
-  -> NodeHeartbeatChecker.markOfflineNodes
-  -> 查找 ONLINE 节点
-  -> 超过阈值未心跳则判定离线
-  -> 调用 task-service 批量标记该节点影响任务失败
-  -> 节点标记 OFFLINE
-  -> 清零 runningCount / cpuUsage / memoryUsage
+scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/support/
 ```
 
-这说明“离线”不是管理员手工改状态，而是由调度器根据心跳超时自动判定。
+#### `AvailableNodeSelector.java`
 
-### 5.4 调度与派发流程
+一个简单的候选节点过滤组件，只保留 `canDispatch()` 的节点。
+
+当前主调度链路里并没有直接使用它，属于保留的基础组件。
+
+#### `NodeHeartbeatChecker.java`
+
+节点离线巡检支撑组件，是 `NodeOfflineCheckJob` 的核心实现。
+
+它的逻辑是：
+
+- 取出所有 `ONLINE` 节点；
+- 如果最近心跳时间为空或早于“当前时间 - 30 秒”，就认为节点离线；
+- 调 `task-service` 把该节点上未完成任务批量标记失败；
+- 再把节点本身改为 `OFFLINE`，并清零运行数和负载。
+
+这说明当前离线补偿策略是“失败终止”，不是“自动重排回队列”。
+
+#### `NodeLoadCalculator.java`
+
+负载分值计算组件，当前按：
+
+- `runningCount * 10 + cpu + memory`
+
+计算一个综合分值。
+
+但它目前没有直接接入 `FcfsLeastLoadStrategy`，属于预留扩展组件。
+
+---
+
+## 13. 支撑层
+
+### 13.1 对应文件夹
+
+支撑层对应文件夹：
 
 ```text
-TaskScheduleJob 定时运行
-  -> TaskClient.listPendingTasks(20)
-  -> ScheduleAppService.scheduleTask
-  -> ScheduleDomainService 过滤可用节点
-  -> FcfsLeastLoadStrategy 选节点
-  -> 预占节点 runningCount +1
-  -> task-service markScheduled
-  -> node-agent dispatch-task
-  -> task-service markDispatched
-  -> 保存 SUCCESS 调度记录
+scheduler-service/src/main/java/com/example/cae/scheduler/support/
 ```
 
-若中途失败，则会：
+### 13.2 文件说明
 
-- 释放节点预占
-- 在必要时回写任务失败
-- 保存 FAILED 调度记录
+#### `ScheduleLogWriter.java`
 
-### 5.5 任务取消流程
+一个简单的调度日志包装器，提供：
 
-```text
-task-service 请求取消运行中任务
-  -> scheduler-service /internal/nodes/{nodeId}/cancel-task
-  -> ScheduleAppService.cancelTaskOnNode
-  -> NodeAgentClient.cancelTask
-  -> node-agent 执行取消
-```
+- `info(String message)`
+- `warn(String message)`
 
-因此，运行中取消并不是直接改数据库，而是通过调度器向执行侧转发。
+当前主链路里基本还没有深入使用它，更多是一个统一日志前缀的预留点。
 
-## 6. 核心设计
+---
 
-### 6.1 设计一：节点状态由“注册 + 心跳 + 离线检查”动态驱动
+## 14. 与数据库表的对应关系
 
-这是 `scheduler-service` 最重要的设计点之一。  
-当前节点状态不是静态维护，而是靠三步构成闭环：
+### 14.1 `compute_node`
 
-1. 节点启动时注册
-2. 节点运行中持续心跳
-3. 调度器定时离线检查
+对应代码链路：
 
-这正是计算节点动态管理的核心机制，也使节点状态真正能够反映实际调度环境。
+- 领域模型：`domain/model/ComputeNode.java`
+- 持久化对象：`infrastructure/persistence/entity/ComputeNodePO.java`
+- Mapper：`infrastructure/persistence/mapper/ComputeNodeMapper.java`
+- 仓储实现：`infrastructure/persistence/repository/ComputeNodeRepositoryImpl.java`
 
-### 6.2 设计二：将节点“主状态”和“求解器能力”分离
+它保存节点本身的信息：
 
-系统没有把“节点是否支持某求解器”写成节点表中的单个字段，而是单独维护 `node_solver_capability`。  
-这样做的好处是：
+- 节点编码
+- 主机地址
+- token
+- 在线状态
+- 节点整体启用状态
+- 最大并发
+- 当前运行数
+- CPU、内存、最近心跳
 
-- 一个节点可以支持多个求解器
-- 每个求解器能力可以单独启停
-- 可以记录版本信息
-- 未来更容易扩展多求解器场景
+### 14.2 `node_solver_capability`
 
-### 6.3 设计三：调度链路分成“选节点”和“下发任务”两个阶段
+对应代码链路：
 
-当前调度过程不是一步到位，而是分成：
+- 领域模型：`domain/model/NodeSolverCapability.java`
+- 持久化对象：`infrastructure/persistence/entity/NodeSolverCapabilityPO.java`
+- Mapper：`infrastructure/persistence/mapper/NodeSolverCapabilityMapper.java`
+- 仓储实现：`infrastructure/persistence/repository/NodeSolverCapabilityRepositoryImpl.java`
 
-- 先筛选并选择节点
-- 再通知任务服务更新调度状态
-- 再向节点代理发送下发请求
+它保存节点的求解器能力信息：
 
-这种分段式设计使系统更容易定位问题，例如是“没有可用节点”“调度成功但下发失败”还是“节点执行阶段失败”。
+- 节点 ID
+- 求解器 ID
+- 求解器版本
+- 能力是否允许参与调度
 
-### 6.4 设计四：用调度记录沉淀调度轨迹
+当前这张表的生成来源是“节点注册上报能力”，不是管理员手工虚构绑定。
 
-当前系统不仅做调度动作，还会记录：
+### 14.3 `schedule_record`
 
-- 任务调度到哪个节点
-- 使用什么策略
-- 成功还是失败
-- 失败原因是什么
+对应代码链路：
 
-这使调度过程具备了可查询、可解释和可答辩的依据。
+- 领域模型：`domain/model/ScheduleRecord.java`
+- 持久化对象：`infrastructure/persistence/entity/ScheduleRecordPO.java`
+- Mapper：`infrastructure/persistence/mapper/ScheduleRecordMapper.java`
+- 仓储实现：`infrastructure/persistence/repository/ScheduleRecordRepositoryImpl.java`
 
-### 6.5 设计五：通过节点 Token 保证节点侧接口可信
+它只保存调度审计信息，不保存任务全部内容。
 
-节点注册后会获得 `nodeToken`，后续心跳和任务回传都围绕该令牌展开。  
-当前令牌虽然是轻量级 Base64 方案，但已经体现出：
+---
 
-- 节点身份需要显式认证
-- 并非所有请求都可伪造为某个节点
-- `task-service` 与 `scheduler-service` 共享节点身份校验职责
+## 15. 核心调用链
 
-## 7. 架构难点与解决方案
+### 15.1 节点注册链路
 
-### 7.1 难点一：如何让节点状态反映真实运行状态
+当前主注册链路是：
 
-问题：
+1. `node-agent` 启动后调用 `NodeRegisterAppService.registerSelf()`
+2. `NodeInfoCollector` 采集：
+   - 节点编码
+   - 节点名称
+   - 主机地址
+   - 最大并发
+   - 已配置求解器 ID 列表
+3. `SchedulerNodeClientImpl.register()` 组装 `NodeAgentRegisterRequest`
+4. 调用 `scheduler-service` 的 `NodeAgentController.register()`
+5. 转到 `NodeFacade -> NodeManageManager -> NodeAppService.registerNodeFromAgent()`
+6. 若节点已存在则更新，若不存在则新建
+7. 通过 `mergeCapabilities()` 把上报的求解器列表重建为 `node_solver_capability`
+8. 返回 `nodeId + nodeToken`
+9. `node-agent` 本地保存这两个值，供后续心跳和任务回传使用
 
-- 如果节点状态只靠数据库初始数据，前端展示就会是静态假象
-- 调度器也无法判断节点是否真的还活着
+这里最值得写进论文说明的是：
 
-当前解决方案：
+- 节点注册上报的是“事实能力”
+- 平台落库的是 `compute_node + node_solver_capability`
+- 管理员后续控制的是“允不允许调度”
 
-- 节点代理启动时主动注册
-- 运行中持续心跳更新负载与并发
-- 调度器定时检查超时并自动标记离线
+### 15.2 节点心跳与离线判定链路
 
-这正是当前实现中“节点状态动态化”的核心。
+心跳链路：
 
-### 7.2 难点二：如何在调度前同时考虑节点资源与节点能力
+1. `node-agent` 定时调用 `HeartbeatAppService.sendHeartbeat()`
+2. `SchedulerNodeClientImpl.heartbeat()` 调 `/api/node-agent/heartbeat`
+3. 携带 `X-Node-Token`
+4. `NodeAgentController.heartbeat()` 收到请求
+5. 转到 `NodeAppService.heartbeat(request, nodeToken)`
+6. 校验 token
+7. 刷新节点 CPU、内存、运行数和最近心跳时间
+8. 节点状态标记为 `ONLINE`
 
-问题：
+离线巡检链路：
 
-- 节点在线并不意味着它能运行当前任务
-- 节点支持求解器也不意味着它当前有空闲并发
+1. `NodeOfflineCheckJob.run()` 定时执行
+2. 调 `NodeHeartbeatChecker.markOfflineNodes()`
+3. 找出超过 30 秒没心跳的节点
+4. 调 `task-service` 把该节点上的 `SCHEDULED / DISPATCHED / RUNNING` 任务批量标记失败
+5. 节点改成 `OFFLINE`
 
-当前解决方案：
+### 15.3 任务调度链路
 
-- `ScheduleDomainService` 同时检查节点能力和节点可派发状态
-- 调度策略只在通过前置过滤后的节点集合中进行选择
+主调度链路：
 
-这样避免了把能力判断和资源判断混在调度算法内部。
+1. `TaskScheduleJob.run()` 每 5 秒执行一次
+2. `TaskClientStub.listPendingTasks(20)` 向 `task-service` 拉 `QUEUED` 任务
+3. `TaskScheduleManager.schedule(task)`
+4. `ScheduleAppService.scheduleTask(task)` 选节点
+5. `ScheduleDomainService` 过滤可用节点
+6. `FcfsLeastLoadStrategy` 选出最终节点
+7. 先把节点 `runningCount + 1`
+8. 调 `task-service` 把任务标记为 `SCHEDULED`
+9. 调 `node-agent` 下发任务
+10. 再调 `task-service` 把任务标记为 `DISPATCHED`
+11. 写入成功调度记录
 
-### 7.3 难点三：节点离线后如何补偿任务状态
+失败时：
 
-问题：
+- 若只是“没有可用节点”，任务仍会保留在 `QUEUED` 队列中，等待下一轮轮询；
+- 若已经标成 `SCHEDULED` 但下发失败，则当前实现会把任务直接改为 `FAILED`；
+- 失败调度会写 `schedule_record`；
+- 若已占用节点并发，则会回滚 `runningCount`。
 
-- 如果节点离线但任务仍停留在 `RUNNING` 或 `DISPATCHED`，系统状态会失真
+### 15.4 节点启停与能力启停链路
 
-当前解决方案：
+管理员操作链路：
 
-- 离线检测后，调度器调用 `task-service` 批量标记相关任务失败
-- 失败原因中写明是节点心跳超时导致
+1. 前端调用 `NodeController`
+2. 进入 `NodeFacade -> NodeManageManager -> NodeAppService`
+3. 若是节点启停，则修改 `compute_node.enabled`
+4. 若是节点能力启停，则修改 `node_solver_capability.enabled`
 
-这让系统能够从真实执行故障中恢复到一致状态。
+因此，当前调度是否成立，至少要同时满足：
 
-### 7.4 难点四：任务派发失败如何避免节点资源“假占用”
+- 节点 `ONLINE`
+- 节点 `enabled = 1`
+- 节点存在目标求解器能力
+- 能力 `enabled = 1`
 
-问题：
+### 15.5 节点 token 校验链路
 
-- 调度器在选择节点后已经预占了 `runningCount`
-- 如果后续通知节点失败，就必须回收预占
+当前系统中，任务执行状态、日志、结果回传时，`task-service` 会调用调度服务确认节点身份：
 
-当前解决方案：
+1. `task-service` 中的 `NodeAgentAuthService`
+2. 调 `scheduler-service` 的 `GET /internal/nodes/{nodeId}/token/verify`
+3. `InternalSchedulerController` 调用 `NodeAppService.validateNodeToken()`
+4. 返回 token 是否有效
 
-- `scheduleTask()` 先预占并发
-- 若派发失败则调用 `releaseNodeReservation()`
+这使得“任务只允许被分配给它的节点回传状态”成为可能。
 
-这说明当前实现已经考虑了派发失败时的资源回滚。
+---
 
-### 7.5 难点五：如何在原型复杂度和调度真实性之间平衡
+## 16. 设计文档与当前实现的对照
 
-问题：
+### 16.1 已经较好落地的部分
 
-- 真正的分布式调度器通常包含锁、队列、中间件、抢占、优先级、多实例一致性等复杂能力
-- 本科原型项目不能直接做成生产级调度中台
+结合 `需求分析与系统设计.md`、`后端设计.md`、`数据库设计.md`，当前 `scheduler-service` 已经较好落地了下面这些设计目标：
 
-当前解决方案：
+- 节点注册、心跳、在线/离线动态维护；
+- `compute_node`、`node_solver_capability`、`schedule_record` 三表分工明确；
+- 节点能力由注册上报同步，不是管理员手工虚构；
+- 管理员可控制节点整体启停与节点-求解器能力启停；
+- 调度流程已经形成“拉队列 -> 选节点 -> 标记状态 -> 下发 -> 记审计”的完整闭环；
+- 节点离线后会补偿失败该节点上的未完成任务；
+- 调度记录可分页查询、可按任务查询；
+- 调度策略已抽象成接口，不是全部硬编码在定时任务里。
 
-- 采用定时轮询 + 单策略 + 同步下发的轻量方案
-- 保留节点能力、动态心跳、离线补偿和调度记录这些最关键能力
+### 16.2 当前是“基础调度器”而不是“生产级调度器”的部分
 
-这使系统既有真实调度闭环，又保持了实现可控。
+当前实现虽然闭环已经跑通，但仍然是明显的基础版：
 
-## 8. 关键技术手段
+- 只有单机轮询调度，没有分布式锁，也没有多实例防重；
+- 没有消息队列，任务获取和状态回写都靠同步 HTTP；
+- 没有抢占式调度、标签调度、配额调度、资源需求建模；
+- 没有自动重试调度、失败重调度；
+- 没有调度事件即时触发，仍主要依赖定时轮询；
+- 没有复杂资源模型，当前节点负载主要只看运行数、CPU、内存；
+- 没有把 `ScheduleStatusEnum` 真正贯穿全链路使用。
 
-### 8.1 Spring 定时任务
+### 16.3 当前是“预留/占位”的部分
 
-当前依赖两个定时任务驱动系统核心行为：
+下面这些类目前更像架构预留位：
 
-- `TaskScheduleJob`：周期性调度
-- `NodeOfflineCheckJob`：周期性离线检测
+- `SchedulingConfig.java`
+- `FeignClientConfig.java`
+- `AvailableNodeSelector.java`
+- `NodeLoadCalculator.java`
+- `ScheduleLogWriter.java`
+- `ComputeNodeRepository.findByNodeToken()` 这条仓储查询能力当前使用频率较低
 
-这是当前调度系统的“时钟”。
+这类代码适合在文档里表述为“为后续增强预留的扩展点”，不要表述成已经形成完整能力。
 
-### 8.2 策略模式
+### 16.4 当前实现里几个必须写清楚的细节
 
-通过 `ScheduleStrategy` 抽象调度算法，并以 `FcfsLeastLoadStrategy` 作为当前实现。  
-这样未来可以扩展更多策略，而不需要重写整体调度流程。
+#### 1. 节点能力同步是“事实上报 + 平台授权”
 
-### 8.3 微服务内部 HTTP 协作
+当前真实实现并不是管理员手工绑定节点支持哪些求解器，而是：
 
-当前 `scheduler-service` 通过内部 HTTP 与：
+- `node-agent` 注册时上报 `solverId + solverVersion`
+- `scheduler-service` 重建 `node_solver_capability`
+- 保留原有 `enabled` 开关
+- 未再上报的能力会被移除
 
-- `task-service`
-- `node-agent`
+这一点和需求分析中的设计是吻合的。
 
-进行协作，形成完整调度闭环，体现了微服务边界下的职责分离。
+#### 2. 调度任务顺序主要由 `task-service` 决定
 
-### 8.4 节点能力映射模型
+`TaskScheduleJob` 从 `task-service` 拉到的 `QUEUED` 列表，本身已经按任务优先级与提交时间排序。  
+`scheduler-service` 负责的是“在当前这批待调度任务中，为某个任务选哪个节点”，而不是自己重排整个任务队列。
 
-通过 `ComputeNode + NodeSolverCapability` 的双层模型表达：
+#### 3. 调度失败后的处理还比较保守
 
-- 节点基础状态
-- 节点支持的求解器能力
+当前实现中：
 
-这是实现多求解器多节点调度的关键数据结构。
+- 无可用节点：任务继续留在 `QUEUED`
+- 已标 `SCHEDULED` 但下发失败：任务直接记为 `FAILED`
+- 节点离线：受影响任务直接记为 `FAILED`
 
-### 8.5 运行数预占与心跳反馈结合
+也就是说，当前没有自动回队和自动重调度机制。
 
-当前节点负载管理并不是单纯依赖心跳，也不是单纯依赖数据库统计，而是采用：
+#### 4. `schedule_record.node_id` 最好允许为空
 
-- 调度瞬间先预占 `runningCount`
-- 节点后续再通过心跳持续刷新实际 `runningCount`
+代码里存在“调度失败时 `nodeId = null` 也照样写调度记录”的逻辑，所以数据库表若仍强制 `NOT NULL`，就会和代码口径冲突。这个点在文档中需要明确写成“实现收口要求”。
 
-这是一种适合原型平台的简化运行数管理方案。
+---
 
-## 9. 当前实现的优点
+## 17. 推荐的阅读顺序
 
-- 已实现节点注册、心跳、离线检测的动态节点状态闭环。
-- 已建立节点与求解器能力映射，能够支持多求解器场景下的节点筛选。
-- 已实现调度器轮询任务、选择节点、下发任务、记录结果的完整调度主链。
-- 已实现节点离线后的任务失败补偿，避免任务长期卡死在运行态。
-- 已实现节点 Token 生成与校验，内部安全性优于纯白名单放行。
-- 已提供节点查询、调度记录查询和可用节点查询能力，便于前端展示和问题定位。
+### 17.1 先看接口
 
-## 10. 当前实现的局限与边界
+建议先看：
 
-### 10.1 当前更适合单实例调度器原型
+- `NodeController.java`
+- `ScheduleController.java`
+- `NodeAgentController.java`
+- `InternalSchedulerController.java`
 
-当前调度链路中没有看到分布式锁、任务抢占保护或多实例幂等协调机制。  
-这意味着如果未来扩展成多实例调度器，可能出现重复轮询和重复调度风险。
+这样能先理解调度服务对外暴露了哪些能力。
 
-### 10.2 调度触发仍为轮询模式
+### 17.2 再看主流程编排
 
-当前调度器依赖 `TaskScheduleJob` 周期性轮询 `task-service`。  
-因此任务提交后不会立即被推送调度，而是等待下一轮扫描。
+接着看：
 
-### 10.3 调度策略较基础
+- `TaskScheduleJob.java`
+- `ScheduleAppService.java`
+- `NodeAppService.java`
 
-当前仅实现了 `FcfsLeastLoadStrategy`，主要考虑：
+这样能看清楚真正的业务主链。
 
-- 当前并发数
-- CPU 使用率
-- 内存使用率
+### 17.3 再看领域规则和策略
 
-尚未进一步纳入：
+然后看：
 
-- 严格任务优先级排序控制
-- 任务预估资源需求
-- 节点亲和性
-- 公平调度
-- 抢占式调度
+- `ComputeNode.java`
+- `NodeSolverCapability.java`
+- `ScheduleDomainService.java`
+- `FcfsLeastLoadStrategy.java`
 
-### 10.4 节点 Token 仍是轻量原型方案
+这样能知道调度判定规则到底是什么。
 
-当前 `nodeToken` 是基于 `nodeCode + UUID` 的 Base64 编码生成结果。  
-它能满足原型系统的节点身份识别，但还不是生产级的节点证书或强签名方案。
+### 17.4 最后看数据库与远程调用
 
-### 10.5 缺少更强的调度治理能力
+最后看：
 
-当前还没有实现：
+- `TaskClientStub.java`
+- `NodeAgentClientStub.java`
+- `ComputeNodeMapper.java`
+- `NodeSolverCapabilityMapper.java`
+- `ScheduleRecordMapper.java`
 
-- 调度任务队列中间件
-- 调度重试策略
-- 分布式锁
-- 多副本高可用协调
-- 调度事件流审计
-- 节点黑名单和故障熔断
+这样就能把“业务抽象”和“实际落库/实际调用”对应起来。
 
-这些都更适合作为扩展点，而不是当前本科毕设原型的首版目标。
+---
 
-## 11. 对本科毕设的价值
+## 18. 当前结论
 
-从本科毕业设计角度看，`scheduler-service` 的价值非常高，主要体现在：
+`scheduler-service` 当前已经完成了“本科毕设/课程设计层面可用的基础调度中心”：
 
-1. 它体现了平台不是静态任务管理系统，而是真正具备“资源调度”能力的任务平台。
-2. 它能够说明系统中的节点状态是动态变化的，而不是展示层假数据。
-3. 它将微服务拆分、节点管理、任务调度、故障补偿这些关键技术点连接起来。
-4. 它足以支撑“分布式计算节点调度原型”这一核心技术指标的展示。
+- 节点可动态注册、心跳、上下线；
+- 节点能力可随注册自动同步；
+- 管理员可控制节点和能力开关；
+- 调度器可按在线状态、启用状态、节点能力、并发上限筛选节点；
+- 任务可被实际派发到节点代理；
+- 调度失败、节点离线都有基本补偿和审计记录。
 
-因此，`scheduler-service` 是答辩时非常值得重点讲解的模块。
+但也要如实说明，它还不是完整的生产级分布式调度系统。当前更准确的定位是：
 
-## 12. 答辩时可采用的表述
+> 一个已经打通“任务入队 -> 中央调度 -> 节点执行 -> 状态回传”主链路的基础型 CAE 分布式调度原型。
 
-可以将该模块概括为：
+如果下一步继续完善，最值得优先增强的方向是：
 
-> `scheduler-service` 是平台的调度与节点管理中心，负责计算节点的注册、能力维护、心跳接收、离线检测以及排队任务的节点分配。系统通过节点代理注册和周期性心跳实现节点状态动态刷新，通过节点能力映射和负载筛选实现任务与节点的匹配，通过定时调度作业完成任务轮询、节点选择和任务下发，并在节点离线时触发任务失败补偿，从而形成面向 CAE 仿真任务的轻量级调度闭环。
-
-## 13. 后续可扩展方向
-
-在不改变当前原型定位的前提下，后续可以继续扩展：
-
-- 引入提交后主动触发调度，而不只依赖轮询
-- 增加更丰富的调度策略，如优先级调度、资源感知调度
-- 引入分布式锁或一致性机制，支持多实例调度器
-- 增加节点故障熔断、黑名单和重试机制
-- 将节点 Token 升级为更强的安全认证方案
-- 增加更精细的资源模型，如 GPU、磁盘、许可证等资源维度
-- 完善调度日志、审计和运行监控能力
-
-这些内容更适合作为扩展能力，而不是当前首版必须全部完成的内容。
-
-## 14. 当前结论
-
-`scheduler-service` 当前已经完成了本项目原型平台中与“调度”和“动态节点管理”相关的核心能力：
-
-- 可实现节点注册、心跳上报与离线检测
-- 可动态维护节点在线状态、负载和并发数
-- 可维护节点支持的求解器能力集合
-- 可轮询排队任务并执行节点选择与任务下发
-- 可记录调度成功与失败轨迹
-- 可在节点离线时触发任务失败补偿
-
-从实现深度看，它已经超出了“数据库里写几个节点状态供前端展示”的静态演示层面，而是真正实现了一个具备动态节点状态管理、基础调度策略和故障补偿能力的轻量级调度原型。  
-从本科毕设要求看，这个模块已经能够很好支撑“微服务 + 分布式节点 + 任务调度”这几个核心技术指标的展示。
+- 多实例调度防重；
+- 自动重试与重调度；
+- 更丰富的调度策略；
+- 事件驱动而非纯轮询触发；
+- 更严格的调度状态一致性控制。

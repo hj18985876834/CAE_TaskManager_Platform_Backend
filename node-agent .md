@@ -1,439 +1,766 @@
-# node-agent 模块分析文档
+# node-agent 模块说明文档
 
-## 1. 模块定位
+## 1. 文档目的
 
-`node-agent` 是整个平台中最靠近计算节点运行环境的执行代理服务，部署在具体的计算节点上，负责把调度器下发的“可执行任务”真正落到本机执行环境中。
+这份文档继续沿用 `user-service.md`、`solver-service.md`、`task-service.md`、`scheduler-service.md` 的说明方式，不只是回答“`node-agent` 是做什么的”，还要把它拆到“模块根目录 -> 分层目录 -> 具体代码文件 -> 文件职责”的粒度，方便下面几类工作：
+
+- 写毕业论文或设计说明时，能把节点代理模块和真实代码一一对应；
+- 排查“节点为什么没有注册上来”“心跳为什么失败”“任务为什么没有真正执行”“日志为什么没有回传”这类问题时，快速定位到具体类；
+- 理清 `scheduler-service -> node-agent -> task-service` 这一条跨服务执行链；
+- 区分“设计文档中的目标能力”和“当前已经真实落地的实现能力”；
+- 为后续补容器执行、结果收集增强、共享存储、执行隔离和鉴权增强打基础。
+
+分析范围以 `node-agent/src/main/java`、`node-agent/src/main/resources` 以及模块根目录下的部署文件为主，`target/` 不作为设计分析对象。
+
+---
+
+## 2. 模块定位
+
+`node-agent` 是平台中的“节点执行代理服务”，部署在具体的计算节点上，负责把调度器下发的任务真正落到本机执行环境中。
 
 如果说：
 
-- `solver-service` 解决“平台支持哪些求解器、模板和文件规则”
-- `task-service` 解决“任务如何创建、校验、提交、跟踪和汇总”
-- `scheduler-service` 解决“任务应该分配给哪个节点”
+- `solver-service` 解决“平台支持哪些求解器、模板和文件规则”；
+- `task-service` 解决“任务如何创建、校验、提交、流转和回传”；
+- `scheduler-service` 解决“任务应该派发给哪个节点”；
 
 那么 `node-agent` 解决的就是：
 
-- 节点如何向调度中心注册自己
-- 节点如何持续上报心跳和负载
-- 节点如何接收调度下发的任务
-- 节点如何准备本地工作目录和输入文件
-- 节点如何选择对应执行器并启动本地进程
-- 节点如何把运行日志、结果摘要、结果文件和最终状态回传给 `task-service`
-- 节点如何处理取消、超时和异常退出
+1. 节点如何向调度中心注册自己；
+2. 节点如何持续上报心跳和运行负载；
+3. 节点如何接收调度器下发的任务；
+4. 节点如何准备工作目录与输入文件；
+5. 节点如何选择合适的执行器并启动本地进程；
+6. 节点如何将运行状态、日志、结果摘要、结果文件回传给 `task-service`；
+7. 节点如何处理中途取消、超时和异常退出。
 
-因此，`node-agent` 不是用户侧业务服务，也不是调度决策服务，而是平台中的“节点执行侧代理”。
+因此，`node-agent` 不是用户侧业务服务，也不是调度决策服务，而是平台的“执行端代理层”。
 
-## 2. 模块在系统中的作用
+它在系统中的位置可以概括为：
 
-从整个系统协作关系看，`node-agent` 主要承担以下作用：
+> `scheduler-service` 负责选节点，`node-agent` 负责在这个节点上把任务真正执行起来。
 
-1. 作为计算节点的身份载体，向 `scheduler-service` 注册节点信息、求解器能力和运行状态。
-2. 作为任务执行入口，接收 `scheduler-service` 下发的 `/internal/dispatch-task` 请求。
-3. 作为本地执行编排器，把任务从远程请求对象转换为本地执行上下文。
-4. 作为进程管理器，启动求解器命令、读取标准输出和错误输出、处理超时与取消。
-5. 作为结果回传器，向 `task-service` 上报状态、日志、结果摘要、结果文件和最终结束状态。
-6. 作为共享存储桥接层，处理 Windows 与 Linux 之间的路径映射，适配跨机器共享目录场景。
+---
 
-也就是说，`node-agent` 处在 `scheduler-service` 与真实求解器运行环境之间，是调度闭环落到执行闭环的最后一环。
+## 3. 模块根目录与源码入口
 
-## 3. 当前实现架构
+### 3.1 模块根目录
 
-### 3.1 技术栈
-
-- Spring Boot
-- Spring MVC 风格 REST 接口
-- `@Scheduled` 定时任务
-- `RestTemplate` 方式调用 `scheduler-service` 与 `task-service`
-- `ProcessBuilder` 启动本地外部进程
-- 本地文件系统目录管理
-- `common-lib` 中的统一返回体、异常、常量与枚举
-
-### 3.2 当前目录结构
-
-当前代码结构如下：
+模块根目录是：
 
 ```text
 node-agent/
-└─ src/main/java/com/example/cae/nodeagent/
-   ├─ NodeAgentApplication.java
-   ├─ config/
-   │  ├─ NodeAgentConfig.java
-   │  ├─ NodeAgentBeanConfig.java
-   │  ├─ ExecutorConfig.java
-   │  └─ FeignClientConfig.java
-   ├─ interfaces/
-   │  ├─ controller/
-   │  │  └─ DispatchController.java
-   │  ├─ request/
-   │  │  ├─ DispatchTaskRequest.java
-   │  │  └─ CancelTaskRequest.java
-   │  └─ response/
-   │     ├─ DispatchTaskResponse.java
-   │     └─ CancelTaskResponse.java
-   ├─ application/
-   │  ├─ assembler/
-   │  │  └─ ExecutionContextAssembler.java
-   │  ├─ manager/
-   │  │  ├─ TaskDispatchManager.java
-   │  │  ├─ TaskExecuteManager.java
-   │  │  ├─ TaskReportManager.java
-   │  │  └─ TaskRuntimeRegistry.java
-   │  ├─ scheduler/
-   │  │  └─ HeartbeatJob.java
-   │  └─ service/
-   │     ├─ NodeRegisterAppService.java
-   │     ├─ HeartbeatAppService.java
-   │     └─ TaskReportAppService.java
-   ├─ domain/
-   │  ├─ enums/
-   │  │  └─ ExecutionStageEnum.java
-   │  ├─ executor/
-   │  │  ├─ SolverExecutor.java
-   │  │  ├─ AbstractSolverExecutor.java
-   │  │  ├─ MockExecutor.java
-   │  │  ├─ OpenFoamExecutor.java
-   │  │  └─ CalculixExecutor.java
-   │  ├─ model/
-   │  │  ├─ ExecutionContext.java
-   │  │  ├─ ExecutionResult.java
-   │  │  ├─ InputFileMeta.java
-   │  │  └─ NodeInfo.java
-   │  └─ service/
-   │     ├─ ExecutionContextBuildService.java
-   │     └─ ExecutorSelectDomainService.java
-   ├─ infrastructure/
-   │  ├─ client/
-   │  │  ├─ SchedulerNodeClient.java
-   │  │  ├─ TaskReportClient.java
-   │  │  └─ impl/
-   │  │     ├─ SchedulerNodeClientImpl.java
-   │  │     └─ TaskReportClientImpl.java
-   │  ├─ process/
-   │  │  ├─ ProcessRunner.java
-   │  │  ├─ ProcessLogReader.java
-   │  │  ├─ ProcessExitHandler.java
-   │  │  ├─ ProcessCanceledException.java
-   │  │  └─ ProcessTimeoutException.java
-   │  ├─ storage/
-   │  │  ├─ WorkDirManager.java
-   │  │  ├─ InputFilePrepareService.java
-   │  │  ├─ ResultFileCollector.java
-   │  │  └─ PathMappingSupport.java
-   │  └─ support/
-   │     ├─ NodeInfoCollector.java
-   │     ├─ CommandBuilder.java
-   │     └─ LogPushBuffer.java
-   └─ support/
-      └─ AgentTempFileCleaner.java
 ```
 
-这个结构和 `node-agent` 的职责是匹配的：它既有控制入口，也有执行编排，还把进程、存储、远程上报这些基础设施能力拆了出来，而不是把所有逻辑堆进一个 `service` 类。
+当前最重要的入口位置包括：
 
-## 4. 各部分功能与职责
+- `node-agent/pom.xml`
+- `node-agent/src/main/java/com/example/cae/nodeagent/`
+- `node-agent/src/main/resources/application.yml`
+- `node-agent/Dockerfile`
+- `node-agent/deploy.sh`
 
-### 4.1 启动与配置层
+### 3.2 不需要作为设计分析重点的目录
 
-#### `NodeAgentApplication`
+下面这些目录不属于源码设计主体：
 
-职责：
+```text
+node-agent/target/
+```
 
-- 启动 `node-agent`
-- 开启定时任务支持
-- 扫描整套 `com.example.cae` 包下组件
+`target/` 是打包后的编译产物，不应写入模块源码结构设计部分。
 
-#### `NodeAgentConfig`
+---
 
-职责：
+## 4. 分层与文件夹映射
 
-- 统一承载 `cae.node.*` 配置项
-- 保存节点自身身份信息，如 `nodeId`、`nodeCode`、`nodeName`
-- 保存运行配置，如 `maxConcurrency`、`workRoot`、`processLogCharset`
-- 保存远程服务地址，如 `schedulerBaseUrl`、`taskBaseUrl`
-- 保存注册成功后由调度器返回的 `nodeToken`
-- 保存跨系统共享目录映射信息
-- 保存节点支持的 `solverIds` 和 `solverVersions`
+| 分层       | 对应文件夹                                                   | 作用                                                 |
+| ---------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+| 启动入口层 | `node-agent/src/main/java/com/example/cae/nodeagent/`        | Spring Boot 启动入口，开启定时任务                   |
+| 配置层     | `node-agent/src/main/java/com/example/cae/nodeagent/config/` | 节点配置、线程池、HTTP 客户端配置                    |
+| 接口层     | `node-agent/src/main/java/com/example/cae/nodeagent/interfaces/` | 接收调度器下发任务、接收取消请求、定义请求响应对象   |
+| 应用层     | `node-agent/src/main/java/com/example/cae/nodeagent/application/` | 任务接收、异步执行编排、回传编排、心跳与注册编排     |
+| 领域层     | `node-agent/src/main/java/com/example/cae/nodeagent/domain/` | 执行上下文、执行结果、节点信息、执行器抽象与选择规则 |
+| 基础设施层 | `node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/` | 跨服务调用、进程管理、文件准备、路径映射、命令构建   |
+| 支撑层     | `node-agent/src/main/java/com/example/cae/nodeagent/support/` | 节点临时目录清理等附属支撑功能                       |
+| 资源配置层 | `node-agent/src/main/resources/`                             | 节点基础配置、服务地址、并发与求解器配置             |
 
-这是 `node-agent` 的核心配置入口，也是节点运行态信息的内存载体之一。
+如果只想快速找代码，可以这样记：
 
-#### `NodeAgentBeanConfig`
+- 看调度器下发入口：`interfaces/controller`
+- 看任务接收和异步启动：`application/manager/TaskDispatchManager`
+- 看真正执行流程：`application/manager/TaskExecuteManager`
+- 看日志/结果回传：`application/manager/TaskReportManager`
+- 看执行器实现：`domain/executor`
+- 看进程运行细节：`infrastructure/process`
+- 看输入输出目录和路径映射：`infrastructure/storage`
+- 看与 `scheduler-service`、`task-service` 的远程调用：`infrastructure/client`
 
-职责：
+---
 
-- 提供任务执行线程池 `taskExecutor`
-- 线程池大小直接跟随 `maxConcurrency`
-- 提供超时受控的 `RestTemplate`
+## 5. 模块级结构总览
 
-这里体现了 `node-agent` 的并发模型比较直接：并发上限由节点配置控制，线程池与运行中任务数之间保持一致性。
+当前源码结构如下：
 
-#### `ExecutorConfig` 与 `FeignClientConfig`
+```text
+node-agent/
+├── Dockerfile
+├── deploy.sh
+├── pom.xml
+├── src/main/java/com/example/cae/nodeagent/
+│   ├── NodeAgentApplication.java
+│   ├── application/
+│   │   ├── assembler/
+│   │   │   └── ExecutionContextAssembler.java
+│   │   ├── manager/
+│   │   │   ├── TaskDispatchManager.java
+│   │   │   ├── TaskExecuteManager.java
+│   │   │   ├── TaskReportManager.java
+│   │   │   └── TaskRuntimeRegistry.java
+│   │   ├── scheduler/
+│   │   │   └── HeartbeatJob.java
+│   │   └── service/
+│   │       ├── HeartbeatAppService.java
+│   │       ├── NodeRegisterAppService.java
+│   │       └── TaskReportAppService.java
+│   ├── config/
+│   │   ├── ExecutorConfig.java
+│   │   ├── FeignClientConfig.java
+│   │   ├── NodeAgentBeanConfig.java
+│   │   └── NodeAgentConfig.java
+│   ├── domain/
+│   │   ├── enums/
+│   │   │   └── ExecutionStageEnum.java
+│   │   ├── executor/
+│   │   │   ├── AbstractSolverExecutor.java
+│   │   │   ├── CalculixExecutor.java
+│   │   │   ├── MockExecutor.java
+│   │   │   ├── OpenFoamExecutor.java
+│   │   │   └── SolverExecutor.java
+│   │   ├── model/
+│   │   │   ├── ExecutionContext.java
+│   │   │   ├── ExecutionResult.java
+│   │   │   ├── InputFileMeta.java
+│   │   │   └── NodeInfo.java
+│   │   └── service/
+│   │       ├── ExecutionContextBuildService.java
+│   │       └── ExecutorSelectDomainService.java
+│   ├── infrastructure/
+│   │   ├── client/
+│   │   │   ├── SchedulerNodeClient.java
+│   │   │   ├── TaskReportClient.java
+│   │   │   └── impl/
+│   │   │       ├── SchedulerNodeClientImpl.java
+│   │   │       └── TaskReportClientImpl.java
+│   │   ├── process/
+│   │   │   ├── ProcessCanceledException.java
+│   │   │   ├── ProcessExitHandler.java
+│   │   │   ├── ProcessLogReader.java
+│   │   │   ├── ProcessRunner.java
+│   │   │   └── ProcessTimeoutException.java
+│   │   ├── storage/
+│   │   │   ├── InputFilePrepareService.java
+│   │   │   ├── PathMappingSupport.java
+│   │   │   ├── ResultFileCollector.java
+│   │   │   └── WorkDirManager.java
+│   │   └── support/
+│   │       ├── CommandBuilder.java
+│   │       ├── LogPushBuffer.java
+│   │       └── NodeInfoCollector.java
+│   ├── interfaces/
+│   │   ├── controller/
+│   │   │   └── DispatchController.java
+│   │   ├── request/
+│   │   │   ├── CancelTaskRequest.java
+│   │   │   └── DispatchTaskRequest.java
+│   │   └── response/
+│   │       ├── CancelTaskResponse.java
+│   │       └── DispatchTaskResponse.java
+│   └── support/
+│       └── AgentTempFileCleaner.java
+└── src/main/resources/application.yml
+```
 
-当前这两个类是空配置类，主要作用是保留结构位置，便于后续扩展：
+和 `scheduler-service` 不同，`node-agent` 的复杂度不在持久化，而在：
 
-- `ExecutorConfig` 适合未来挂接求解器执行器 Bean、解析器 Bean 或执行环境配置
-- `FeignClientConfig` 当前未启用 Feign，更像是从其他模块结构中保留下来的预留点
+- 进程执行；
+- 工作目录准备；
+- 跨系统路径映射；
+- 日志与结果回传；
+- 取消和超时处理；
+- 多执行器分流。
 
-### 4.2 接口层
+---
 
-#### `DispatchController`
+## 6. 根目录文件说明
 
-这是 `node-agent` 唯一的对外控制入口，但这里的“对外”是指对调度器开放的内部入口，而不是给前端或网关使用的业务接口。
+### 6.1 `node-agent/pom.xml`
 
-当前暴露两个接口：
+模块的 Maven 描述文件，作用包括：
+
+- 声明当前模块是 `node-agent`；
+- 继承父工程 `cae-taskmanager-backend`；
+- 引入 `spring-boot-starter-web`；
+- 引入共享模块 `common-lib`；
+- 配置 `spring-boot-maven-plugin` 打成可运行 Jar。
+
+当前这个模块没有引入数据库依赖，也没有 MyBatis、JPA，说明 `node-agent` 是一个“无持久化、纯运行时”的服务。
+
+### 6.2 `node-agent/Dockerfile`
+
+节点代理的容器镜像构建文件。
+
+它的关键点包括：
+
+- 直接使用 `opencfd/openfoam-default:2312` 作为基础镜像；
+- 容器内再安装 `openjdk-17-jre` 与 `hwloc`；
+- 设置时区为 `Asia/Shanghai`；
+- 创建 `/cae-data/workspaces` 和 `/cae-data/logs` 工作目录；
+- 将打好的 `node-agent.jar` 复制进镜像；
+- 清空基础镜像自带的 `ENTRYPOINT`；
+- 通过 `source /usr/lib/openfoam/openfoam2312/etc/bashrc` 先加载 OpenFOAM 环境，再启动 Java。
+
+这个 `Dockerfile` 说明当前 `node-agent` 的部署思路是：
+
+- 节点代理本身可以容器化；
+- 但任务执行仍主要是“容器内本机进程执行”，并不等于“每个任务独立容器执行”。
+
+### 6.3 `node-agent/deploy.sh`
+
+Ubuntu/Linux 环境下的快速部署脚本。
+
+它的作用主要有：
+
+- 检查并准备 `node-agent` 的 Jar 包；
+- 构建 `cae-node-agent:latest` 镜像；
+- 接收 Windows 宿主机 IP 和共享目录映射参数；
+- 使用 `docker run` 启动一个或多个节点代理实例；
+- 配置 `SCHEDULER_SERVICE_BASE_URL`、`TASK_SERVICE_BASE_URL`、`CAE_NODE_ADVERTISED_HOST` 等环境变量；
+- 挂载共享工作目录 `/cae-data/workspaces`。
+
+这个脚本对演示“Ubuntu 虚拟机上的 docker 计算节点”很有帮助，属于部署说明的重要组成部分。
+
+### 6.4 `node-agent/src/main/resources/application.yml`
+
+节点代理的运行配置文件，定义了：
+
+- 服务端口：默认 `8085`
+- 服务名：`node-agent`
+- 节点 ID、节点编码、节点名称
+- 日志读取字符集：`process-log-charset`
+- 节点对外端口
+- 最大并发
+- `scheduler-service` 基础地址
+- `task-service` 基础地址
+- 广播给调度器的主机地址 `advertised-host`
+- 工作目录根路径 `work-root`
+- 节点支持的求解器 ID 列表 `solver-ids`
+- 各求解器版本映射 `solver-versions`
+
+这说明当前节点代理支持“通过静态配置声明本机支持哪些求解器及版本”，再在启动注册时上报给调度中心。
+
+---
+
+## 7. 启动入口层
+
+### 7.1 对应文件夹
+
+启动入口层对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/
+```
+
+### 7.2 文件说明
+
+#### `NodeAgentApplication.java`
+
+这是节点代理的 Spring Boot 启动类，负责：
+
+- 启动整个 `node-agent`；
+- 通过 `@EnableScheduling` 开启定时任务。
+
+如果没有它：
+
+- 启动后不会执行 `NodeRegisterAppService` 的注册逻辑；
+- `HeartbeatJob` 和 `AgentTempFileCleaner` 这类定时任务也不会按计划运行。
+
+---
+
+## 8. 配置层
+
+### 8.1 对应文件夹
+
+配置层对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/config/
+```
+
+### 8.2 文件说明
+
+#### `NodeAgentConfig.java`
+
+这是节点代理最核心的配置对象，绑定前缀为 `cae.node`。
+
+当前包含的主要配置有：
+
+- 节点身份信息：`nodeId`、`nodeCode`、`nodeName`
+- 日志字符集：`processLogCharset`
+- 节点对外端口：`nodePort`
+- 最大并发：`maxConcurrency`
+- 调度服务地址：`schedulerBaseUrl`
+- 任务服务地址：`taskBaseUrl`
+- 对外通告主机地址：`advertisedHost`
+- 节点 token：`nodeToken`
+- 工作目录根路径：`workRoot`
+- Windows/Linux 路径映射前缀：`pathMappingWindows`、`pathMappingLinux`
+- 支持的求解器列表：`solverIds`
+- 求解器版本映射：`solverVersions`
+
+它是整个 `node-agent` 的配置中心，`NodeInfoCollector`、`SchedulerNodeClientImpl`、`TaskReportClientImpl`、`WorkDirManager`、`PathMappingSupport` 都依赖它。
+
+#### `NodeAgentBeanConfig.java`
+
+负责注册两个重要 Bean：
+
+1. `taskExecutor`
+2. `RestTemplate`
+
+其中 `taskExecutor` 的线程池策略是：
+
+- 核心线程数 = 最大线程数 = `maxConcurrency`
+- 队列容量 `200`
+- 线程名前缀 `node-agent-task-`
+- 拒绝策略 `CallerRunsPolicy`
+
+这说明当前节点代理的并发控制思路是：
+
+- 用配置的 `maxConcurrency` 控制真正并行执行任务数；
+- 用线程池承接异步执行；
+- 额外配合 `TaskDispatchManager` 和 `TaskRuntimeRegistry` 做运行数判断。
+
+#### `ExecutorConfig.java`
+
+执行器配置占位类。
+
+当前是空实现，说明架构上预留了“集中配置执行器相关 Bean”的位置，但首版还没有填入更复杂的执行器装配逻辑。
+
+#### `FeignClientConfig.java`
+
+Feign 配置占位类。
+
+当前同样是空实现。结合 `pom.xml` 可以看出，当前跨服务调用仍是 `RestTemplate`，还没有切到 OpenFeign。
+
+---
+
+## 9. 接口层
+
+### 9.1 对应文件夹
+
+接口层对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/interfaces/
+```
+
+它分为：
+
+- `controller/`：接收调度器下发请求
+- `request/`：请求对象
+- `response/`：响应对象
+
+### 9.2 控制器目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/interfaces/controller/
+```
+
+#### `DispatchController.java`
+
+这是节点代理暴露给调度服务的内部接口控制器，包含两个入口：
 
 - `POST /internal/dispatch-task`
 - `POST /internal/cancel-task`
 
 其中：
 
-- `dispatch-task` 负责接收调度器下发任务，请求体为 `DispatchTaskRequest`
-- `cancel-task` 负责接收取消请求，请求体为 `CancelTaskRequest`
+- `dispatch()` 负责接收任务并调用 `TaskDispatchManager.acceptTask()`
+- `cancel()` 负责接收取消请求并调用 `TaskDispatchManager.cancelTask()`
 
-接口层本身保持很薄，主要职责是：
+需要特别说明的是：
 
-- 接收请求
-- 调用 `TaskDispatchManager`
-- 返回统一的 `accepted + message` 响应
+- 当前这两个接口没有额外 token 鉴权；
+- 也就是说，当前 `scheduler-service -> node-agent` 的调用建立在受信任内网或受控部署环境之上。
 
-它不直接处理目录准备、进程控制或上报逻辑。
+### 9.3 请求对象目录
 
-#### `DispatchTaskRequest`
+对应文件夹：
 
-这个请求对象承接的是调度器已经组装好的“可执行任务”，关键字段包括：
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/interfaces/request/
+```
 
-- `taskId`、`taskNo`
-- `solverId`、`solverCode`
-- `profileId`、`taskType`
+#### `DispatchTaskRequest.java`
+
+调度器下发给节点的任务请求对象，字段包括：
+
+- `taskId`
+- `taskNo`
+- `solverId`
+- `solverCode`
+- `profileId`
+- `taskType`
 - `commandTemplate`
 - `parserName`
 - `timeoutSeconds`
 - `inputFiles`
 - `params`
 
-可以看出，`node-agent` 接收到的已经不是原始业务任务，而是带有执行模板信息的任务对象。
+它本质上是“执行上下文原始输入对象”，后续会被转换为 `ExecutionContext`。
 
-#### `CancelTaskRequest`
+#### `CancelTaskRequest.java`
 
-字段很轻量：
+取消任务请求对象，字段包括：
 
 - `taskId`
 - `reason`
 
-取消请求并不重新建模为复杂流程对象，而是让运行时注册表直接处理。
+### 9.4 响应对象目录
 
-### 4.3 应用层
+对应文件夹：
 
-#### `NodeRegisterAppService`
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/interfaces/response/
+```
 
-职责：
+#### `DispatchTaskResponse.java`
 
-- 在应用启动后自动注册节点
-- 调用 `NodeInfoCollector` 采集节点信息
-- 调用 `SchedulerNodeClient.register(...)` 向调度器注册
+下发任务响应对象，字段包括：
 
-这里通过 `@PostConstruct` 在启动后自动执行 `registerOnStartup()`，说明当前节点注册是节点自注册模式，而不是调度器主动发现模式。
+- `accepted`
+- `message`
 
-#### `HeartbeatAppService`
+调度器据此判断节点是否接受了当前任务。
 
-职责：
+#### `CancelTaskResponse.java`
 
-- 定期上报心跳
-- 心跳失败时尝试重新注册
-- 重新注册成功后再次补发一次心跳
+取消任务响应对象，字段包括：
 
-这体现出当前设计有一个轻量级自愈逻辑：如果调度器重启、节点令牌丢失或节点记录失效，节点侧会尝试恢复而不是直接静默失败。
+- `accepted`
+- `message`
 
-#### `TaskReportAppService`
+如果任务已经不在运行，则会返回 `accepted = false`。
 
-职责：
+---
 
-- 封装状态回传、日志回传、结果摘要回传、结果文件回传
-- 封装任务完成与失败回传
-- 封装节点 `runningCount` 更新
+## 10. 应用层
 
-这个类本身像一个“上报网关”，把 `TaskReportClient` 和 `SchedulerNodeClient` 聚合起来，对上层暴露统一的回传方法。
+### 10.1 对应文件夹
 
-#### `ExecutionContextAssembler`
+应用层对应文件夹：
 
-职责：
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/application/
+```
 
-- 把 `DispatchTaskRequest` 转为 `ExecutionContext`
+这是 `node-agent` 的核心编排层，负责把：
 
-它本身很薄，但保留了“接口对象”和“内部执行上下文”之间的转换边界，便于以后增加默认值处理、字段补齐、参数展开等逻辑。
+- 调度器下发请求；
+- 运行时状态管理；
+- 本地执行；
+- 结果回传；
+- 注册和心跳；
 
-#### `TaskDispatchManager`
+串成完整闭环。
 
-这是任务接入编排的核心类，职责包括：
+### 10.2 组装器目录
 
-- 校验 `taskId` 是否为空
-- 校验节点是否超出最大并发
-- 校验任务是否已经在本节点运行
-- 在 `TaskRuntimeRegistry` 中注册任务
-- 构建执行上下文
-- 初始化日志序号
-- 把真正执行逻辑投递给线程池异步执行
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/application/assembler/
+```
+
+#### `ExecutionContextAssembler.java`
+
+作用：把 `DispatchTaskRequest` 转换成 `ExecutionContext`。
+
+当前它本身逻辑很薄，真正构建逻辑委托给 `ExecutionContextBuildService`，但它提供了清晰的“接口层对象 -> 领域执行上下文”过渡层。
+
+### 10.3 Manager 目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/application/manager/
+```
+
+#### `TaskDispatchManager.java`
+
+任务接收管理器，是 `DispatchController` 背后的第一层业务入口。
+
+它负责：
+
+- 校验调度请求是否包含 `taskId`
+- 校验节点当前是否达到最大并发
+- 防止同一个任务重复运行
+- 构造执行上下文
+- 标记任务已接受
+- 将实际执行提交到线程池异步运行
 - 处理取消请求
 
-它的作用是把“收到任务”转换为“异步执行已接管”。
+关键方法如下。
 
-这里有两个非常关键的保护：
+##### `acceptTask(DispatchTaskRequest request)`
 
-- 若 `runningCount >= maxConcurrency`，直接拒绝任务
-- 若相同 `taskId` 已注册运行，直接拒绝重复下发
+流程是：
 
-#### `TaskExecuteManager`
+1. 校验请求和 `taskId`
+2. 检查 `TaskRuntimeRegistry.runningCount()` 是否已达到 `maxConcurrency`
+3. 调 `taskRuntimeRegistry.register(taskId)` 防止重复任务
+4. 将请求转成 `ExecutionContext`
+5. 调 `taskReportManager.onTaskAccepted(taskId)` 初始化日志序号
+6. 把执行任务提交给线程池，异步调用 `taskExecuteManager.execute(context)`
 
-这是本模块最核心的执行编排器，职责包括：
+如果线程池提交失败，会把已注册的运行态回滚。
 
-- 绑定当前工作线程到运行时注册表
-- 检查任务是否已被取消
+##### `cancelTask(CancelTaskRequest request)`
+
+流程是：
+
+1. 校验 `taskId`
+2. 调 `taskRuntimeRegistry.cancel(taskId, reason)`
+3. 若任务存在，就尝试中断线程和销毁进程
+
+#### `TaskExecuteManager.java`
+
+这是节点代理中最核心的执行编排器，负责把一条任务真正执行到底。
+
+主要职责包括：
+
+- 绑定当前执行线程到运行时注册表
+- 检查是否已收到取消请求
 - 准备工作目录
 - 准备输入文件
 - 上报任务进入 `RUNNING`
 - 选择执行器
-- 调用执行器实际执行
-- 根据执行结果决定走成功或失败上报
-- 处理取消、超时和普通异常
-- 最终统一收尾
+- 调用执行器执行
+- 根据执行结果走成功、失败或取消回传
+- 最终做收尾清理
 
-它把整个执行链路拆成了比较清晰的阶段，而不是把目录、文件、进程、日志、结果全部揉在一个方法里。
+关键方法如下。
 
-#### `TaskReportManager`
+##### `execute(ExecutionContext context)`
 
-这是执行结果汇总与上报编排器，职责包括：
+主执行流程：
 
-- 为每个任务初始化日志序号计数器
-- 上报运行中状态
-- 推送日志行并维护自增 `seqNo`
+1. 绑定 worker thread
+2. 检查是否已取消
+3. `prepareWorkDir(context)`
+4. `prepareInputFiles(context)`
+5. `taskReportManager.reportRunning(context)`
+6. `selectExecutor(context)`
+7. `executor.execute(context)`
+8. 根据 `ExecutionResult.success` 分流：
+   - 成功：`reportSuccess`
+   - 失败：`reportFail`
+9. 如果异常是取消或 `ProcessCanceledException`，走 `reportCanceled`
+10. `finally` 中总会 `completeTask(taskId)`
+
+##### `prepareWorkDir(ExecutionContext context)`
+
+委托 `WorkDirManager` 创建任务本地工作目录。
+
+##### `prepareInputFiles(ExecutionContext context)`
+
+委托 `InputFilePrepareService` 把任务输入文件复制或解压到本地目录。
+
+##### `selectExecutor(ExecutionContext context)`
+
+委托 `ExecutorSelectDomainService` 根据 `solverCode` 选择合适的执行器。
+
+#### `TaskReportManager.java`
+
+负责运行中的回传编排，是“执行”和“回传”之间的桥梁。
+
+它的主要职责包括：
+
+- 初始化日志序号
+- 上报 `RUNNING`
+- 逐行推送日志
+- 回传结果摘要
+- 回传结果文件
+- 上报完成
+- 上报失败
+- 上报取消
+- 完成后清理运行态并更新调度器运行数
+
+关键方法如下。
+
+##### `onTaskAccepted(Long taskId)`
+
+为任务初始化日志序号计数器。
+
+##### `reportRunning(ExecutionContext context)`
+
+向 `task-service` 上报状态 `RUNNING`。
+
+##### `pushLog(Long taskId, Integer seqNo, String line)`
+
+逐行上报日志。  
+如果外部没有指定 `seqNo`，它会自动递增生成。
+
+##### `reportSuccess(ExecutionContext context, ExecutionResult result, long startMillis)`
+
+成功回传链路：
+
+- 补齐执行时长
 - 上报结果摘要
-- 逐个上报结果文件
-- 上报完成或失败
-- 上报取消状态
-- 在任务结束后清理日志序号、移除运行态并更新节点运行数
+- 遍历回传结果文件
+- 最后标记任务完成
 
-它把“执行过程产生的各种输出”统一收敛成对外上报动作，是执行链路和远程回传链路之间的桥梁。
+##### `reportFail(ExecutionContext context, Exception ex)`
 
-#### `TaskRuntimeRegistry`
+失败回传链路：
 
-这是 `node-agent` 并发与取消控制的关键组件，职责包括：
+- 若异常是 `ProcessTimeoutException`，写 `TIMEOUT`
+- 否则写 `RUNTIME_ERROR`
 
-- 维护当前运行任务表
-- 记录任务是否被取消
-- 记录取消原因
-- 记录任务对应工作线程
-- 记录任务对应外部进程
-- 在取消时同时中断线程并强制销毁进程
+##### `reportCanceled(ExecutionContext context, String reason)`
 
-这个实现虽然简单，但非常实用。它把“任务运行态”从业务对象中抽离出来，形成节点本地的运行时内存注册表。
+取消回传链路：
 
-#### `HeartbeatJob`
+- 当前只调用 `reportStatus(taskId, "CANCELED", message)`
 
-职责：
+也就是说，当前取消是通过“状态上报”为主，而不是单独走 `markFailed` 或 `markFinished`。
 
-- 按 `cae.node.heartbeat-interval-ms` 周期触发心跳上报
+##### `completeTask(Long taskId)`
 
-### 4.4 领域层
+统一收尾动作：
 
-#### `ExecutionContext`
+- 清理日志序号缓存
+- 从运行时注册表移除任务
+- 调调度服务把 `runningCount - 1`
 
-这是执行阶段最核心的领域模型，承载：
+这里有一个很重要的实现细节：
 
-- 任务标识信息
-- 求解器和模板信息
-- 命令模板与解析器名
-- 超时设置
-- 输入文件列表和运行参数
-- 本地工作目录、输入目录、输出目录、日志目录
+- `node-agent` 在任务接收时没有显式上报 `runningCount + 1`
+- 因为调度器在选中节点时已经预占了并发数
+- 节点侧真正负责的是完成后尽快回传 `-1`，以及在心跳中持续上报实时 `runningCount`
 
-它还提供了几个语义方法：
+#### `TaskRuntimeRegistry.java`
 
-- `isTimeoutEnabled()`
-- `hasInputFiles()`
-- `hasParser()`
+这是节点代理唯一的“运行态注册表”，使用内存中的 `ConcurrentHashMap` 保存当前活动任务。
 
-说明它不是纯数据包，而是具备一定执行语义判断能力。
+它负责：
 
-#### `ExecutionResult`
+- 注册任务是否进入运行态
+- 统计运行中的任务数
+- 记录每个任务的执行线程
+- 记录每个任务的底层 `Process`
+- 标记取消请求与取消原因
+- 发出线程中断和进程销毁信号
 
-职责：
+这说明当前 `node-agent` 的运行态完全在内存里，服务重启后不会保留。
 
-- 表达执行成功或失败
-- 承载耗时、摘要、指标、结果文件列表
+### 10.4 定时任务目录
 
-它提供了：
+对应文件夹：
 
-- `success(...)`
-- `fail(...)`
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/application/scheduler/
+```
 
-两个静态工厂方法，使执行器返回结果时更统一。
+#### `HeartbeatJob.java`
 
-#### `InputFileMeta`
+心跳定时任务，默认每 `10000ms` 执行一次。
 
-职责：
+它负责调用 `HeartbeatAppService.sendHeartbeat()`，持续把节点负载上报给调度器。
 
-- 表达单个输入文件元数据
-- 提供 `fileKey / originName / storagePath`
+### 10.5 应用服务目录
 
-当前 `node-agent` 实际使用最关键的是 `originName` 与 `storagePath`。
+对应文件夹：
 
-#### `NodeInfo`
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/application/service/
+```
 
-职责：
+#### `NodeRegisterAppService.java`
 
-- 表达节点注册与心跳上报时的节点快照
-- 承载 `host`、并发数、CPU、内存、运行数、支持的求解器列表
+节点注册应用服务。
 
-#### `ExecutorSelectDomainService`
+它有两个职责：
 
-职责：
+- 在启动后通过 `@PostConstruct` 自动注册自己
+- 提供 `registerSelf()` 供其他地方显式重试注册
 
-- 遍历当前所有 `SolverExecutor`
-- 基于 `supports(context)` 选择可用执行器
-- 若没有匹配执行器则直接报错
+它调用链是：
 
-这是一种很典型的策略模式实现，适合未来继续横向扩展执行器。
+- `NodeInfoCollector.collectNodeInfo()`
+- `SchedulerNodeClient.register(nodeInfo)`
 
-#### `ExecutionContextBuildService`
+当前实现中，如果启动注册失败，只会记录日志，不会阻止 `node-agent` 启动。
 
-职责：
+#### `HeartbeatAppService.java`
 
-- 从下发请求中提取并构建标准 `ExecutionContext`
+节点心跳应用服务。
 
-它让“上下文构建”具备独立职责，便于后续添加默认值、路径渲染、参数展开等增强逻辑。
+它的逻辑是：
 
-#### `SolverExecutor`、`AbstractSolverExecutor`
+1. 采集当前节点信息
+2. 调调度器发送心跳
+3. 如果失败，则尝试“重新注册一次”
+4. 再重新发一次心跳
 
-这是执行器扩展体系的根接口和抽象基类：
+这意味着当前 `node-agent` 有一个比较实用的自恢复逻辑：
 
-- `supports(context)` 决定当前执行器是否适用
-- `execute(context)` 是统一执行入口
-- `AbstractSolverExecutor` 提供了模板方法模式，先 `prepare` 再 `doExecute`
+- 心跳失败时会主动尝试重新注册，而不是一直静默失败。
 
-#### `MockExecutor`
+#### `TaskReportAppService.java`
 
-职责：
+任务回传应用服务，是 `TaskReportManager` 对外部系统的薄封装。
 
-- 处理 `solverCode=MOCK` 或 `solverId` 为空/为 `0` 的任务
-- 模拟产生日志
-- 构造模拟执行成功结果
+它负责把回传请求分别分派给：
 
-它非常适合作为演示环境、联调环境和无真实求解器环境下的替代执行器。
+- `TaskReportClient`：回传到 `task-service`
+- `SchedulerNodeClient`：回调调度服务调整运行数
 
-#### `OpenFoamExecutor` 与 `CalculixExecutor`
+主要能力包括：
 
-职责：
+- `reportStatus`
+- `reportLog`
+- `reportResultSummary`
+- `reportResultFile`
+- `markFinished`
+- `markFailed`
+- `updateRunningCount`
 
-- 根据 `solverCode` 判断是否支持
-- 构造命令
-- 调用 `ProcessRunner` 启动本地进程
-- 实时推送标准输出与错误输出日志
-- 非 0 退出码时直接报错
-- 执行完成后收集输出目录下结果文件
-- 返回标准化 `ExecutionResult`
+---
 
-这两个执行器的结构基本一致，体现了当前执行器模型的可复用性。
+## 11. 领域层
 
-#### `ExecutionStageEnum`
+### 11.1 对应文件夹
 
-当前定义了：
+领域层对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/domain/
+```
+
+### 11.2 枚举目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/domain/enums/
+```
+
+#### `ExecutionStageEnum.java`
+
+定义了执行阶段枚举：
 
 - `RECEIVED`
 - `PREPARING`
@@ -442,600 +769,854 @@ node-agent/
 - `FINISHED`
 - `FAILED`
 
-但从现有代码看，这个枚举还没有真正接入主流程，更像是后续丰富执行阶段可观测性的预留设计。
+当前它更多是一个预留的语义化枚举，并没有完整贯穿到回传链路中。
 
-### 4.5 基础设施层
+### 11.3 领域模型目录
 
-#### `SchedulerNodeClient` / `SchedulerNodeClientImpl`
+对应文件夹：
 
-职责：
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/domain/model/
+```
 
-- 向 `scheduler-service` 发起注册
-- 向 `scheduler-service` 发起心跳
-- 向 `scheduler-service` 更新运行计数
+#### `ExecutionContext.java`
 
-其中注册接口调用：
+任务执行上下文模型，是 `node-agent` 的核心领域对象。
 
-- `POST /api/node-agent/register`
+它包含两类信息：
 
-心跳接口调用：
+1. 调度器下发的业务信息
+2. 节点本地执行时计算出的目录信息
 
-- `POST /api/node-agent/heartbeat`
+主要字段包括：
 
-运行计数更新调用：
+- 任务标识：`taskId`、`taskNo`
+- 求解器信息：`solverId`、`solverCode`
+- 模板信息：`profileId`、`taskType`
+- 执行信息：`commandTemplate`、`parserName`、`timeoutSeconds`
+- 输入信息：`inputFiles`、`params`
+- 本地目录：`workDir`、`taskDir`、`inputDir`、`outputDir`、`logDir`
 
-- `POST /internal/nodes/{nodeId}/running-count`
+它还封装了几个方便判断的方法：
 
-注册成功后，调度器返回的 `nodeId` 与 `nodeToken` 会被写回 `NodeAgentConfig`，这使节点从“配置节点”变成“注册后的活跃节点”。
+- `isTimeoutEnabled()`
+- `hasInputFiles()`
+- `hasParser()`
 
-#### `TaskReportClient` / `TaskReportClientImpl`
+#### `ExecutionResult.java`
 
-职责：
+执行结果模型，代表一次执行完成后的总结信息。
 
-- 向 `task-service` 上报状态
+核心字段包括：
+
+- 是否成功
+- 持续时间
+- 摘要文本
+- 指标信息 `metrics`
+- 结果文件列表
+
+并提供了：
+
+- `success(...)`
+- `fail(...)`
+
+两个静态工厂方法。
+
+#### `InputFileMeta.java`
+
+输入文件元信息模型，字段包括：
+
+- `fileKey`
+- `originName`
+- `storagePath`
+
+这些数据来自调度器透传的任务输入文件清单。
+
+#### `NodeInfo.java`
+
+节点信息模型，用于注册和心跳上报。
+
+核心字段包括：
+
+- 节点编码
+- 节点名称
+- 主机地址
+- 最大并发
+- CPU 使用率
+- 内存使用率
+- 当前运行任务数
+- 支持的求解器 ID 列表
+
+### 11.4 领域服务目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/domain/service/
+```
+
+#### `ExecutionContextBuildService.java`
+
+负责从 `DispatchTaskRequest` 构造 `ExecutionContext`。
+
+当前它做的是字段级拷贝，目录类字段还需要在后续工作目录准备阶段再补齐。
+
+#### `ExecutorSelectDomainService.java`
+
+执行器选择领域服务。
+
+它会遍历 Spring 容器中的所有 `SolverExecutor` 实现，找到第一个 `supports(context)` 返回 `true` 的执行器。
+
+如果找不到，就抛出异常：
+
+- `no available executor for solver`
+
+这就是当前节点侧“按求解器选择执行器”的真正入口。
+
+### 11.5 执行器目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/domain/executor/
+```
+
+#### `SolverExecutor.java`
+
+执行器统一接口，定义：
+
+- `boolean supports(ExecutionContext context)`
+- `ExecutionResult execute(ExecutionContext context)`
+
+#### `AbstractSolverExecutor.java`
+
+执行器抽象基类，提供模板方法：
+
+- 先 `prepare(context)`
+- 再 `doExecute(context)`
+
+当前默认 `prepare()` 是空实现，给各执行器预留自定义准备逻辑。
+
+#### `OpenFoamExecutor.java`
+
+OpenFOAM 执行器。
+
+它的行为是：
+
+- `supports()` 依据 `solverCode == OPENFOAM`
+- 通过 `CommandBuilder` 生成命令
+- 调 `ProcessRunner.run(...)` 执行进程
+- 将标准输出和标准错误都逐行推送给 `TaskReportManager.pushLog()`
+- 用 `ResultFileCollector` 扫描结果目录
+- 返回 `ExecutionResult.success(...)`
+
+如果进程退出码不是 0，会抛出异常。
+
+#### `CalculixExecutor.java`
+
+CalculiX 执行器。
+
+整体模式与 `OpenFoamExecutor` 一致，只是 `supports()` 判断的是 `solverCode == CALCULIX`。
+
+#### `MockExecutor.java`
+
+Mock 执行器。
+
+它支持：
+
+- `solverCode == MOCK`
+- 或 `solverId == null`
+- 或 `solverId == 0`
+
+作用主要是用于联调或演示场景：
+
+- 模拟输出 5 行日志
+- 睡眠构造执行时间
+- 返回一个简单成功结果
+
+它使得即使没有真实求解器环境，平台主链也能跑通。
+
+---
+
+## 12. 基础设施层
+
+### 12.1 对应文件夹
+
+基础设施层对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/
+```
+
+### 12.2 远程调用目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/client/
+```
+
+#### `SchedulerNodeClient.java`
+
+调度服务客户端抽象，定义：
+
+- 注册节点
+- 发送心跳
+- 调整节点运行任务数
+
+#### `TaskReportClient.java`
+
+任务服务回传客户端抽象，定义：
+
+- 上报状态
 - 上报日志
 - 上报结果摘要
 - 上报结果文件
-- 标记任务完成
-- 标记任务失败
+- 标记完成
+- 标记失败
 
-对应调用的内部接口包括：
+#### `impl/SchedulerNodeClientImpl.java`
 
-- `/internal/tasks/{taskId}/status-report`
-- `/internal/tasks/{taskId}/log-report`
-- `/internal/tasks/{taskId}/result-summary-report`
-- `/internal/tasks/{taskId}/result-file-report`
-- `/internal/tasks/{taskId}/mark-finished`
-- `/internal/tasks/{taskId}/mark-failed`
+`SchedulerNodeClient` 的实现类，使用 `RestTemplate` 调用 `scheduler-service`。
 
-它还会在请求头中写入 `X-Node-Token`，与 `task-service` 的 `NodeAgentAuthService` 配合，完成节点回传校验。
+它对应的远程接口包括：
 
-#### `ProcessRunner`
+- `POST /api/node-agent/register`
+- `POST /api/node-agent/heartbeat`
+- `POST /internal/nodes/{nodeId}/running-count`
 
-职责：
+其中有几个非常关键的实现细节：
 
-- 启动本地外部进程
-- 将进程对象绑定到运行时注册表
-- 分别读取标准输出和错误输出
-- 处理超时等待
-- 处理取消中断
-- 检查退出码
-- 在结束后清理进程引用
+- 注册时会把 `solverIds` 转成 `solvers[{solverId, solverVersion}]`
+- 注册成功后会把返回的 `nodeId` 和 `nodeToken` 回写到 `NodeAgentConfig`
+- 心跳请求会通过请求头携带 `X_NODE_TOKEN`
+- 调整运行数时，如果 `delta == 0` 或 `nodeId == null` 会直接跳过
 
-这是 `node-agent` 最贴近操作系统进程控制的类。
+#### `impl/TaskReportClientImpl.java`
 
-#### `ProcessLogReader`
+`TaskReportClient` 的实现类，使用 `RestTemplate` 调用 `task-service`。
 
-职责：
+它对应的远程接口包括：
 
-- 按配置字符集读取求解器输出流
-- 逐行回调消费者
+- `POST /internal/tasks/{taskId}/status-report`
+- `POST /internal/tasks/{taskId}/log-report`
+- `POST /internal/tasks/{taskId}/result-summary-report`
+- `POST /internal/tasks/{taskId}/result-file-report`
+- `POST /internal/tasks/{taskId}/mark-finished`
+- `POST /internal/tasks/{taskId}/mark-failed`
 
-这里的 `processLogCharset` 很重要，因为不同求解器、不同平台环境下日志编码可能并不一致。当前默认配置是 `GBK`，比较贴近 Windows 本地求解器输出场景。
+关键实现细节包括：
 
-#### `ProcessExitHandler`
+- 每次回传都会带上 `nodeId`
+- 每次回传都会携带 `X_NODE_TOKEN`
+- 结果文件路径会通过 `PathMappingSupport.toWindowsPath()` 转回平台可识别的 Windows 路径
+- 根据结果文件后缀推断 `fileType`
 
-职责：
+这说明当前节点回传链已经支持“节点 token 校验”和“跨 Windows/Linux 路径映射”。
 
-- 非 0 退出码时报错
+### 12.3 进程执行目录
 
-它虽然很简单，但保留了“退出码解释”这个扩展点。
+对应文件夹：
 
-#### `WorkDirManager`
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/process/
+```
 
-职责：
+#### `ProcessRunner.java`
 
-- 按任务创建本地工作目录
-- 生成 `input / output / log` 三类子目录
-- 将目录路径写回 `ExecutionContext`
+本地外部进程运行器，是节点代理的关键基础设施组件。
 
-当前目录结构是：
+它的执行流程是：
+
+1. 用 `ProcessBuilder` 启动外部命令
+2. 把 `Process` 注册到 `TaskRuntimeRegistry`
+3. 起两个线程分别读取标准输出和错误输出
+4. 根据是否配置超时决定 `waitFor` 方式
+5. 超时则强杀进程并抛 `ProcessTimeoutException`
+6. 等待日志线程结束
+7. 若任务已被取消，则抛 `ProcessCanceledException`
+8. 检查退出码
+9. 最终清理注册的进程句柄
+
+#### `ProcessLogReader.java`
+
+进程日志读取器。
+
+它按 `NodeAgentConfig.processLogCharset` 指定的字符集逐行读取输出流，默认可配置为 `GBK` 或 `UTF-8`。
+
+这对于 Windows 环境下的求解器输出尤其重要。
+
+#### `ProcessExitHandler.java`
+
+进程退出码检查器。
+
+当前规则很简单：
+
+- 退出码不为 0 就抛异常
+
+#### `ProcessCanceledException.java`
+
+表示任务被取消时的专用异常。
+
+#### `ProcessTimeoutException.java`
+
+表示进程执行超时的专用异常。
+
+### 12.4 存储与工作目录目录
+
+对应文件夹：
+
+```text
+node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/storage/
+```
+
+#### `WorkDirManager.java`
+
+任务工作目录管理器。
+
+它会基于：
+
+- `workRoot`
+- `taskId`
+
+为每个任务创建：
+
+- `workDir`
+- `taskDir`
+- `inputDir`
+- `outputDir`
+- `logDir`
+
+目录结构大致是：
 
 ```text
 {workRoot}/{taskId}/
-├─ input/
-├─ output/
-└─ log/
+├── input/
+├── output/
+└── log/
 ```
 
-这种设计足够清晰，便于后续定位任务现场文件。
+其中 `cleanupTaskDirs()` 当前还是预留空实现。
 
-#### `InputFilePrepareService`
+#### `InputFilePrepareService.java`
 
-职责：
+输入文件准备服务，是节点代理最关键的文件处理组件之一。
 
-- 遍历任务输入文件列表
-- 根据共享路径映射把来源路径转换成本机可访问路径
-- 把输入文件复制到本地 `input` 目录
+它的主要职责包括：
 
-这一步是把“任务文件在平台上的存储位置”转换为“当前节点本地执行目录中的输入材料”。
+- 根据 `storagePath` 找到原始输入文件
+- 通过 `PathMappingSupport.toLinuxPath()` 将平台路径映射为节点本地路径
+- 把输入文件复制到任务 `inputDir`
+- 如果文件是 `.zip`，则自动解压到工作目录
+- 通过 Zip Slip 防护确保压缩包不会越界写入
+- 如果压缩包只有一个顶层目录，则把 `taskDir` 指向该目录
 
-#### `ResultFileCollector`
+这使得当前节点代理可以直接处理“上传压缩包后执行”的场景。
 
-职责：
+#### `ResultFileCollector.java`
 
-- 收集 `output` 目录下的直接文件
+结果文件收集器。
 
-当前实现比较简单，只收集输出目录第一层文件，不递归处理子目录。
+当前实现非常简单：
 
-#### `PathMappingSupport`
+- 扫描 `outputDir`
+- 只返回该目录下的文件
+- 不递归子目录
 
-职责：
+这说明当前结果收集属于基础版实现，没有复杂的规则过滤、归档和索引策略。
 
-- 处理 Windows 路径到 Linux 路径的映射
-- 处理 Linux 路径回写为 Windows 路径
+#### `PathMappingSupport.java`
 
-这对于当前项目非常关键，因为平台很可能是：
+跨系统路径映射工具。
 
-- `task-service` 在 Windows 上落库和保存路径
-- `node-agent` 在 Linux 节点上执行
-- 节点和平台通过共享目录读写同一批文件
+它提供：
 
-没有这层映射，就无法把数据库中的路径安全地转换为节点本机可读取路径。
+- `toLinuxPath(String windowsPath)`
+- `toWindowsPath(String linuxPath)`
 
-#### `NodeInfoCollector`
+主要用于 Windows 平台的任务文件路径与 Linux 节点容器内路径之间的互相转换。
 
-职责：
+这是当前支持“Windows 管理平台 + Ubuntu docker 节点”场景的关键组件。
 
-- 采集节点标识与主机地址
-- 采集最大并发数
-- 采集 CPU 使用率
-- 采集内存使用率
-- 采集当前运行任务数
-- 采集节点支持的求解器列表
+### 12.5 基础支撑目录
 
-它让节点注册与心跳不必依赖外部传参，而是直接根据本机状态实时生成快照。
-
-#### `CommandBuilder`
-
-职责：
-
-- 根据操作系统类型包装命令模板
-- Windows 下使用 `cmd /c`
-- Linux 下使用 `/bin/sh -c`
-
-这意味着当前 `node-agent` 执行的不是结构化命令数组模板，而是字符串命令模板。
-
-#### `LogPushBuffer`
-
-当前这个类提供了简单的日志缓存与批量取出能力，但从现有执行链路看并未实际接入主流程，属于预留组件。
-
-### 4.6 通用支持层
-
-#### `AgentTempFileCleaner`
-
-职责：
-
-- 定期扫描 `workRoot`
-- 删除超过 24 小时未更新的任务目录
-
-这说明当前节点并不是永久保留所有任务现场，而是有一个非常轻量的清理策略，避免本地磁盘持续膨胀。
-
-## 5. 核心业务流程
-
-### 5.1 节点启动注册流程
-
-`node-agent` 启动后的典型流程如下：
+对应文件夹：
 
 ```text
-NodeAgentApplication 启动
-  -> NodeRegisterAppService.registerOnStartup()
-  -> NodeInfoCollector.collectNodeInfo()
-  -> SchedulerNodeClientImpl.register()
-  -> 调用 scheduler-service /api/node-agent/register
-  -> scheduler-service 返回 nodeId + nodeToken
-  -> 写回 NodeAgentConfig
+node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/support/
 ```
 
-这个流程的关键意义在于：
+#### `CommandBuilder.java`
 
-- 节点不是写死在调度器里的
-- 节点上线后可以自注册
-- 节点令牌由调度器统一下发
+命令构建器。
 
-### 5.2 节点心跳流程
+它会把 `commandTemplate` 中的变量替换为上下文真实值，例如：
+
+- `${taskId}`
+- `${taskNo}`
+- `${solverId}`
+- `${solverCode}`
+- `${profileId}`
+- `${taskType}`
+- `${workDir}`
+- `${taskDir}`
+- `${inputDir}`
+- `${outputDir}`
+- `${logDir}`
+
+同时还会把 `params` 中的键值也并入替换。
+
+最终：
+
+- Windows 上用 `cmd /c`
+- Linux 上用 `/bin/sh -c`
+
+执行命令。
+
+需要注意的是，当前替换是“简单字符串替换”，没有做更强的参数转义和 shell 安全封装。
+
+#### `LogPushBuffer.java`
+
+日志缓冲组件，提供：
+
+- `append(String line)`
+- `drain()`
+
+当前主执行链路里基本没有真正使用它，更像是为“批量推送日志”预留的支撑点。
+
+#### `NodeInfoCollector.java`
+
+节点信息采集器，是注册和心跳的基础组件。
+
+它负责采集：
+
+- 节点编码、名称
+- 通告给平台的主机地址
+- 最大并发
+- CPU 使用率
+- 内存使用率
+- 当前运行任务数
+- 支持的求解器列表
+
+其中：
+
+- `runningCount` 来自 `TaskRuntimeRegistry`
+- CPU 和内存来自 `OperatingSystemMXBean`
+- 如果无法读取系统负载，就回落为 `0`
+- 若设置了 `advertisedHost`，优先使用该地址，否则自动拼接本机 IP + 端口
+
+---
+
+## 13. 支撑层
+
+### 13.1 对应文件夹
+
+支撑层对应文件夹：
 
 ```text
-HeartbeatJob 定时触发
-  -> HeartbeatAppService.sendHeartbeat()
-  -> NodeInfoCollector.collectNodeInfo()
-  -> SchedulerNodeClientImpl.heartbeat()
-  -> 调用 scheduler-service /api/node-agent/heartbeat
-  -> 若失败则尝试重新注册
-  -> 重新注册成功后再次发送心跳
+node-agent/src/main/java/com/example/cae/nodeagent/support/
 ```
 
-心跳上报的内容主要包括：
+### 13.2 文件说明
+
+#### `AgentTempFileCleaner.java`
+
+节点临时目录清理器。
+
+它是一个定时任务，默认每小时执行一次，会：
+
+- 扫描 `workRoot`
+- 找出最后修改时间超过 24 小时的任务目录
+- 递归删除这些旧目录
+
+这是节点磁盘空间自清理的基础能力。
+
+需要说明的是：
+
+- 当前实现是直接递归删除；
+- 适合作为开发和演示环境的基础清理策略；
+- 生产环境如果要增强，应再补更严格的安全边界、保留策略和清理审计。
+
+---
+
+## 14. 与外部服务接口的对应关系
+
+`node-agent` 没有自己的数据库表，核心关系主要体现在它与 `scheduler-service` 和 `task-service` 的接口协作上。
+
+### 14.1 与 `scheduler-service` 的接口关系
+
+节点代理主动调用调度服务的接口包括：
+
+- `POST /api/node-agent/register`
+- `POST /api/node-agent/heartbeat`
+- `POST /internal/nodes/{nodeId}/running-count`
+
+对应代码链路：
+
+- `application/service/NodeRegisterAppService.java`
+- `application/service/HeartbeatAppService.java`
+- `application/service/TaskReportAppService.java`
+- `infrastructure/client/impl/SchedulerNodeClientImpl.java`
+
+### 14.2 接收 `scheduler-service` 的派发接口
+
+调度服务主动调用节点代理的接口包括：
+
+- `POST /internal/dispatch-task`
+- `POST /internal/cancel-task`
+
+对应代码链路：
+
+- `interfaces/controller/DispatchController.java`
+- `application/manager/TaskDispatchManager.java`
+
+### 14.3 与 `task-service` 的回传接口关系
+
+节点代理主动调用任务服务的接口包括：
+
+- `POST /internal/tasks/{taskId}/status-report`
+- `POST /internal/tasks/{taskId}/log-report`
+- `POST /internal/tasks/{taskId}/result-summary-report`
+- `POST /internal/tasks/{taskId}/result-file-report`
+- `POST /internal/tasks/{taskId}/mark-finished`
+- `POST /internal/tasks/{taskId}/mark-failed`
+
+对应代码链路：
+
+- `application/manager/TaskReportManager.java`
+- `application/service/TaskReportAppService.java`
+- `infrastructure/client/impl/TaskReportClientImpl.java`
+
+### 14.4 与共享文件目录的关系
+
+节点代理对文件目录的使用关系包括：
+
+- 读取平台输入文件：`InputFilePrepareService`
+- 将输入文件复制或解压到本地任务目录：`WorkDirManager + InputFilePrepareService`
+- 扫描本地输出目录收集结果：`ResultFileCollector`
+- 回传结果文件路径时做 Linux/Windows 路径反向映射：`PathMappingSupport`
+
+---
+
+## 15. 核心调用链
+
+### 15.1 启动注册链路
+
+节点代理启动后的注册链路如下：
+
+1. `NodeAgentApplication` 启动 Spring 容器
+2. `NodeRegisterAppService.registerOnStartup()` 被 `@PostConstruct` 触发
+3. `NodeInfoCollector.collectNodeInfo()` 收集：
+   - 节点标识
+   - 广播地址
+   - 并发
+   - 当前运行数
+   - 支持求解器列表
+4. `SchedulerNodeClientImpl.register()` 组装注册请求
+5. 调 `scheduler-service` 的 `/api/node-agent/register`
+6. 调度服务返回 `nodeId + nodeToken`
+7. 节点代理把两者写回 `NodeAgentConfig`
+
+需要强调的是：
+
+- `node-agent` 上报的求解器能力来源于本地配置；
+- 上报时会同时带 `solverVersion`；
+- 调度中心据此重建节点能力表。
+
+### 15.2 心跳链路
+
+心跳链路如下：
+
+1. `HeartbeatJob.sendHeartbeat()` 定时执行
+2. `HeartbeatAppService.sendHeartbeat()`
+3. `NodeInfoCollector.collectNodeInfo()` 重新采集 CPU、内存、运行数
+4. `SchedulerNodeClientImpl.heartbeat(nodeInfo)`
+5. 调 `scheduler-service` 的 `/api/node-agent/heartbeat`
+6. 请求头带上 `X_NODE_TOKEN`
+
+如果失败：
+
+1. `HeartbeatAppService` 先尝试重新注册
+2. 再重发一次心跳
+
+这条链保证了节点代理和调度器之间能进行“自恢复式重新握手”。
+
+### 15.3 任务接收与异步执行链路
+
+调度器下发任务后的链路如下：
+
+1. `scheduler-service` 调 `POST /internal/dispatch-task`
+2. `DispatchController.dispatch()`
+3. `TaskDispatchManager.acceptTask(request)`
+4. 校验并发和重复任务
+5. `ExecutionContextAssembler.fromDispatchRequest(request)`
+6. `taskReportManager.onTaskAccepted(taskId)`
+7. 提交给线程池异步执行
+8. `TaskExecuteManager.execute(context)`
+
+这说明：
+
+- 接口层只负责接请求；
+- 真正执行一定是异步的；
+- 每个运行任务都先登记到 `TaskRuntimeRegistry`。
+
+### 15.4 本地执行链路
+
+任务真正执行时的链路如下：
+
+1. `TaskExecuteManager.prepareWorkDir(context)`
+2. `WorkDirManager.prepareTaskDirs(context)`
+3. `TaskExecuteManager.prepareInputFiles(context)`
+4. `InputFilePrepareService.prepare(context)`
+5. `taskReportManager.reportRunning(context)`
+6. `ExecutorSelectDomainService.selectExecutor(context)`
+7. 对应执行器：
+   - `OpenFoamExecutor`
+   - `CalculixExecutor`
+   - `MockExecutor`
+8. `CommandBuilder.buildCommand(context)`
+9. `ProcessRunner.run(...)`
+10. 日志逐行通过 `TaskReportManager.pushLog(...)` 回传
+11. 完成后 `ResultFileCollector.collect(context)`
+12. `TaskReportManager.reportSuccess(...)` 或 `reportFail(...)`
+13. `TaskReportManager.completeTask(taskId)`
+
+### 15.5 输入文件准备链路
+
+输入文件准备链路如下：
+
+1. 从调度器传来的 `DispatchTaskRequest.inputFiles` 取出每个文件的 `storagePath`
+2. `PathMappingSupport.toLinuxPath()` 把平台路径转换为节点本地路径
+3. 复制到 `inputDir`
+4. 如果是压缩包：
+   - 自动解压
+   - 做 Zip Slip 防护
+   - 根据顶层目录情况调整 `taskDir`
+
+这条链是当前“Windows 平台上传压缩包 -> Ubuntu 节点执行”的关键实现。
+
+### 15.6 日志、结果与状态回传链路
+
+回传链路如下：
+
+1. 执行开始时：`reportRunning()`
+2. 执行过程中：`pushLog()`
+3. 执行成功后：
+   - `reportResultSummary()`
+   - `reportResultFile()` 循环回传
+   - `markFinished()`
+4. 执行失败后：`markFailed()`
+5. 执行取消后：`reportStatus(..., "CANCELED", ...)`
+6. 执行完成后：`updateRunningCount(-1)`
+
+每次回传都会带：
 
 - `nodeId`
-- `nodeCode`
-- `cpuUsage`
-- `memoryUsage`
-- `runningCount`
+- `X_NODE_TOKEN`
 
-这保证调度器拿到的是动态节点状态，而不是静态配置。
+因此 `task-service` 可以校验回传身份是否合法。
 
-### 5.3 任务下发与执行流程
+### 15.7 取消任务链路
 
-这是 `node-agent` 最关键的主链路：
+取消链路如下：
 
-```text
-scheduler-service 下发 /internal/dispatch-task
-  -> DispatchController.dispatch()
-  -> TaskDispatchManager.acceptTask()
-  -> 校验 taskId / 并发上限 / 是否重复运行
-  -> TaskRuntimeRegistry.register(taskId)
-  -> ExecutionContextAssembler.fromDispatchRequest()
-  -> TaskReportManager.onTaskAccepted(taskId)
-  -> 投递到 taskExecutor 异步执行
-  -> TaskExecuteManager.execute(context)
-  -> 绑定 workerThread
-  -> 检查是否已取消
-  -> WorkDirManager.prepareTaskDirs()
-  -> InputFilePrepareService.prepare()
-  -> TaskReportManager.reportRunning()
-  -> ExecutorSelectDomainService.selectExecutor()
-  -> SolverExecutor.execute()
-  -> CommandBuilder.buildCommand()
-  -> ProcessRunner.run()
-  -> ProcessLogReader 按行读取日志并回传
-  -> ResultFileCollector.collect()
-  -> TaskReportManager.reportSuccess()/reportFail()
-  -> TaskReportManager.completeTask()
-```
+1. `scheduler-service` 调 `POST /internal/cancel-task`
+2. `DispatchController.cancel()`
+3. `TaskDispatchManager.cancelTask(request)`
+4. `TaskRuntimeRegistry.cancel(taskId, reason)`
+5. 若任务正在运行：
+   - 标记 `cancelRequested = true`
+   - 保存取消原因
+   - 强制销毁底层进程
+   - 中断执行线程
+6. `TaskExecuteManager.execute()` 捕获取消态
+7. `TaskReportManager.reportCanceled(context, reason)`
 
-这个流程说明：
+当前取消策略是“强制终止”，不是“优雅停止”。
 
-- `node-agent` 不是“收到任务就同步执行然后阻塞返回”
-- 而是“快速接受请求，然后异步接管任务执行”
+---
 
-因此它更像一个本节点上的轻量执行守护进程。
+## 16. 设计文档与当前实现的对照
 
-### 5.4 任务取消流程
+### 16.1 已经较好落地的部分
 
-```text
-scheduler-service 下发 /internal/cancel-task
-  -> DispatchController.cancel()
-  -> TaskDispatchManager.cancelTask()
-  -> TaskRuntimeRegistry.cancel(taskId, reason)
-  -> 设置 cancelRequested
-  -> 如有进程则 destroyForcibly()
-  -> 如有线程则 interrupt()
-  -> TaskExecuteManager 捕获取消态
-  -> TaskReportManager.reportCanceled()
-  -> TaskReportManager.completeTask()
-```
+结合 `需求分析与系统设计.md`、`后端设计.md`、`开发文档.md`，当前 `node-agent` 已经较好落地了这些设计目标：
 
-这条链路表明当前取消实现不是业务层“标记取消后等待自然结束”，而是直接对本地运行态发出中断与进程销毁信号。
+- 节点启动自动注册；
+- 周期性心跳上报；
+- 节点运行负载采集；
+- 接收调度器下发任务；
+- 支持执行器抽象与多执行器分流；
+- 工作目录准备；
+- 输入文件复制与 zip 解压；
+- 本机进程执行；
+- 标准输出/错误输出日志回传；
+- 执行结果摘要与结果文件回传；
+- 中途取消与超时处理；
+- 节点回传时使用 token 鉴权；
+- Linux/Windows 路径映射；
+- 节点临时目录定期清理。
 
-## 6. 核心设计
+### 16.2 当前是“最小执行闭环”而不是“完整执行平台”的部分
 
-### 6.1 节点侧职责保持聚焦
+当前实现仍明显属于基础版执行代理：
 
-当前 `node-agent` 的设计边界非常清晰，它只做三类事：
+- 只有本机进程执行，没有真正的 `CONTAINER` 执行模式；
+- 没有和 `solver-service.execMode` 做完整联动；
+- 没有对象存储或稳定共享存储方案，仍是本地路径复制；
+- 结果收集只是简单扫描 `outputDir`；
+- 没有更复杂的结果解析器机制；
+- 没有执行重试、断点恢复、沙箱隔离；
+- 没有统一的任务级资源限制和监控；
+- 没有更强的日志缓冲、批量推送或背压控制；
+- 没有持久化运行态，重启后活动任务上下文会丢失。
 
-- 节点注册与心跳
-- 本地任务执行
-- 执行结果回传
+### 16.3 当前是“预留/占位”的部分
 
-它不负责：
+当前这些类更偏预留位：
 
-- 任务创建与校验
-- 求解器模板管理
-- 调度策略选择
-- 用户鉴权与前端接口
+- `ExecutorConfig.java`
+- `FeignClientConfig.java`
+- `ExecutionStageEnum.java`
+- `LogPushBuffer.java`
+- `WorkDirManager.cleanupTaskDirs()`
 
-这种职责划分很适合微服务架构中的执行代理模块。
+它们适合在文档里描述成“为后续增强预留的扩展点”，而不是已经形成完整能力。
 
-### 6.2 并发控制采用“线程池 + 运行时注册表”
+### 16.4 当前实现里几个必须写清楚的细节
 
-当前并发模型的核心是：
+#### 1. 节点实际上报求解器能力来自本地配置
 
-- `NodeAgentBeanConfig` 提供固定大小线程池
-- `TaskDispatchManager` 先检查 `runningCount`
-- `TaskRuntimeRegistry` 负责记录活动任务
+当前 `node-agent` 不是扫描系统软件自动发现求解器，而是：
 
-这种设计的优点是实现成本低、语义直观，而且可以自然支持：
+- 从 `application.yml` 或环境变量读 `solver-ids`
+- 再根据 `solver-versions` 组装版本号
+- 注册时上报给调度器
 
-- 并发上限控制
-- 重复任务拦截
-- 取消信号投递
-- 运行中任务计数
+因此它是“配置声明 + 注册上报”的实现，不是“自动探测安装环境”的实现。
 
-### 6.3 执行器采用策略模式
+#### 2. 调度器已经预占并发，节点侧主要负责回传实时运行数和结束后的 `-1`
 
-当前执行器体系是：
+当前并发数更新逻辑不是完全由节点侧单独决定，而是两边协同：
 
-- `SolverExecutor` 统一接口
-- `AbstractSolverExecutor` 提供模板方法
-- `MockExecutor / OpenFoamExecutor / CalculixExecutor` 负责具体实现
-- `ExecutorSelectDomainService` 按 `supports(...)` 选择执行器
+- `scheduler-service` 在选中节点时先 `runningCount + 1`
+- `node-agent` 心跳持续上报真实 `runningCount`
+- 任务完成时 `node-agent` 再主动发 `updateRunningCount(-1)`
 
-这样做的好处是：
+这点在文档里最好明确，否则容易误以为节点接收任务时为什么没有显式 `+1`。
 
-- 扩展新求解器时不需要改动总流程
-- 执行器之间职责隔离
-- 可以支持“真实求解器”和“模拟求解器”并存
+#### 3. 命令执行目前是 shell 字符串替换，不是结构化参数执行
 
-### 6.4 共享存储与跨系统路径映射解耦
+`CommandBuilder` 当前只是把变量替换进 `commandTemplate`，再交给：
 
-`PathMappingSupport + InputFilePrepareService + TaskReportClientImpl` 共同解决了一个很现实的问题：
+- Windows：`cmd /c`
+- Linux：`/bin/sh -c`
 
-- 平台记录的文件路径可能是 Windows 风格
-- 计算节点执行环境可能是 Linux
-- 结果文件回传后又需要让平台按 Windows 路径进行展示或访问
+执行。
 
-这说明当前设计已经考虑到“平台与计算节点异构部署”的真实场景，而不只是单机自娱自乐的演示代码。
+这说明当前实现灵活，但也意味着：
 
-### 6.5 执行与上报解耦
+- 参数转义能力较弱；
+- 复杂命令更依赖模板书写正确；
+- 安全控制和可审计性还可以进一步增强。
 
-`TaskExecuteManager` 不直接写 HTTP 调用，而是统一通过 `TaskReportManager -> TaskReportAppService -> TaskReportClient` 上报。
+#### 4. 调度器下发到节点代理的接口当前没有额外鉴权
 
-这带来两个好处：
+当前 `scheduler-service -> node-agent` 的 `/internal/dispatch-task`、`/internal/cancel-task` 调用，没有像节点回传到 `task-service` 那样携带 `X_NODE_TOKEN`。
 
-- 执行编排逻辑更清晰
-- 将来如果要把回传方式从同步 HTTP 改成消息队列、批量缓冲或异步重试，改动面会更小
+所以当前安全模型更接近：
 
-### 6.6 节点状态采用“注册 + 心跳 + 轻量自恢复”
+- 节点回传到平台：有 token 校验
+- 平台下发到节点：默认受信任网络
 
-当前节点治理模型不是复杂的服务发现体系，而是：
+这在文档里必须如实说明。
 
-- 启动时主动注册
-- 运行中持续心跳
-- 心跳失败时尝试重新注册
+#### 5. 取消任务当前是强制 kill，不是优雅停止
 
-这非常适合本科毕设原型系统：实现难度适中，但又足以支撑动态节点管理的完整展示。
+`TaskRuntimeRegistry.cancel()` 会：
 
-## 7. 架构难点与解决方案
+- 中断线程
+- `process.destroyForcibly()`
 
-### 7.1 难点一：调度任务如何真正落到节点本地执行
+这对基础版原型是可接受的，但在真实求解器场景下，后续可能需要按求解器支持情况提供更细的退出策略。
 
-调度器只知道任务应该去哪台节点，但并不知道如何在节点上准备目录、复制输入、执行命令、收集输出。
+---
 
-当前解决方案是：
+## 17. 推荐的阅读顺序
 
-- 用 `DispatchTaskRequest` 传递执行所需关键元数据
-- 在节点侧构建 `ExecutionContext`
-- 用 `TaskExecuteManager` 统一编排执行链路
+### 17.1 先看对外入口
 
-这样把“调度成功”与“执行完成”之间的空白补上了。
+建议先看：
 
-### 7.2 难点二：如何在节点上实现可取消、可超时的进程执行
+- `DispatchController.java`
+- `DispatchTaskRequest.java`
+- `CancelTaskRequest.java`
 
-真实求解器运行常常是长时任务，如果只调用 `Runtime.exec()` 而没有运行态跟踪，就很难实现取消和超时。
+这样可以先理解节点代理从调度器接收的到底是什么。
 
-当前解决方案是：
+### 17.2 再看执行编排主链
 
-- `TaskRuntimeRegistry` 保存 `workerThread` 与 `process`
-- `ProcessRunner` 使用 `waitFor(timeout, TimeUnit.SECONDS)` 做超时控制
-- 取消时同时 `interrupt` 线程并 `destroyForcibly` 进程
+接着看：
 
-这个方案虽然不算复杂，但已经足以支持任务生命周期中的关键异常分支。
+- `TaskDispatchManager.java`
+- `TaskExecuteManager.java`
+- `TaskReportManager.java`
+- `TaskRuntimeRegistry.java`
 
-### 7.3 难点三：日志如何实时回传
+这四个类基本就是整个节点代理的“主心骨”。
 
-如果任务执行完成后才一次性上传日志，不利于调试，也不利于观察任务是否卡死。
+### 17.3 再看执行器和进程基础设施
 
-当前解决方案是：
+然后看：
 
-- `ProcessLogReader` 分别读取 stdout / stderr
-- 每读取一行就交给 `TaskReportManager.pushLog(...)`
-- 由 `TaskReportClientImpl` 实时推送到 `task-service`
+- `ExecutorSelectDomainService.java`
+- `OpenFoamExecutor.java`
+- `CalculixExecutor.java`
+- `MockExecutor.java`
+- `ProcessRunner.java`
+- `CommandBuilder.java`
 
-因此当前系统已经具备了“任务运行中持续看到节点输出”的基础能力。
+这样能看清楚任务是怎么从“上下文”变成“本机进程”的。
 
-### 7.4 难点四：节点文件路径如何跨系统兼容
+### 17.4 最后看注册、心跳、回传与文件路径
 
-在 Windows 平台管理任务、Linux 节点执行求解，是非常常见但也非常容易出问题的部署方式。
+最后看：
 
-当前解决方案是：
+- `NodeRegisterAppService.java`
+- `HeartbeatAppService.java`
+- `SchedulerNodeClientImpl.java`
+- `TaskReportClientImpl.java`
+- `InputFilePrepareService.java`
+- `PathMappingSupport.java`
 
-- 在配置中定义 `pathMappingWindows` 与 `pathMappingLinux`
-- 输入文件复制前做一次路径转换
-- 结果文件回传前再做一次反向路径转换
+这样就能把“执行端”和“平台端”的联动关系串起来。
 
-这样可以避免数据库中记录的路径在节点上无法直接访问。
+---
 
-### 7.5 难点五：节点回传接口如何做最基本安全控制
+## 18. 当前结论
 
-如果 `task-service` 完全相信任意请求都来自合法节点，会存在伪造回传风险。
+`node-agent` 当前已经完成了“节点代理最小执行闭环”的核心实现：
 
-当前解决方案是：
+- 节点能注册、能心跳；
+- 调度器能把任务下发到节点；
+- 节点能准备工作目录和输入文件；
+- 节点能选择执行器并启动本地进程；
+- 日志、状态、结果摘要和结果文件都能回传；
+- 取消、超时、异常退出都有基本处理。
 
-- 节点注册时由 `scheduler-service` 生成 `nodeToken`
-- `node-agent` 回传 `task-service` 时带上 `X-Node-Token`
-- `task-service` 再调用 `scheduler-service` 验证 `nodeToken`
+因此，从毕设或课程设计原型的标准看，它已经足以支撑：
 
-这说明当前系统已经具备了内部节点身份校验意识，而不是单纯依赖网关白名单。
+> “中心调度 + 多节点执行 + 执行过程回传”的基础分布式执行闭环。
 
-## 8. 关键技术手段
+但它还不是生产级执行平台代理。当前更准确的定位是：
 
-### 8.1 启动自注册
+> 一个面向 CAE 仿真场景、以本机进程执行为主的基础型节点执行代理。
 
-通过 `@PostConstruct` 自动触发节点注册，减少人工干预。
+如果下一步继续增强，最值得优先补的方向是：
 
-### 8.2 定时心跳
-
-通过 `@Scheduled` 周期上报节点负载，支持动态节点状态刷新。
-
-### 8.3 本地进程管理
-
-通过 `ProcessBuilder + waitFor(timeout)` 实现命令启动、阻塞等待、超时控制。
-
-### 8.4 运行态注册表
-
-通过 `ConcurrentHashMap` 保存任务运行时状态，实现：
-
-- 运行任务计数
-- 取消标记
-- 工作线程跟踪
-- 子进程跟踪
-
-### 8.5 实时日志推送
-
-通过双流读取标准输出与错误输出，实现执行过程日志实时上报。
-
-### 8.6 节点负载采集
-
-通过 `OperatingSystemMXBean` 采集 CPU 与内存使用率，形成调度所需的运行状态信息。
-
-### 8.7 共享目录路径映射
-
-通过 `PathMappingSupport` 统一处理 Windows 与 Linux 路径映射，解决异构部署问题。
-
-### 8.8 结果文件类型推断
-
-`TaskReportClientImpl` 会根据后缀简单判断结果文件类型：
-
-- `log / txt` -> `LOG`
-- `html / pdf / doc / docx` -> `REPORT`
-- `png / jpg / jpeg / bmp` -> `IMAGE`
-- 其他 -> `RESULT`
-
-这有助于结果文件在任务侧被更好地分类展示。
-
-## 9. 当前实现的优点
-
-- 已形成“注册节点 -> 心跳上报 -> 接收任务 -> 执行命令 -> 回传状态与结果”的完整执行闭环。
-- 已具备可扩展的执行器体系，支持 `Mock`、`OpenFOAM`、`CalculiX` 三类执行模式。
-- 已考虑跨操作系统共享目录映射，不是只适用于单机同构环境。
-- 已支持任务取消与超时处理，节点不再只是单向执行黑盒。
-- 已支持实时日志回传，便于联调、排错和演示。
-- 已具备节点内部身份校验链路，安全性优于纯白名单放行。
-- 已提供临时任务目录清理能力，避免节点磁盘无限增长。
-
-## 10. 当前实现的局限与边界
-
-### 10.1 `dispatch-task` 与 `cancel-task` 入口当前未做节点侧认证
-
-`DispatchController` 当前只暴露内部接口，但没有额外校验调用方身份。
-
-这意味着当前设计默认：
-
-- `node-agent` 端口只在受控内网暴露
-- 调度器是唯一调用者
-
-这更适合原型环境，而不是直接暴露到复杂生产网络环境。
-
-### 10.2 命令模板当前还是字符串直传模式
-
-`CommandBuilder` 当前只是把 `commandTemplate` 包装成：
-
-- Windows: `cmd /c`
-- Linux: `/bin/sh -c`
-
-它还没有实现：
-
-- 参数占位符渲染
-- 命令白名单
-- 执行沙箱
-- 环境变量隔离
-
-因此当前更像“可信内部命令模板执行”，而不是生产级安全执行框架。
-
-### 10.3 结果处理能力目前较轻量
-
-当前节点侧完成后主要做的是：
-
-- 判断退出码
-- 收集 `output` 目录下的文件
-- 上报摘要与文件
-
-但尚未实现：
-
-- 解析器 `parserName` 的实际调用
-- 结构化结果提取
-- 指标自动解析
-- 递归目录结果收集
-
-也就是说，当前 `parserName` 字段还处于“数据已贯通、能力未落地”的状态。
-
-### 10.4 部分类仍是预留扩展点
-
-当前尚未真正接入主链路的预留项包括：
-
-- `ExecutionStageEnum`
-- `LogPushBuffer`
-- `ExecutorConfig`
-- `FeignClientConfig`
-- `WorkDirManager.cleanupTaskDirs(...)`
-
-这说明模块已经考虑了后续扩展方向，但当前版本仍然是以原型可用为目标。
-
-### 10.5 回传可靠性仍以同步 HTTP 为主
-
-当前所有状态、日志、结果回传都依赖同步 `RestTemplate` 调用，没有：
-
-- 失败重试队列
-- 批量缓冲
-- 断点续传
-- 幂等去重
-
-这在网络稳定的演示环境中通常足够，但在高延迟或弱网络环境下可靠性有限。
-
-### 10.6 清理策略较简单
-
-`AgentTempFileCleaner` 当前按“目录最后修改时间超过 24 小时”直接递归删除。
-
-这套策略虽然实用，但还没有：
-
-- 与任务最终状态联动
-- 白名单保护
-- 更细粒度保留策略
-- 删除失败重试与审计记录
-
-### 10.7 容器化执行环境目前存在“设计目标”和“默认编排”之间的差距
-
-仓库中 `node-agent/Dockerfile` 明显是面向 `OpenFOAM + Java` 的专用节点镜像，而根目录 `compose.yaml` 中的 `node-agent` 服务实际使用的是通用 `Dockerfile.service`。
-
-这意味着当前默认 `docker compose` 方案更偏向：
-
-- 原型联调
-- `MockExecutor` 场景
-- 通用 Java 服务运行
-
-而真正的求解器执行环境，仍然更依赖专用镜像或单独部署脚本。
-
-## 11. 对本科毕设的价值
-
-从本科毕业设计角度看，`node-agent` 的价值非常高，主要体现在：
-
-1. 它把“任务管理平台”真正延伸到了“计算节点执行平台”，使系统不再只是数据库和页面层面的原型。
-2. 它把调度器、任务中心和真实执行环境连接起来，形成完整的端到端闭环。
-3. 它体现了分布式节点注册、心跳监测、任务下发、远程执行、日志回传、结果回收等多个关键技术点。
-4. 它能够很好支撑“CAE 仿真任务并非只做表单管理，而是能在节点上实际执行”的核心展示目标。
-
-因此，`node-agent` 是论文和答辩中非常值得重点讲解的模块之一。
-
-## 12. 答辩时可采用的表述
-
-可以将该模块概括为：
-
-> `node-agent` 是部署在计算节点上的执行代理服务，负责完成节点自注册、周期性心跳上报、调度任务接收、本地工作目录准备、求解器命令执行、日志实时回传、结果文件收集以及任务完成状态回传。系统通过 `scheduler-service` 管理节点身份与运行状态，通过 `task-service` 汇聚任务执行过程数据，从而形成“调度中心下发、节点本地执行、任务中心统一沉淀”的完整执行闭环。
-
-## 13. 后续可扩展方向
-
-- 为 `/internal/dispatch-task` 和 `/internal/cancel-task` 增加调度器身份认证或签名校验。
-- 真正落地 `parserName` 对应的结果解析器体系，自动提取结构化指标与摘要。
-- 把命令模板从字符串执行升级为可渲染、可校验的结构化命令模型。
-- 增加日志与结果回传失败后的本地缓冲、重试与幂等机制。
-- 支持输出目录递归收集、结果压缩打包与分级上传。
-- 完善任务目录清理策略，按任务状态、保留周期和磁盘水位做更精细治理。
-- 增加更多求解器执行器，如 Abaqus、Fluent、Code_Aster 等。
-- 把节点资源模型从 CPU/内存扩展到 GPU、许可证、磁盘容量等维度。
-- 将 `node-agent/Dockerfile` 所代表的专用求解器运行环境与默认编排方式统一起来。
-
-## 14. 当前结论
-
-`node-agent` 当前已经完成了本项目原型平台中与“节点执行代理”相关的核心能力建设：
-
-- 可完成节点启动注册与周期性心跳
-- 可接收调度器下发任务并进行并发控制
-- 可在本地准备任务目录与输入文件
-- 可按求解器类型选择执行器并启动本地进程
-- 可处理日志回传、结果回传、取消和超时
-- 可通过 `nodeToken` 与上游服务协同完成内部回传认证
-
-从实现深度看，它已经超出了“简单调用一个脚本”的演示层面，而是形成了一个具有节点身份管理、本地执行编排、进程控制和结果汇聚能力的轻量级执行代理原型。
-
-从本科毕设要求看，这个模块已经能够很好支撑“微服务 + 动态计算节点 + 仿真任务执行闭环”这一核心技术目标的展示。
+- 容器执行模式；
+- 更可靠的共享存储或对象存储；
+- 更细粒度的结果收集与解析；
+- 更强的调度器到节点代理鉴权；
+- 更安全的命令构建与参数转义；
+- 更稳健的执行隔离、重试与恢复机制。

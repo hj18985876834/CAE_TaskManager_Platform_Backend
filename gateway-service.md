@@ -1,539 +1,776 @@
-# gateway-service 模块分析文档
+# gateway-service 模块说明文档
 
-## 1. 模块定位
+## 1. 文档目的
 
-`gateway-service` 是整个平台的统一入口，位于前端与后端各业务微服务之间，负责接收外部请求并完成统一转发与基础安全控制。
+这份文档将 `gateway-service` 按“模块根目录 -> 分层目录 -> 具体代码文件 -> 文件职责”的颗粒度重新整理，目标是让网关模块的设计说明不再停留在“统一入口”这种概念层面，而是能直接定位到真实代码。
 
-在当前项目中，它的职责被明确限制为四类：
+它主要解决下面几类问题：
 
-- 路由转发
-- 统一鉴权
-- 基础权限拦截
-- 请求日志与异常收口
+- 网关的启动入口、配置层、过滤器层、支撑层分别在哪个文件夹；
+- 每个代码文件具体承担什么职责；
+- 请求从进入网关到转发给下游服务，实际经过了哪些步骤；
+- 白名单、管理员路径控制、用户上下文透传、异常处理分别落在哪些类；
+- 设计文档中“统一入口、统一鉴权、统一转发”的目标，当前代码具体实现到了什么程度。
 
-它**不承担业务处理职责**，也不直接访问业务数据库，不参与任务调度、节点管理、求解器管理等核心业务逻辑。
+分析范围以 `gateway-service/src/main/java`、`gateway-service/src/main/resources` 和 `gateway-service/pom.xml` 为主。
 
-这种设计符合微服务架构中的“边界清晰、入口统一、业务下沉到服务内部”的原则，也很适合作为本科毕设中的网关层实现。
+---
 
-## 2. 模块在系统中的作用
+## 2. 模块定位
 
-从系统整体看，`gateway-service` 主要解决以下问题：
+`gateway-service` 是整个平台的统一入口服务，位于前端与各个后端业务服务之间。
 
-1. 对前端或外部调用方提供统一访问入口，避免直接暴露多个业务服务地址。
-2. 在进入业务服务前统一完成 Token 校验，避免每个服务重复实现同样的入口认证逻辑。
-3. 将用户上下文通过请求头透传到下游服务，支撑后端服务内部做进一步业务鉴权。
-4. 对常见安全异常进行统一响应，保证接口返回风格一致。
-5. 记录请求链路日志，为联调和问题定位提供基础支撑。
+它在当前系统中的核心职责有四类：
 
-因此，`gateway-service` 在架构上起到的是“入口控制层”而不是“业务服务层”的作用。
+1. 统一接收外部请求；
+2. 按路径把请求转发到对应后端服务；
+3. 在网关层完成基础 token 校验和粗粒度权限控制；
+4. 统一记录请求日志、补充追踪头、收口安全异常响应。
 
-## 3. 当前实现架构
+它明确不承担这些职责：
 
-### 3.1 技术栈
+- 不直接处理业务数据；
+- 不直接访问数据库；
+- 不做任务调度；
+- 不做节点管理；
+- 不做求解器管理；
+- 不做任务生命周期流转。
 
-- Spring Boot
-- Spring Cloud Gateway
-- WebFlux 响应式过滤链
-- 基于配置属性的静态路由
-- 公共库 `common-lib` 中的 Header 常量、异常、Token 工具
+因此，`gateway-service` 的准确定位是：
 
-### 3.2 当前目录结构
+> 统一入口层 + 基础安全前置层，而不是业务服务层。
 
-当前代码结构如下：
+---
+
+## 3. 模块根目录与源码入口
+
+### 3.1 模块根目录
+
+模块根目录是：
 
 ```text
 gateway-service/
-└── src/main/java/com/example/cae/gateway/
-    ├── GatewayApplication.java
-    ├── config/
-    │   ├── CorsConfig.java
-    │   ├── GatewayBeanConfig.java
-    │   ├── GatewayRouteConfig.java
-    │   └── WhiteListConfig.java
-    ├── filter/
-    │   ├── JwtAuthFilter.java
-    │   ├── RequestLogFilter.java
-    │   └── TraceIdFilter.java
-    ├── handler/
-    │   └── GatewayExceptionHandler.java
-    ├── properties/
-    │   ├── GatewayRouteProperties.java
-    │   └── GatewaySecurityProperties.java
-    ├── router/
-    │   └── RouteDefinitionLoader.java
-    └── support/
-        ├── GatewayRequestMutator.java
-        ├── GatewayResponseWriter.java
-        ├── PathMatcherSupport.java
-        └── TokenParser.java
 ```
 
-整体结构比较轻量，和网关“只做入口层能力”的定位是匹配的。
+当前最重要的入口位置包括：
 
-## 4. 各部分功能与职责
+- `gateway-service/pom.xml`
+- `gateway-service/src/main/java/com/example/cae/gateway/`
+- `gateway-service/src/main/resources/application.yml`
 
-### 4.1 启动层
-
-#### `GatewayApplication`
-
-职责：
-
-- 启动网关服务
-- 扫描网关自身配置、过滤器、异常处理器与属性类
-
-这一层没有业务逻辑，保持最小化即可。
-
-### 4.2 配置层
-
-#### `GatewayRouteConfig`
-
-职责：
-
-- 通过 `RouteLocator` 声明网关路由规则
-- 将不同路径前缀映射到不同微服务
-
-当前已配置的主要转发边界包括：
-
-- `/api/auth/**`、`/api/users/**` -> `user-service`
-- `/api/solvers/**`、`/api/profiles/**`、`/api/file-rules/**` -> `solver-service`
-- `/api/tasks/*/schedules`、`/api/node-agent/**`、`/api/scheduler/**`、`/api/nodes/**`、`/api/schedules/**` -> `scheduler-service`
-- `/api/tasks/**`、`/api/admin/tasks/**`、`/api/admin/dashboard/**` -> `task-service`
-
-它体现的是“按服务职责边界进行路径分流”的设计思想。
-
-#### `CorsConfig`
-
-职责：
-
-- 统一处理跨域请求
-- 允许前端在开发阶段通过浏览器访问网关接口
-
-当前实现较宽松，属于开发和演示友好型配置。
-
-#### `GatewayBeanConfig`
-
-职责：
-
-- 提供 `AntPathMatcher` 等通用 Bean
-- 支撑白名单路径、管理员路径的模式匹配
-
-#### `WhiteListConfig`
-
-职责：
-
-- 维护无需用户登录即可访问的路径
-- 将默认白名单与配置文件中的自定义白名单合并
-
-当前默认白名单包括：
-
-- `/api/auth/login`
-- `/api/auth/logout`
-- `/api/node-agent/register`
-- `/api/node-agent/heartbeat`
-- `/actuator/health`
-
-这里要特别注意：节点注册和心跳放行的是“用户 JWT 校验”，并不意味着完全无保护。对于节点心跳，调度服务下游仍会校验 `X-Node-Token`。
-
-### 4.3 过滤器层
-
-#### `TraceIdFilter`
-
-职责：
-
-- 为每个请求生成 `X-Trace-Id`
-- 将 traceId 注入请求头，便于全链路日志串联
-
-这是最前置的过滤器之一，属于基础可观测性能力。
-
-#### `RequestLogFilter`
-
-职责：
-
-- 记录请求方法、路径、traceId、耗时
-- 为联调和排错提供入口访问日志
-
-它并不关心业务内容，只关注请求经过网关时的访问轨迹。
-
-#### `JwtAuthFilter`
-
-职责：
-
-- 判断当前请求是否属于白名单
-- 从 `Authorization` 头中提取 Bearer Token
-- 使用 `JwtUtil` 解析与校验 Token
-- 判断管理员专属路径和管理员写操作路径
-- 将 `userId` 和 `roleCode` 注入下游请求头
-
-这是网关的核心过滤器，也是当前 `gateway-service` 最关键的实现点。
-
-它不仅做“是否登录”的判断，还做一层粗粒度角色拦截：
-
-- 某些路径无论请求方法如何，都要求管理员角色
-- 某些资源路径在 `POST / PUT / DELETE` 等写操作下要求管理员角色
-
-这样做的目的，是在网关层尽早拦截明显越权请求，减少无效请求继续进入业务服务。
-
-### 4.4 支撑层
-
-#### `TokenParser`
-
-职责：
-
-- 从 `Authorization` 请求头中提取 Token
-- 检查是否满足 `Bearer xxx` 格式
-
-它将“Token 解析”从过滤器主逻辑中拆出，使 `JwtAuthFilter` 更清晰。
-
-#### `PathMatcherSupport`
-
-职责：
-
-- 对路径与 Ant 风格通配符模式进行匹配
-- 支撑白名单、管理员路径判断
-
-#### `GatewayRequestMutator`
-
-职责：
-
-- 将 `X-User-Id`、`X-Role-Code` 写入下游请求头
-
-这样下游服务不需要重复解析前端传来的 Token，而是直接读取网关已经透传的用户上下文。
-
-#### `GatewayResponseWriter`
-
-当前为预留类，尚未承担实际功能。
-
-#### `RouteDefinitionLoader`
-
-当前也是预留扩展点，尚未实现动态路由加载逻辑。
-
-### 4.5 异常处理层
-
-#### `GatewayExceptionHandler`
-
-职责：
-
-- 统一捕获网关层抛出的异常
-- 将 `UnauthorizedException` 转为 401
-- 将 `ForbiddenException` 转为 403
-- 将其他异常转为 500
-- 输出统一 JSON 响应格式
-
-这样可以保证前端拿到的异常响应风格稳定，便于统一处理。
-
-### 4.6 属性配置层
-
-#### `GatewayRouteProperties`
-
-职责：
-
-- 读取业务服务的目标地址
-- 支撑通过环境变量切换不同部署环境
-
-当前属于显式配置 URI 的路由方案，而不是基于注册中心的动态服务发现。
-
-#### `GatewaySecurityProperties`
-
-职责：
-
-- 读取白名单路径
-- 读取管理员专属路径
-- 读取管理员写操作路径
-
-这样既保留了默认规则，也为后续环境化配置预留了空间。
-
-## 5. 核心请求流程
-
-当前网关的典型请求流程如下：
+### 3.2 不需要作为设计分析重点的目录
 
 ```text
-客户端请求
-  -> TraceIdFilter 生成 traceId
-  -> RequestLogFilter 开始计时
-  -> JwtAuthFilter 做白名单判断 / Token 校验 / 角色判断 / Header 注入
-  -> GatewayRouteConfig 按路径转发到目标服务
-  -> 下游服务处理并返回
-  -> RequestLogFilter 记录耗时日志
-  -> 如有异常则由 GatewayExceptionHandler 统一输出 JSON
+gateway-service/target/
 ```
 
-其中过滤器顺序为：
+`target/` 是编译产物，不属于源码设计主体。
 
-- `TraceIdFilter`：`-300`
-- `RequestLogFilter`：`-200`
-- `JwtAuthFilter`：`-100`
+---
 
-这一顺序是合理的，因为：
+## 4. 分层与文件夹映射
 
-- 先生成 traceId，后续日志和异常都能拿到同一个链路标识；
-- 再记录请求耗时；
-- 最后再做鉴权与角色校验。
+| 分层 | 对应文件夹 | 作用 |
+| --- | --- | --- |
+| 启动入口层 | `gateway-service/src/main/java/com/example/cae/gateway/` | Spring Boot 启动入口 |
+| 配置层 | `gateway-service/src/main/java/com/example/cae/gateway/config/` | 路由、CORS、Bean、白名单配置 |
+| 过滤器层 | `gateway-service/src/main/java/com/example/cae/gateway/filter/` | TraceId、请求日志、JWT 鉴权过滤链 |
+| 异常处理层 | `gateway-service/src/main/java/com/example/cae/gateway/handler/` | 网关层异常统一响应 |
+| 属性配置层 | `gateway-service/src/main/java/com/example/cae/gateway/properties/` | 路由地址和安全路径配置绑定 |
+| 路由支撑层 | `gateway-service/src/main/java/com/example/cae/gateway/router/` | 预留路由加载扩展点 |
+| 支撑层 | `gateway-service/src/main/java/com/example/cae/gateway/support/` | Token 解析、路径匹配、请求变更等辅助组件 |
+| 资源配置层 | `gateway-service/src/main/resources/` | 端口、路由地址、白名单和管理员路径配置 |
 
-## 6. 核心设计
+如果只想快速找代码，可以这样记：
 
-### 6.1 设计一：网关保持“薄层”
+- 看转发规则：`config/GatewayRouteConfig.java`
+- 看鉴权逻辑：`filter/JwtAuthFilter.java`
+- 看日志与 trace：`filter/TraceIdFilter.java`、`filter/RequestLogFilter.java`
+- 看路径匹配和 token 解析：`support/`
+- 看配置绑定：`properties/`
+- 看网关异常收口：`handler/GatewayExceptionHandler.java`
 
-这是本模块最重要的设计原则。
+---
 
-当前网关只做：
+## 5. 模块级结构总览
 
-- 入口认证
-- 路由转发
-- 粗粒度权限控制
-- 日志与异常收口
+当前源码结构如下：
 
-不做：
+```text
+gateway-service/
+├── pom.xml
+├── src/main/java/com/example/cae/gateway/
+│   ├── GatewayApplication.java
+│   ├── config/
+│   │   ├── CorsConfig.java
+│   │   ├── GatewayBeanConfig.java
+│   │   ├── GatewayRouteConfig.java
+│   │   └── WhiteListConfig.java
+│   ├── filter/
+│   │   ├── JwtAuthFilter.java
+│   │   ├── RequestLogFilter.java
+│   │   └── TraceIdFilter.java
+│   ├── handler/
+│   │   └── GatewayExceptionHandler.java
+│   ├── properties/
+│   │   ├── GatewayRouteProperties.java
+│   │   └── GatewaySecurityProperties.java
+│   ├── router/
+│   │   └── RouteDefinitionLoader.java
+│   └── support/
+│       ├── GatewayRequestMutator.java
+│       ├── GatewayResponseWriter.java
+│       ├── PathMatcherSupport.java
+│       └── TokenParser.java
+└── src/main/resources/application.yml
+```
 
-- 登录业务
-- 用户查询
-- 任务处理
+和其他服务相比，`gateway-service` 的结构明显更轻量：
+
+- 没有 `interfaces/`
+- 没有 `application/`
+- 没有 `domain/`
+- 没有 `infrastructure/persistence/`
+
+因为它的重点不是业务处理，而是“请求入口控制”。
+
+---
+
+## 6. 根目录文件说明
+
+### 6.1 `gateway-service/pom.xml`
+
+模块的 Maven 描述文件，作用包括：
+
+- 声明当前模块是 `gateway-service`
+- 继承父工程 `cae-taskmanager-backend`
+- 引入 `spring-cloud-starter-gateway`
+- 引入共享基础模块 `common-lib`
+- 配置 `spring-boot-maven-plugin`
+
+这说明网关模块的技术核心是 Spring Cloud Gateway，而公共 Header、异常、JWT 工具等则来自 `common-lib`。
+
+### 6.2 `gateway-service/src/main/resources/application.yml`
+
+网关运行配置文件，定义了：
+
+- 服务端口：默认 `8080`
+- 服务名：`gateway-service`
+- Gateway 最大内存缓冲：`10MB`
+- `spring.cloud.gateway.discovery.locator.enabled = true`
+- 各业务服务基础地址：
+  - `user-service-uri`
+  - `solver-service-uri`
+  - `scheduler-service-uri`
+  - `task-service-uri`
+- 安全配置：
+  - `white-list`
+  - `admin-only-paths`
+  - `admin-write-paths`
+
+虽然配置里打开了 `discovery.locator.enabled`，但当前真正使用的还是静态 URI 路由，不是服务发现驱动的动态路由。
+
+---
+
+## 7. 启动入口层
+
+### 7.1 对应文件夹
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/
+```
+
+### 7.2 文件说明
+
+#### `GatewayApplication.java`
+
+Spring Boot 启动入口类。
+
+作用很纯粹：
+
+- 启动网关服务；
+- 扫描网关的配置类、过滤器、处理器和属性配置类。
+
+它本身不承载业务逻辑。
+
+---
+
+## 8. 配置层
+
+### 8.1 对应文件夹
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/config/
+```
+
+### 8.2 文件说明
+
+#### `GatewayRouteConfig.java`
+
+网关最核心的配置类之一，负责声明实际的路由规则。
+
+当前定义的路由映射关系如下：
+
+- `user-service`
+  - `/api/auth/**`
+  - `/api/users/**`
+- `solver-service`
+  - `/api/solvers/**`
+  - `/api/profiles/**`
+  - `/api/file-rules/**`
+- `scheduler-service`
+  - `/api/tasks/*/schedules`
+  - `/api/node-agent/**`
+  - `/api/scheduler/nodes/**`
+  - `/api/scheduler/records/**`
+  - `/api/nodes/**`
+  - `/api/schedules/**`
+- `task-service`
+  - `/api/tasks/**`
+  - `/api/admin/tasks/**`
+  - `/api/admin/dashboard/**`
+
+这里有一个很关键的实现细节：
+
+- `/api/tasks/*/schedules` 被单独提前路由到 `scheduler-service`
+- 而 `/api/tasks/**` 的其余请求走 `task-service`
+
+这说明网关已经显式处理了“同一前缀下不同职责服务”的路由拆分问题。
+
+#### `CorsConfig.java`
+
+全局 CORS 配置。
+
+当前策略是：
+
+- 允许所有来源
+- 允许所有 Header
+- 允许所有方法
+- 允许携带凭证
+
+这对联调和毕设原型比较友好，但在生产环境并不算严格策略。
+
+#### `GatewayBeanConfig.java`
+
+网关基础 Bean 配置。
+
+当前只注册了一个：
+
+- `AntPathMatcher`
+
+这个 Bean 主要供 `PathMatcherSupport` 使用。
+
+#### `WhiteListConfig.java`
+
+白名单配置封装类。
+
+它做了两件事：
+
+1. 定义默认白名单：
+   - `/api/auth/login`
+   - `/api/auth/logout`
+   - `/api/node-agent/register`
+   - `/api/node-agent/heartbeat`
+   - `/actuator/health`
+2. 将默认白名单与配置文件中的白名单合并去重
+
+这意味着：
+
+- 用户登录和节点注册/心跳无需 token
+- 其它业务请求默认都要进入鉴权链
+
+---
+
+## 9. 过滤器层
+
+### 9.1 对应文件夹
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/filter/
+```
+
+网关的真实请求主链就在这里。
+
+### 9.2 文件说明
+
+#### `TraceIdFilter.java`
+
+全局追踪 ID 过滤器。
+
+它的职责是：
+
+- 为每个进入网关的请求生成一个 traceId
+- 写入请求头 `X-Trace-Id`
+- 再继续传给下游服务
+
+当前执行顺序：
+
+- `getOrder() = -300`
+
+说明它是整个过滤链中最早执行的一批过滤器之一。
+
+#### `RequestLogFilter.java`
+
+请求日志过滤器。
+
+它会记录：
+
+- 请求方法
+- 请求路径
+- traceId
+- 请求耗时
+
+输出日志格式由 `buildAccessLog(...)` 统一构造。
+
+当前执行顺序：
+
+- `getOrder() = -200`
+
+所以它会在 TraceId 已补充后执行，并能拿到 traceId。
+
+#### `JwtAuthFilter.java`
+
+网关最核心的安全过滤器。
+
+它负责：
+
+1. 判断当前路径是否在白名单中；
+2. 如果不在白名单，则从 `Authorization` 头中提取 token；
+3. 调 `JwtUtil.validateToken(token)` 校验 token；
+4. 解析 `userId` 与 `roleCode`；
+5. 对管理员路径做粗粒度角色判断；
+6. 将用户上下文透传到下游请求头；
+7. 再放行给后续链路与最终路由。
+
+当前执行顺序：
+
+- `getOrder() = -100`
+
+说明它在 trace 和日志基础能力之后执行，但在真正路由转发前完成鉴权。
+
+它内部有两类默认管理员路径：
+
+1. `DEFAULT_ADMIN_ONLY_PATHS`
+   - `/api/admin/**`
+   - `/api/users/**`
+   - `/api/nodes/**`
+   - `/api/schedules/**`
+2. `DEFAULT_ADMIN_WRITE_PATHS`
+   - `/api/solvers/**`
+   - `/api/profiles/**`
+   - `/api/file-rules/**`
+
+判定逻辑是：
+
+- 命中 `admin-only` 路径，必须是 `ADMIN`
+- 命中 `admin-write` 路径，且方法是 `POST/PUT/DELETE`，必须是 `ADMIN`
+
+这体现了当前网关的权限模型：
+
+- 用户级鉴权前置在网关
+- 更细粒度的业务权限仍应由下游服务继续控制
+
+---
+
+## 10. 异常处理层
+
+### 10.1 对应文件夹
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/handler/
+```
+
+### 10.2 文件说明
+
+#### `GatewayExceptionHandler.java`
+
+网关层统一异常处理器，实现了 `ErrorWebExceptionHandler`。
+
+它负责将网关过滤链抛出的异常统一包装成 JSON：
+
+- `UnauthorizedException` -> 401
+- `ForbiddenException` -> 403
+- 其它异常 -> 500
+
+返回体仍保持 `Result.fail(...)` 的统一格式。
+
+这保证了：
+
+- 网关侧错误和业务服务错误风格一致；
+- 前端不会拿到风格完全不同的默认 WebFlux 错误页面。
+
+---
+
+## 11. 属性与支撑层
+
+### 11.1 属性配置目录
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/properties/
+```
+
+#### `GatewayRouteProperties.java`
+
+绑定前缀 `gateway.routes` 的配置类。
+
+当前维护四个下游服务基础地址：
+
+- `userServiceUri`
+- `solverServiceUri`
+- `schedulerServiceUri`
+- `taskServiceUri`
+
+所有静态路由最终都从这里读取目标地址。
+
+#### `GatewaySecurityProperties.java`
+
+绑定前缀 `gateway.security` 的配置类。
+
+负责接收：
+
+- `whiteList`
+- `adminOnlyPaths`
+- `adminWritePaths`
+
+它让白名单和管理员路径规则可以通过配置文件扩展，而不是完全写死在代码里。
+
+### 11.2 路由支撑目录
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/router/
+```
+
+#### `RouteDefinitionLoader.java`
+
+当前是空实现的预留类。
+
+从命名看，它原本适合承担：
+
+- 动态加载路由定义
+- 从配置中心或数据库加载路由
+
+但在当前版本中，真正的路由规则还是直接写在 `GatewayRouteConfig` 里。
+
+### 11.3 支撑目录
+
+对应文件夹：
+
+```text
+gateway-service/src/main/java/com/example/cae/gateway/support/
+```
+
+#### `TokenParser.java`
+
+Token 提取工具。
+
+它负责：
+
+- 从 `Authorization` 头取值
+- 判断是否以 `Bearer ` 开头
+- 截掉前缀后返回 token 正文
+
+这个类让 `JwtAuthFilter` 不必自己处理头解析细节。
+
+#### `PathMatcherSupport.java`
+
+路径匹配工具，内部基于 `AntPathMatcher`，提供：
+
+- `matchAny(String path, List<String> patterns)`
+
+当前白名单判断、管理员路径判断都依赖它。
+
+#### `GatewayRequestMutator.java`
+
+请求变更工具。
+
+它当前最重要的能力是：
+
+- 把 `userId` 和 `roleCode` 写入请求头
+
+也就是：
+
+- `X-User-Id`
+- `X-Role-Code`
+
+这使下游服务能够直接拿到用户身份上下文，而不必重复解析 token。
+
+#### `GatewayResponseWriter.java`
+
+当前是空实现的预留类。
+
+从命名上看，它适合将来承担：
+
+- 统一响应改写
+- 网关层特殊响应生成
+- 某些错误返回包装
+
+但当前版本尚未实际使用。
+
+---
+
+## 12. 与下游服务的路由关系
+
+网关模块的核心之一就是“把哪些路径转发到哪个服务”。
+
+### 12.1 路由到 `user-service`
+
+路径包括：
+
+- `/api/auth/**`
+- `/api/users/**`
+
+意义：
+
+- 用户登录登出
+- 用户管理
+
+### 12.2 路由到 `solver-service`
+
+路径包括：
+
+- `/api/solvers/**`
+- `/api/profiles/**`
+- `/api/file-rules/**`
+
+意义：
+
+- 求解器定义管理
+- 模板管理
+- 文件规则管理
+
+### 12.3 路由到 `scheduler-service`
+
+路径包括：
+
+- `/api/tasks/*/schedules`
+- `/api/node-agent/**`
+- `/api/scheduler/nodes/**`
+- `/api/scheduler/records/**`
+- `/api/nodes/**`
+- `/api/schedules/**`
+
+意义：
+
+- 节点接入
 - 节点管理
-- 调度决策
+- 调度记录查询
+- 某任务调度记录查询
 
-这样可以避免网关和业务耦合过深，也便于后续替换或扩展。
+### 12.4 路由到 `task-service`
 
-### 6.2 设计二：粗粒度鉴权前置，细粒度鉴权下沉
+路径包括：
 
-当前网关层负责两级控制：
+- `/api/tasks/**`
+- `/api/admin/tasks/**`
+- `/api/admin/dashboard/**`
 
-1. 用户是否已经携带有效 Token。
-2. 某些明显的管理员路径或管理员写操作是否满足管理员角色。
+意义：
 
-但更细粒度的权限判断仍应由下游业务服务继续处理，例如：
+- 任务创建、校验、提交、查询
+- 管理员任务操作
+- 仪表盘统计
 
-- 某个任务是否属于当前用户
-- 某个管理操作是否满足业务状态约束
+---
 
-这种分层是合理的，因为网关只知道“用户是谁、角色是什么”，不知道业务对象的完整上下文。
+## 13. 核心请求调用链
 
-### 6.3 设计三：用户上下文通过 Header 透传
+### 13.1 普通受保护请求链路
 
-网关在鉴权通过后，将：
+典型请求链如下：
 
-- `X-User-Id`
-- `X-Role-Code`
+1. 请求进入网关
+2. `TraceIdFilter` 生成 traceId 并写入请求头
+3. `RequestLogFilter` 开始计时
+4. `JwtAuthFilter` 判断是否白名单
+5. 若不是白名单：
+   - 解析 `Authorization`
+   - 校验 token
+   - 解析用户身份
+   - 判断管理员权限
+   - 写入 `X-User-Id` 与 `X-Role-Code`
+6. 匹配路由规则
+7. 转发到下游服务
+8. 请求返回后，`RequestLogFilter` 记录耗时日志
 
-注入到下游请求头中。
+### 13.2 白名单请求链路
 
-这样做的好处是：
+如：
 
-- 下游服务不需要重复解析 Token；
-- 统一了服务间的用户上下文获取方式；
-- 简化了各业务服务的入口处理。
+- `/api/auth/login`
+- `/api/node-agent/register`
+- `/api/node-agent/heartbeat`
 
-### 6.4 设计四：配置化路由与安全路径
+它们的链路是：
 
-当前路由与安全路径都采用“默认规则 + 配置文件覆盖/补充”的形式：
+1. 进入网关
+2. 写 traceId
+3. 记录请求日志
+4. `JwtAuthFilter` 发现命中白名单
+5. 直接放行
+6. 路由到对应服务
 
-- 路由目标地址来自 `application.yml`
-- 白名单和管理员路径也来自 `application.yml`
+这也是为什么节点代理注册和心跳不需要先登录。
 
-这样做兼顾了：
+### 13.3 管理员接口链路
 
-- 本科毕设阶段的实现简单性
-- 后续部署环境切换的可配置性
+如：
 
-## 7. 架构难点与解决方案
+- `/api/users/**`
+- `/api/nodes/**`
+- `/api/schedules/**`
+- 对 `/api/solvers/**` 的写操作
 
-### 7.1 难点一：既要统一鉴权，又不能让网关承担业务权限逻辑
+链路上比普通用户多一步：
 
-问题：
+- `JwtAuthFilter` 在解析出 `roleCode` 后，会额外检查是否为 `ADMIN`
 
-- 如果所有权限判断都放到网关，网关会变重，甚至演变成半个业务服务。
-- 如果网关完全不做权限判断，又会让明显越权请求进入下游，增加后端负担。
+如果不是，就抛 `ForbiddenException`，最后由 `GatewayExceptionHandler` 返回 403。
 
-当前解决方案：
+### 13.4 网关异常链路
 
-- 网关只做“是否登录 + 是否管理员”的粗粒度判断；
-- 业务级权限仍交由下游服务处理。
+当过滤器链抛出异常时：
 
-这是当前项目里比较平衡的方案。
+1. `JwtAuthFilter` 或其它组件抛出异常
+2. `GatewayExceptionHandler.handle(...)` 捕获
+3. 包装成 `Result.fail(...)`
+4. 设置正确的 HTTP 状态码
+5. 返回 JSON 给前端
 
-### 7.2 难点二：如何让下游服务拿到用户身份
+---
 
-问题：
+## 14. 设计文档与当前实现的对照
 
-- 各业务服务如果都自行解析 Token，会造成重复实现；
-- 还会导致服务间安全处理逻辑不一致。
+### 14.1 已经较好落地的部分
 
-当前解决方案：
+结合现有设计文档和代码，当前网关已经较好落地了这些目标：
 
-- 统一由网关解析 Token；
-- 统一透传 `X-User-Id` 和 `X-Role-Code`；
-- 下游服务直接读取请求头。
+- 提供统一入口；
+- 按服务进行路径转发；
+- 支持白名单；
+- 支持基于 token 的统一前置鉴权；
+- 支持粗粒度管理员接口保护；
+- 支持将用户上下文透传给下游服务；
+- 支持统一请求日志与 traceId；
+- 支持统一网关异常响应。
 
-这降低了服务间重复代码，也符合微服务网关的常见实践。
+### 14.2 当前是“基础网关”而不是“完整服务治理网关”的部分
 
-### 7.3 难点三：节点接口与用户接口安全模型不同
+当前实现仍明显是基础版网关：
 
-问题：
+- 路由仍是静态 URI，不是动态服务发现；
+- 没有熔断、限流、重试、降级；
+- 没有黑白名单 IP 控制；
+- 没有更细粒度权限模型；
+- 没有 API 版本治理；
+- 没有请求体级审计或改写；
+- 没有统一的响应包装增强；
+- 没有网关级缓存。
 
-- 平台既有“用户通过 JWT 调用”的接口，也有“节点代理通过 nodeToken 调用”的接口。
-- 如果简单把节点接口也纳入普通 JWT 流程，会和节点侧调用方式冲突。
+### 14.3 当前实现里几个必须写清楚的细节
 
-当前解决方案：
+#### 1. 当前 token 校验依赖的是简化版 `JwtUtil`
 
-- 在网关白名单中放行节点注册、节点心跳等接口的用户 JWT 校验；
-- 真正的节点身份验证由下游 `scheduler-service` 继续通过 `X-Node-Token` 校验。
+网关虽然叫 `JwtAuthFilter`，但它依赖的 `JwtUtil` 来自 `common-lib`，当前实际上只是 Base64 编码解析，不是严格的标准 JWT 实现。
 
-这样实现了“不同调用主体，不同认证方式”的分层处理。
+所以文档中更准确的说法应是：
 
-### 7.4 难点四：保持入口层可扩展但不过度设计
+- 实现了“基于 token 的统一认证前置”
+- 但当前 token 机制仍是简化版
 
-问题：
+#### 2. 管理员权限控制当前只做粗粒度路径级保护
 
-- 毕设项目往往容易一开始就引入注册中心、限流、熔断、动态路由等复杂能力；
-- 这样虽然“看起来更高级”，但会显著增加实现和联调成本。
+网关当前能做到的是：
 
-当前解决方案：
+- 哪些路径必须管理员访问
+- 哪些写操作必须管理员访问
 
-- 已预留 `RouteDefinitionLoader` 等扩展点；
-- 当前仍采用静态路由和简化安全方案；
-- 将高级服务治理能力明确放到后续扩展阶段。
+但它不负责更细的业务权限，例如：
 
-这非常符合“先完成核心原型，再考虑高级工程化”的项目策略。
+- 某管理员是否能修改某个具体资源
+- 某用户是否只能看到自己的任务
 
-## 8. 关键技术手段
+这些仍应下沉到业务服务。
 
-### 8.1 Spring Cloud Gateway
+#### 3. `discovery.locator.enabled = true` 但当前主要还是静态路由
 
-用于实现：
+这是一个很容易在答辩时被误解的点。  
+配置里虽然打开了 discovery locator，但当前真正的转发地址还是通过 `GatewayRouteProperties` 明确写死的服务 URI。
 
-- 网关统一入口
-- 路由分发
-- 全局过滤器链
+#### 4. `RouteDefinitionLoader` 和 `GatewayResponseWriter` 目前都是预留类
 
-它是当前模块的基础技术核心。
+这两者适合作为“后续扩展点”写进文档，而不是描述成已完成能力。
 
-### 8.2 WebFlux 全局过滤器
+---
 
-用于实现：
+## 15. 推荐的阅读顺序
 
-- traceId 注入
-- 请求日志统计
-- JWT 鉴权
+### 15.1 先看路由配置
 
-相比传统 MVC 拦截器，Gateway 的过滤器链更适合入口层请求处理。
+建议先看：
 
-### 8.3 AntPathMatcher
+- `GatewayRouteConfig.java`
+- `GatewayRouteProperties.java`
 
-用于实现：
+这样先理解“哪些请求会被转发到哪里”。
 
-- 白名单路径匹配
-- 管理员路径匹配
-- 管理员写操作路径匹配
+### 15.2 再看鉴权和请求主链
 
-它解决了路径规则配置中的通配匹配问题。
+然后看：
 
-### 8.4 公共 Header 约定
+- `TraceIdFilter.java`
+- `RequestLogFilter.java`
+- `JwtAuthFilter.java`
+- `WhiteListConfig.java`
+- `GatewaySecurityProperties.java`
 
-通过 `common-lib` 中的常量统一约定：
+这样就能看清请求进入网关后的真实过滤链。
 
-- `Authorization`
-- `X-User-Id`
-- `X-Role-Code`
-- `X-Trace-Id`
-- `X-Node-Token`
+### 15.3 最后看支撑与异常处理
 
-这使网关与下游服务之间的协议更稳定，减少了魔法字符串散落。
+最后看：
 
-### 8.5 属性配置与环境变量注入
+- `TokenParser.java`
+- `PathMatcherSupport.java`
+- `GatewayRequestMutator.java`
+- `GatewayExceptionHandler.java`
 
-通过 `GatewayRouteProperties` 和 `GatewaySecurityProperties`，配合 `application.yml` 与环境变量，实现：
+这样就能把“辅助逻辑”和“错误收口”补完整。
 
-- 路由目标地址切换
-- 安全路径配置化
+---
 
-这对本地运行、Docker 部署和答辩演示都很重要。
+## 16. 当前结论
 
-## 9. 当前实现的优点
+`gateway-service` 当前已经完成了毕设原型所需的基础网关能力：
 
-- 结构清晰，职责边界明确。
-- 网关足够轻，不与业务耦合。
-- 已完成统一入口、统一鉴权、统一异常、基础日志能力。
-- 已支持管理员路径和写操作路径的粗粒度权限控制。
-- 已支持将用户上下文透传给下游服务。
-- 已预留动态路由等扩展点，便于后续升级。
+- 统一入口；
+- 统一鉴权；
+- 粗粒度权限控制；
+- 请求日志与 traceId；
+- 统一异常响应；
+- 静态路由转发。
 
-## 10. 当前实现的局限与边界
+因此，它已经足以支撑当前这个多服务后端原型的对外访问闭环。
 
-### 10.1 安全能力仍是基础版
+但它还不是生产级服务治理网关。当前更准确的定位是：
 
-当前 `JwtUtil` 实际上是简化的 Base64 编码方案，并非生产级 JWT。
+> 一个面向毕设原型、以静态路由和基础安全前置为主的轻量网关服务。
 
-因此，在文档和答辩表述中应准确说明：
+如果下一步继续增强，最值得优先补的方向是：
 
-- 当前实现完成了“统一 Token 鉴权原型”
-- 但尚未达到生产级签名校验、过期控制、刷新令牌、安全审计等能力
-
-### 10.2 路由仍是静态服务地址
-
-虽然 `application.yml` 中保留了 `discovery.locator.enabled: true` 的配置项，但当前真正起作用的路由仍是：
-
-- `GatewayRouteConfig` 中基于 Java DSL 的显式路径路由
-- `GatewayRouteProperties` 中配置的静态服务地址
-
-这意味着当前网关满足“微服务统一入口”的要求，但还不是完整的服务发现方案。
-
-### 10.3 权限控制仍是粗粒度
-
-网关目前只做：
-
-- 是否登录
-- 是否管理员
-
-更细粒度的业务权限控制仍需下游服务自行完成。
-
-### 10.4 缺少更完整的网关治理能力
-
-当前尚未实现：
-
-- 限流
-- 熔断
-- 重试
-- 负载均衡
-- 灰度路由
-- 动态路由加载
-- 完整链路追踪集成
-
-这些能力更适合定义为后续扩展点，而不是本科毕设首版必须项。
-
-## 11. 对本科毕设的价值
-
-从毕业设计角度看，`gateway-service` 的价值主要体现在：
-
-1. 能清晰体现微服务体系中的统一入口设计。
-2. 能说明为什么要把认证、日志、异常处理前置到网关层。
-3. 能展示系统已经具备基础的服务拆分和统一接入能力。
-4. 能为答辩中“微服务架构设计”这一部分提供具体、可讲解的工程落地实例。
-
-因此，虽然网关本身业务复杂度不高，但它是系统架构完整性的重要组成部分。
-
-## 12. 答辩时可采用的表述
-
-可以将该模块概括为：
-
-> `gateway-service` 作为平台统一入口，采用 Spring Cloud Gateway 实现请求路由、统一鉴权、基础权限拦截、请求日志与异常收口。该模块不承载业务逻辑，只负责入口层控制，并通过请求头向下游微服务透传用户上下文，从而保证网关轻量、边界清晰，符合微服务架构设计原则。
-
-## 13. 后续可扩展方向
-
-在不影响当前核心交付的前提下，`gateway-service` 后续可继续扩展：
-
-- 接入真实 JWT 签名、过期时间和刷新机制
-- 接入注册中心和真实服务发现
-- 补全动态路由加载能力
-- 增加限流、熔断、黑白名单等网关治理能力
-- 打通完整链路追踪与监控体系
-
-这些内容应作为“扩展能力”而不是当前首版已实现能力来表述。
-
-## 14. 当前结论
-
-`gateway-service` 当前已经完成了作为本科毕设原型平台所需的核心职责：
-
-- 能统一接入外部请求
-- 能将请求准确转发到对应微服务
-- 能完成基础认证与管理员路径控制
-- 能提供入口层日志和统一异常处理
-
-从工程深度看，它属于“基础版、可演示、可讲解”的网关实现；从系统架构完整性看，它已经足够支撑本项目的微服务原型闭环。
+- 标准 JWT 和更完整认证体系；
+- 动态服务发现与注册中心联动；
+- 限流、熔断、重试、降级；
+- 更细粒度的权限模型；
+- 更完整的网关可观测性和治理能力。

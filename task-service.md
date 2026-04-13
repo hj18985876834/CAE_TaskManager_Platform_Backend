@@ -774,3 +774,473 @@ node-agent 执行
 
 从实现深度看，它已经不是简单的任务表管理，而是一个具备生命周期编排、规则校验、调度协作和结果汇聚能力的任务中枢原型。  
 从本科毕设要求看，这个模块已经足以支撑“CAE 仿真任务调度与管理平台”的核心业务表达，也是系统中最具代表性的关键模块。
+
+## 15. 快速定位版：层级目录与文件夹
+
+为了方便直接查代码，下面把 `task-service` 每一层与对应文件夹再明确列一次。
+
+| 分层 | 对应文件夹 | 说明 |
+| --- | --- | --- |
+| 启动入口层 | `task-service/src/main/java/com/example/cae/task/` | Spring Boot 启动入口 |
+| 配置层 | `task-service/src/main/java/com/example/cae/task/config/` | `RestTemplate`、上传、远程地址、存储根目录等配置 |
+| 接口层 | `task-service/src/main/java/com/example/cae/task/interfaces/` | 对外接口、内部接口、请求体、响应体 |
+| 应用层 | `task-service/src/main/java/com/example/cae/task/application/` | Facade、应用服务、Manager、定时任务、Assembler |
+| 领域层 | `task-service/src/main/java/com/example/cae/task/domain/` | 任务模型、仓储抽象、状态规则、校验规则 |
+| 基础设施层 | `task-service/src/main/java/com/example/cae/task/infrastructure/` | 远程客户端、数据库实现、文件存储、辅助组件 |
+| 资源配置层 | `task-service/src/main/resources/` | 服务端口、数据源、multipart、存储和远程服务配置 |
+
+如果想最快定位问题，可以按下面记：
+
+- 看任务命令入口：`interfaces/controller/TaskController.java`
+- 看任务查询入口：`interfaces/controller/TaskQueryController.java`
+- 看调度器对接：`interfaces/internal/InternalTaskDispatchController.java`
+- 看节点回传：`interfaces/internal/InternalTaskReportController.java`
+- 看生命周期总编排：`application/manager/TaskLifecycleManager.java`
+- 看任务校验：`application/manager/TaskValidationManager.java`
+- 看调度载荷组装：`application/manager/TaskDispatchManager.java`
+- 看日志和结果回收：`application/manager/TaskResultManager.java`
+- 看状态流转规则：`domain/service/TaskStatusDomainService.java`
+- 看文件存储：`infrastructure/storage/LocalTaskFileStorageService.java`
+
+## 16. 逐文件索引
+
+这一节按“文件夹 -> 文件”的方式列出当前主要源码文件及其作用，方便后续定位。
+
+### 16.1 根目录与启动入口
+
+对应文件夹：
+
+```text
+task-service/
+task-service/src/main/java/com/example/cae/task/
+task-service/src/main/resources/
+```
+
+- `pom.xml`
+  作用：声明 `task-service` 子模块依赖，打包为可运行 Spring Boot 服务。
+- `src/main/resources/application.yml`
+  作用：配置服务端口、数据库、multipart 限制、远程服务地址、任务与结果文件根目录。
+- `TaskApplication.java`
+  作用：服务启动入口；额外启用了 `@EnableScheduling`，说明本模块有定时任务。
+
+### 16.2 配置层
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/config/
+```
+
+- `TaskServiceConfig.java`
+  作用：定义 `RestTemplate` Bean，并设置连接/读取超时，供远程调用 `solver-service` 和 `scheduler-service` 使用。
+- `TaskStorageProperties.java`
+  作用：读取 `cae.storage.*` 配置，统一管理任务文件与结果文件根目录。
+- `TaskRemoteServiceProperties.java`
+  作用：读取 `cae.remote.*` 配置，统一管理远程求解器服务和调度服务基地址。
+- `MultipartConfig.java`
+  作用：当前为空配置类，作为上传相关扩展配置的预留位置。
+- `FeignClientConfig.java`
+  作用：当前为空配置类，文件名说明原本预期用于 Feign 或远程调用配置，但当前实际还是 `RestTemplate`。
+
+### 16.3 接口层：对外 Controller
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/interfaces/controller/
+```
+
+- `TaskController.java`
+  作用：普通用户任务命令入口，负责创建、更新、上传输入包、校验、提交、废弃、取消任务。
+- `TaskQueryController.java`
+  作用：普通用户任务查询入口，负责我的任务分页、详情、状态历史、任务文件列表。
+- `TaskLogController.java`
+  作用：日志查询与日志下载接口。
+- `TaskResultController.java`
+  作用：结果摘要查询、结果文件列表查询和结果文件下载接口。
+- `AdminTaskController.java`
+  作用：管理员任务入口，负责全量任务查询、优先级调整和失败/超时任务重试。
+- `AdminDashboardController.java`
+  作用：管理员首页看板汇总接口，返回任务总量、运行量、排队量、成功率、在线节点数等摘要数据。
+
+### 16.4 接口层：内部 Controller
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/interfaces/internal/
+```
+
+- `InternalTaskDispatchController.java`
+  作用：面向 `scheduler-service` 的内部接口，负责拉取排队任务、标记已调度、标记已下发、标记下发失败、批量处理节点离线受影响任务。
+- `InternalTaskReportController.java`
+  作用：面向 `node-agent` 的内部回传接口，负责状态回传、日志回传、结果摘要回传、结果文件回传、任务完成、任务失败。
+
+### 16.5 接口层：请求对象
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/interfaces/request/
+```
+
+- `CreateTaskRequest.java`
+  作用：创建任务请求体，承载任务名称、求解器、模板、任务类型、优先级、参数等。
+- `UpdateTaskRequest.java`
+  作用：更新任务请求体，主要修改任务名称、优先级和参数。
+- `CancelTaskRequest.java`
+  作用：取消任务时传递取消原因。
+- `DiscardTaskRequest.java`
+  作用：废弃未提交任务时传递原因。
+- `ValidateTaskRequest.java`
+  作用：当前为空请求类，属于预留类；校验接口当前不需要请求体。
+- `SubmitTaskRequest.java`
+  作用：当前为空请求类，属于预留类；提交接口当前不需要请求体。
+- `TaskListQueryRequest.java`
+  作用：任务分页查询过滤条件，支持任务号、任务名、状态、优先级、求解器、模板、节点、用户、任务类型、失败类型、时间范围等筛选。
+- `UpdateTaskPriorityRequest.java`
+  作用：管理员调整任务优先级请求体。
+- `RetryTaskRequest.java`
+  作用：管理员重试任务时传递重试原因。
+- `TaskNodeMarkRequest.java`
+  作用：内部调度接口用于传递 `nodeId` 的简化请求体。
+- `InternalTaskFailRequest.java`
+  作用：调度器标记下发失败时传递 `failType` 与 `reason`。
+- `NodeOfflineTasksRequest.java`
+  作用：节点离线时批量标记任务失败的请求体。
+- `StatusReportRequest.java`
+  作用：节点回传状态变更请求体，可传 `fromStatus`、`toStatus`、`status`、`changeReason`、`reason`、`nodeId` 等字段。
+- `LogReportRequest.java`
+  作用：节点回传日志分片，请求中包含 `nodeId`、`seqNo`、`logContent`。
+- `ResultSummaryReportRequest.java`
+  作用：节点回传结果摘要，包含成功标记、运行时长、摘要文本、指标数据。
+- `ResultFileReportRequest.java`
+  作用：节点回传结果文件元数据，包含文件名、文件类型、存储路径、文件大小等。
+- `MarkFinishedRequest.java`
+  作用：节点回传任务完成事件，请求中包含 `nodeId` 和可选最终状态。
+- `MarkFailedRequest.java`
+  作用：节点回传任务失败事件，请求中包含 `nodeId`、失败类型、失败消息。
+
+### 16.6 接口层：响应对象
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/interfaces/response/
+```
+
+- `TaskCreateResponse.java`
+  作用：创建任务成功后的返回结构。
+- `TaskUpdateResponse.java`
+  作用：更新任务后的返回结构。
+- `TaskValidateResponse.java`
+  作用：任务校验返回结构，包含校验是否通过、当前状态、问题列表。
+- `TaskSubmitResponse.java`
+  作用：任务提交或重试后的返回结构。
+- `TaskListItemResponse.java`
+  作用：任务分页列表项，承载列表展示字段以及 `queueReason`、`canRetry` 等衍生信息。
+- `TaskDetailResponse.java`
+  作用：任务详情返回结构，包含基础任务信息、调度/执行相关字段和可解释信息。
+- `TaskFileResponse.java`
+  作用：任务输入文件或归档文件的返回结构。
+- `TaskStatusHistoryResponse.java`
+  作用：任务状态历史记录返回结构。
+- `TaskLogResponse.java`
+  作用：单条日志分片的返回结构。
+- `TaskLogPageResponse.java`
+  作用：日志分页返回结构，包含日志记录列表和下一序号。
+- `TaskResultSummaryResponse.java`
+  作用：任务结果摘要返回结构。
+- `TaskResultFileResponse.java`
+  作用：任务结果文件列表项返回结构。
+- `TaskDashboardSummaryResponse.java`
+  作用：管理员看板摘要返回结构。
+
+### 16.7 应用层：Assembler
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/application/assembler/
+```
+
+- `TaskAssembler.java`
+  作用：在任务请求对象、领域对象、持久化对象和任务详情/列表/创建/更新响应之间做转换，是任务对象转换核心类。
+- `TaskLogAssembler.java`
+  作用：在日志领域对象、持久化对象、日志响应之间做转换。
+- `TaskResultAssembler.java`
+  作用：在结果摘要/结果文件领域对象和结果响应之间做转换，并借助 `TaskStoragePathSupport` 处理展示路径。
+
+### 16.8 应用层：Facade
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/application/facade/
+```
+
+- `TaskCommandFacade.java`
+  作用：对外封装任务命令类操作，转发创建、更新、上传、校验、提交、废弃、取消、调优、重试等流程。
+- `TaskQueryFacade.java`
+  作用：对外封装任务查询类操作，统一聚合任务详情、状态历史、文件、日志、结果摘要、结果文件等查询。
+
+### 16.9 应用层：Manager
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/application/manager/
+```
+
+- `TaskLifecycleManager.java`
+  作用：任务生命周期总编排器，负责创建、更新、上传归档、提交、取消、废弃、重试、优先级调整、状态回传等核心流程。
+- `TaskValidationManager.java`
+  作用：任务输入校验编排器，负责读取模板规则、解压 ZIP、校验目录穿越、校验路径/文件名/类型/后缀/数量等。
+- `TaskDispatchManager.java`
+  作用：把排队任务转换为 `TaskDTO` 派发给调度器，同时负责标记调度状态、下发状态和节点离线受影响任务处理。
+- `TaskResultManager.java`
+  作用：汇聚节点回传的日志、结果摘要、结果文件，并负责任务完成/失败状态收口。
+
+### 16.10 应用层：定时任务
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/application/scheduler/
+```
+
+- `StaleUnsubmittedTaskCleanupJob.java`
+  作用：定时清理长时间未提交的陈旧任务，调用 `TaskLifecycleManager.cleanStaleUnsubmittedTasks()`。
+
+### 16.11 应用层：应用服务
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/application/service/
+```
+
+- `TaskCommandAppService.java`
+  作用：任务命令类应用服务，对接控制器并把具体流程分发给 `TaskLifecycleManager` 和 `TaskValidationManager`。
+- `TaskQueryAppService.java`
+  作用：任务查询类应用服务，负责列表、详情、状态历史、文件列表、队列原因解释、管理员看板汇总。
+- `TaskLogAppService.java`
+  作用：日志读取服务，负责分页读取日志分片和拼装完整日志文本。
+- `TaskResultAppService.java`
+  作用：结果读取服务，负责结果摘要查询、结果文件列表和结果文件流式下载。
+- `NodeAgentAuthService.java`
+  作用：节点回传鉴权服务，校验任务、绑定节点、上报节点与 `nodeToken` 是否匹配。
+
+### 16.12 领域层：枚举
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/domain/enums/
+```
+
+- `TaskQueryScopeEnum.java`
+  作用：定义任务查询范围相关枚举，通常用于区分“我的任务”和“管理员全量任务”等查询语义。
+- `TaskSortFieldEnum.java`
+  作用：定义任务查询支持的排序字段枚举。
+
+### 16.13 领域层：模型
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/domain/model/
+```
+
+- `Task.java`
+  作用：任务聚合根，承载任务生命周期字段、状态转换、是否结束、是否归属当前用户、优先级调整等核心行为。
+- `TaskFile.java`
+  作用：任务文件领域对象，表示输入文件、归档文件等元数据。
+- `TaskLogChunk.java`
+  作用：任务日志分片领域对象。
+- `TaskResultSummary.java`
+  作用：任务结果摘要领域对象。
+- `TaskResultFile.java`
+  作用：任务结果文件领域对象。
+- `TaskStatusHistory.java`
+  作用：任务状态流转历史领域对象。
+
+### 16.14 领域层：仓储抽象
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/domain/repository/
+```
+
+- `TaskRepository.java`
+  作用：任务主表仓储抽象，负责任务读写、分页、状态统计、按节点查询、查陈旧未提交任务等。
+- `TaskFileRepository.java`
+  作用：任务文件仓储抽象。
+- `TaskLogRepository.java`
+  作用：任务日志仓储抽象。
+- `TaskResultSummaryRepository.java`
+  作用：结果摘要仓储抽象。
+- `TaskResultFileRepository.java`
+  作用：结果文件仓储抽象。
+- `TaskStatusHistoryRepository.java`
+  作用：状态历史仓储抽象。
+
+### 16.15 领域层：规则
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/domain/rule/
+```
+
+- `TaskCancelRule.java`
+  作用：定义哪些状态允许取消、哪些状态允许废弃。
+- `TaskStatusRule.java`
+  作用：定义任务状态转移图和完成态判定，是状态机规则核心文件。
+- `TaskValidationRule.java`
+  作用：定义任务是否允许执行校验的基础条件。
+
+### 16.16 领域层：领域服务
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/domain/service/
+```
+
+- `TaskDomainService.java`
+  作用：对 `TaskCancelRule` 做服务封装，提供 `canCancel`、`canDiscard` 这类业务判断。
+- `TaskStatusDomainService.java`
+  作用：状态机编排核心，负责合法状态转移并写入状态历史。
+- `TaskValidationDomainService.java`
+  作用：定义任务是否可编辑、是否可提交，以及基础文件规则匹配逻辑。
+- `TaskResultDomainService.java`
+  作用：结果摘要与结果文件的基础合法性校验，目前实现较轻。
+
+### 16.17 基础设施层：远程客户端
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/client/
+```
+
+- `SolverClient.java`
+  作用：通过 `RestTemplate` 调用 `solver-service`，获取模板详情、模板规则、上传规范、求解器名称、模板名称、执行元数据等。
+- `SchedulerClient.java`
+  作用：通过 `RestTemplate` 调用 `scheduler-service`，处理任务取消、节点名称查询、排队原因快照、在线节点摘要、节点 token 校验等。
+
+### 16.18 基础设施层：持久化实体
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/persistence/entity/
+```
+
+- `TaskPO.java`
+  作用：`sim_task` 主表持久化对象。
+- `TaskFilePO.java`
+  作用：任务文件表持久化对象。
+- `TaskLogChunkPO.java`
+  作用：任务日志分片表持久化对象。
+- `TaskResultSummaryPO.java`
+  作用：结果摘要表持久化对象。
+- `TaskResultFilePO.java`
+  作用：结果文件表持久化对象。
+- `TaskStatusHistoryPO.java`
+  作用：状态历史表持久化对象。
+
+### 16.19 基础设施层：Mapper
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/persistence/mapper/
+```
+
+- `TaskMapper.java`
+  作用：任务主表 SQL，承载任务查询、分页、状态统计、更新等。
+- `TaskFileMapper.java`
+  作用：任务文件表 SQL。
+- `TaskLogChunkMapper.java`
+  作用：任务日志分片表 SQL。
+- `TaskResultSummaryMapper.java`
+  作用：结果摘要表 SQL。
+- `TaskResultFileMapper.java`
+  作用：结果文件表 SQL。
+- `TaskStatusHistoryMapper.java`
+  作用：状态历史表 SQL。
+
+### 16.20 基础设施层：Repository 实现
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/persistence/repository/
+```
+
+- `TaskRepositoryImpl.java`
+  作用：`TaskRepository` 的数据库实现。
+- `TaskFileRepositoryImpl.java`
+  作用：`TaskFileRepository` 的数据库实现。
+- `TaskLogRepositoryImpl.java`
+  作用：`TaskLogRepository` 的数据库实现。
+- `TaskResultSummaryRepositoryImpl.java`
+  作用：`TaskResultSummaryRepository` 的数据库实现。
+- `TaskResultFileRepositoryImpl.java`
+  作用：`TaskResultFileRepository` 的数据库实现。
+- `TaskStatusHistoryRepositoryImpl.java`
+  作用：`TaskStatusHistoryRepository` 的数据库实现。
+
+### 16.21 基础设施层：文件存储
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/storage/
+```
+
+- `TaskFileStorageService.java`
+  作用：文件存储抽象接口，定义保存输入文件、打开文件、删除文件、删除任务产物等能力。
+- `LocalTaskFileStorageService.java`
+  作用：本地磁盘存储实现，当前项目真实采用的文件存储方式。
+
+### 16.22 基础设施层：辅助组件
+
+对应文件夹：
+
+```text
+task-service/src/main/java/com/example/cae/task/infrastructure/support/
+```
+
+- `TaskNoGenerator.java`
+  作用：生成任务编号 `TASKyyyyMMddHHmmssxxx`。
+- `TaskPathResolver.java`
+  作用：统一生成任务根目录、输入目录、日志目录、结果目录、日志文件路径。
+- `TaskPermissionChecker.java`
+  作用：统一做任务访问权限校验，管理员放行，普通用户只允许访问自己的任务。
+- `TaskQueryBuilder.java`
+  作用：清洗和兜底任务分页查询参数，例如默认页码和分页大小。
+- `TaskStoragePathSupport.java`
+  作用：在存储路径、绝对路径、展示路径之间做统一转换。
+- `LogChunkAppender.java`
+  作用：把日志分片追加写入本地日志文件；当前是辅助工具类。
+
+### 16.23 当前最关键的 10 个文件
+
+如果时间有限，最值得优先看的 10 个文件是：
+
+1. `interfaces/controller/TaskController.java`
+2. `interfaces/internal/InternalTaskDispatchController.java`
+3. `interfaces/internal/InternalTaskReportController.java`
+4. `application/manager/TaskLifecycleManager.java`
+5. `application/manager/TaskValidationManager.java`
+6. `application/manager/TaskDispatchManager.java`
+7. `application/manager/TaskResultManager.java`
+8. `application/service/TaskQueryAppService.java`
+9. `domain/service/TaskStatusDomainService.java`
+10. `infrastructure/storage/LocalTaskFileStorageService.java`
+
+这 10 个文件基本就能把 `task-service` 的任务生命周期主链路看清楚。
