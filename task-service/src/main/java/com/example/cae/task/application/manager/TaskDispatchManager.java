@@ -151,7 +151,7 @@ public class TaskDispatchManager {
 
 	private List<TaskFileDTO> loadInputFiles(Long taskId) {
 		return taskFileRepository.listByTaskId(taskId).stream()
-				.filter(TaskFile::isInputFile)
+				.filter(file -> file.isInputFile() || file.isArchiveFile())
 				.map(this::toTaskFileDTO)
 				.toList();
 	}

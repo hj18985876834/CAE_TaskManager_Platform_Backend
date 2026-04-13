@@ -17,6 +17,7 @@ public class WorkDirManager {
 	public void prepareTaskDirs(ExecutionContext context) {
 		String root = nodeAgentConfig.getWorkRoot() + File.separator + context.getTaskId();
 		context.setWorkDir(root);
+		context.setTaskDir(root);
 		context.setInputDir(root + File.separator + "input");
 		context.setOutputDir(root + File.separator + "output");
 		context.setLogDir(root + File.separator + "log");
@@ -30,4 +31,3 @@ public class WorkDirManager {
 		// reserved for future cleanup policy
 	}
 }
-

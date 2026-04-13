@@ -16,6 +16,7 @@ public class ExecutionContext {
 	private List<InputFileMeta> inputFiles;
 	private Map<String, Object> params;
 	private String workDir;
+	private String taskDir;
 	private String inputDir;
 	private String outputDir;
 	private String logDir;
@@ -132,6 +133,14 @@ public class ExecutionContext {
 		return inputDir;
 	}
 
+	public String getTaskDir() {
+		return taskDir;
+	}
+
+	public void setTaskDir(String taskDir) {
+		this.taskDir = taskDir;
+	}
+
 	public void setInputDir(String inputDir) {
 		this.inputDir = inputDir;
 	}
@@ -152,4 +161,3 @@ public class ExecutionContext {
 		this.logDir = logDir;
 	}
 }
-
