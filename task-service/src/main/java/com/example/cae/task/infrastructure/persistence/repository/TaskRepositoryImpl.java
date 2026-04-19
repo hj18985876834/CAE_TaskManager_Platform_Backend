@@ -28,6 +28,11 @@ public class TaskRepositoryImpl implements TaskRepository {
 	}
 
 	@Override
+	public Optional<Task> findByIdForUpdate(Long taskId) {
+		return Optional.ofNullable(taskMapper.selectByIdForUpdate(taskId)).map(taskAssembler::fromPO);
+	}
+
+	@Override
 	public void save(Task task) {
 		var po = taskAssembler.toPO(task);
 		taskMapper.insert(po);

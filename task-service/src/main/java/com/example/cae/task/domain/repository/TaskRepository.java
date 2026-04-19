@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface TaskRepository {
 	Optional<Task> findById(Long taskId);
 
+	Optional<Task> findByIdForUpdate(Long taskId);
+
 	void save(Task task);
 
 	void update(Task task);

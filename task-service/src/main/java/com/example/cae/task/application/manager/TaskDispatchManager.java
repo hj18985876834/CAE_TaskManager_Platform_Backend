@@ -16,6 +16,7 @@ import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -58,34 +59,62 @@ public class TaskDispatchManager {
 				.toList();
 	}
 
+	@Transactional
 	public void markScheduled(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		if (!TaskStatusEnum.QUEUED.name().equals(task.getStatus())) {
+			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
+					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
+					.contains(task.getStatus())) {
+				return;
+			}
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for scheduling: " + task.getStatus());
+		}
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
+	@Transactional
 	public void markDispatched(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
+			if (Set.of(TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
+					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
+					.contains(task.getStatus())) {
+				return;
+			}
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch confirm: " + task.getStatus());
+		}
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
+	@Transactional
 	public void markFailed(Long taskId, String failType, String reason) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
+			if (Set.of(TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
+					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
+					.contains(task.getStatus())) {
+				return;
+			}
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
+		}
 		task.setFailType(failType);
 		task.setFailMessage(reason);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), reason, OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
+	@Transactional
 	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
@@ -95,10 +124,14 @@ public class TaskDispatchManager {
 				: reason;
 		List<Task> affectedTasks = taskRepository.listByNodeIdAndStatuses(nodeId, List.copyOf(NODE_OFFLINE_AFFECTED_STATUSES));
 		for (Task task : affectedTasks) {
-			task.setFailType(FailTypeEnum.NODE_OFFLINE.name());
-			task.setFailMessage(effectiveReason);
-			taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
-			taskRepository.update(task);
+			Task lockedTask = taskRepository.findByIdForUpdate(task.getId()).orElse(null);
+			if (lockedTask == null || !NODE_OFFLINE_AFFECTED_STATUSES.contains(lockedTask.getStatus())) {
+				continue;
+			}
+			lockedTask.setFailType(FailTypeEnum.NODE_OFFLINE.name());
+			lockedTask.setFailMessage(effectiveReason);
+			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+			taskRepository.update(lockedTask);
 		}
 		return affectedTasks.size();
 	}

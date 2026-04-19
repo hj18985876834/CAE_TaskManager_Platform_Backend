@@ -18,6 +18,10 @@ import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class TaskResultManager {
@@ -74,18 +78,52 @@ public class TaskResultManager {
 		taskResultFileRepository.save(file);
 	}
 
+	@Transactional
 	public void finishTask(Long taskId, String finalStatus) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = finalStatus == null || finalStatus.isBlank() ? TaskStatusEnum.SUCCESS.name() : finalStatus;
+		if (shouldIgnoreTerminalReport(task, target)) {
+			return;
+		}
+		promoteScheduledTaskForNodeTerminal(task, target);
 		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 	}
 
+	@Transactional
 	public void failTask(Long taskId, String failType, String failMessage) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		if (shouldIgnoreTerminalReport(task, TaskStatusEnum.FAILED.name())) {
+			return;
+		}
+		promoteScheduledTaskForNodeTerminal(task, TaskStatusEnum.FAILED.name());
 		task.setFailType(failType);
 		task.setFailMessage(failMessage);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), failMessage, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+	}
+
+	private boolean shouldIgnoreTerminalReport(Task task, String targetStatus) {
+		if (task == null || targetStatus == null) {
+			return false;
+		}
+		if (targetStatus.equalsIgnoreCase(task.getStatus())) {
+			return true;
+		}
+		return task.isFinished();
+	}
+
+	private void promoteScheduledTaskForNodeTerminal(Task task, String targetStatus) {
+		if (task == null || targetStatus == null) {
+			return;
+		}
+		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
+			return;
+		}
+		if (!Set.of(TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(),
+				TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(targetStatus.toUpperCase(Locale.ROOT))) {
+			return;
+		}
+		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "dispatch acknowledged by node result report", OperatorTypeEnum.SYSTEM.name(), null);
 	}
 }

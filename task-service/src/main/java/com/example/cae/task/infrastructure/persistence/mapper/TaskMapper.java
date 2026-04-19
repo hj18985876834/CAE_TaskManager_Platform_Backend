@@ -17,6 +17,9 @@ public interface TaskMapper {
 	@Select("SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt FROM sim_task WHERE id = #{id} AND deleted_flag = 0 LIMIT 1")
 	TaskPO selectById(Long id);
 
+	@Select("SELECT id, task_no AS taskNo, task_name AS taskName, user_id AS userId, solver_id AS solverId, profile_id AS profileId, task_type AS taskType, status, priority, node_id AS nodeId, params_json AS paramsJson, submit_time AS submitTime, start_time AS startTime, end_time AS endTime, fail_type AS failType, fail_message AS failMessage, deleted_flag AS deletedFlag, created_at AS createdAt, updated_at AS updatedAt FROM sim_task WHERE id = #{id} AND deleted_flag = 0 LIMIT 1 FOR UPDATE")
+	TaskPO selectByIdForUpdate(Long id);
+
 	@Options(useGeneratedKeys = true, keyProperty = "id")
 	@Insert("INSERT INTO sim_task(task_no, task_name, user_id, solver_id, profile_id, task_type, status, priority, node_id, params_json, submit_time, start_time, end_time, fail_type, fail_message, deleted_flag) VALUES(#{taskNo}, #{taskName}, #{userId}, #{solverId}, #{profileId}, #{taskType}, #{status}, #{priority}, #{nodeId}, #{paramsJson}, #{submitTime}, #{startTime}, #{endTime}, #{failType}, #{failMessage}, #{deletedFlag})")
 	int insert(TaskPO po);

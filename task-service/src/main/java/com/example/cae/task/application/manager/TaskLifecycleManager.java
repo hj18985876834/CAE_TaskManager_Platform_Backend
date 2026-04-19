@@ -28,12 +28,14 @@ import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 public class TaskLifecycleManager {
@@ -251,8 +253,9 @@ public class TaskLifecycleManager {
 		taskRepository.update(task);
 	}
 
+	@Transactional
 	public void reportStatus(Long taskId, StatusReportRequest request) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (request != null && request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
 		}
@@ -261,6 +264,10 @@ public class TaskLifecycleManager {
 		String operatorType = request == null || request.getOperatorType() == null || request.getOperatorType().isBlank()
 				? OperatorTypeEnum.NODE.name()
 				: request.getOperatorType();
+		if (shouldIgnoreReportedStatus(task, targetStatus)) {
+			return;
+		}
+		promoteScheduledTaskForNodeReport(task, targetStatus);
 		taskStatusDomainService.transfer(task, targetStatus, reason, operatorType, null);
 		taskRepository.update(task);
 	}
@@ -286,6 +293,31 @@ public class TaskLifecycleManager {
 			return request.getChangeReason();
 		}
 		return request.getReason();
+	}
+
+	private boolean shouldIgnoreReportedStatus(Task task, String targetStatus) {
+		if (task == null || targetStatus == null) {
+			return false;
+		}
+		String currentStatus = task.getStatus();
+		if (targetStatus.equalsIgnoreCase(currentStatus)) {
+			return true;
+		}
+		return task.isFinished();
+	}
+
+	private void promoteScheduledTaskForNodeReport(Task task, String targetStatus) {
+		if (task == null || targetStatus == null) {
+			return;
+		}
+		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
+			return;
+		}
+		if (!Set.of(TaskStatusEnum.RUNNING.name(), TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(),
+				TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(targetStatus.toUpperCase(Locale.ROOT))) {
+			return;
+		}
+		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "dispatch acknowledged by node report", OperatorTypeEnum.SYSTEM.name(), null);
 	}
 
 	private TaskFileResponse toTaskFileResponse(TaskFile file) {
