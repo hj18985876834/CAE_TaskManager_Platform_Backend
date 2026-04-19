@@ -61,7 +61,7 @@ echo "-> 计算节点的对外观测 IP (Ubuntu_IP): $UBUNTU_IP"
 echo "-> 跨系统路径映射: $WINDOWS_TASK_ROOT <==> /cae-data/workspaces"
 
 # 挂载的硬盘路径 (Ubuntu 本地存储任务文件的路径，用于接收传输)
-WORK_DIR="/opt/cae/data/workspaces"
+WORK_DIR="/cae-data/workspaces"
 mkdir -p $WORK_DIR
 chmod -R 777 $WORK_DIR
 

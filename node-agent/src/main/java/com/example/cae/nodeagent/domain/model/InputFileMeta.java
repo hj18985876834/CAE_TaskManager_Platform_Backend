@@ -4,6 +4,7 @@ public class InputFileMeta {
 	private String fileKey;
 	private String originName;
 	private String storagePath;
+	private String unpackDir;
 
 	public String getFileKey() {
 		return fileKey;
@@ -27,5 +28,13 @@ public class InputFileMeta {
 
 	public void setStoragePath(String storagePath) {
 		this.storagePath = storagePath;
+	}
+
+	public String getUnpackDir() {
+		return unpackDir;
+	}
+
+	public void setUnpackDir(String unpackDir) {
+		this.unpackDir = unpackDir;
 	}
 }
