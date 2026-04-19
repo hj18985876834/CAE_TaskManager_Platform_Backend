@@ -43,14 +43,17 @@ public class TaskStoragePathSupport {
 			return path;
 		}
 		String normalizedPath = normalize(path);
-		String normalizedRoot = normalize(root);
+		String normalizedRoot = normalizeRoot(root);
 		if (!normalizedRoot.isBlank() && (normalizedPath.equals(normalizedRoot) || normalizedPath.startsWith(normalizedRoot + "/"))) {
 			return normalizedPath;
 		}
 		if (isAbsolutePath(normalizedPath)) {
 			return normalizedPath;
 		}
-		return normalize(Path.of(root, normalizedPath).toString());
+		if (normalizedRoot.isBlank()) {
+			return normalizedPath;
+		}
+		return normalize(Path.of(normalizedRoot, normalizedPath).toString());
 	}
 
 	private String normalize(String path) {
@@ -58,6 +61,17 @@ public class TaskStoragePathSupport {
 			return Path.of(path).normalize().toString().replace("\\", "/");
 		} catch (InvalidPathException ex) {
 			return path.replace("\\", "/");
+		}
+	}
+
+	private String normalizeRoot(String root) {
+		if (root == null || root.isBlank()) {
+			return "";
+		}
+		try {
+			return Path.of(root).toAbsolutePath().normalize().toString().replace("\\", "/");
+		} catch (InvalidPathException ex) {
+			return root.replace("\\", "/");
 		}
 	}
 

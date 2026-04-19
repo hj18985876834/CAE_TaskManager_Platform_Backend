@@ -38,6 +38,6 @@ public class TaskPathResolver {
 	}
 
 	private String resolvePath(String first, String... more) {
-		return Path.of(first, more).normalize().toString().replace("\\", "/");
+		return Path.of(first, more).toAbsolutePath().normalize().toString().replace("\\", "/");
 	}
 }
