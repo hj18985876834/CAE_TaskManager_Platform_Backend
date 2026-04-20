@@ -531,11 +531,11 @@ node-agent 执行
 - `canRetry`
 - `queueReason`
 
-其中 `queueReason` 还会结合 `scheduler-service` 的节点快照动态解释：
+其中 `queueReason` 会先结合任务真实排队顺序，再结合 `scheduler-service` 的节点快照动态解释：
 
+- 前方仍有更高优先级或更早提交任务
 - 暂无满足条件的可用节点
 - 候选节点满载
-- 前方仍有更高优先级或更早提交任务
 - 调度器暂未处理
 
 这说明当前系统已经考虑到“任务为什么在排队”的可见性问题，而不是只给前端一个静态状态码。
@@ -599,8 +599,9 @@ node-agent 执行
 
 当前解决方案：
 
-- 查询接口调用 `scheduler-service` 获取节点快照
-- 根据可调度节点数、在线可用节点数等信息生成 `queueReason`
+- 查询接口先基于 `QUEUED` 任务真实排序判断是否存在排在前面的任务
+- 再调用 `scheduler-service` 获取节点快照
+- 综合排队顺序、可调度节点数、在线可用节点数等信息生成 `queueReason`
 
 这使系统在演示时具备更好的可理解性。
 
