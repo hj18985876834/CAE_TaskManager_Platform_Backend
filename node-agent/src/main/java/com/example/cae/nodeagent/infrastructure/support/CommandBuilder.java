@@ -5,12 +5,18 @@ import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class CommandBuilder {
+	private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{([A-Za-z][A-Za-z0-9_]*)}");
+
 	public List<String> buildCommand(ExecutionContext context) {
 		if (context.getCommandTemplate() == null || context.getCommandTemplate().trim().isEmpty()) {
 			throw new BizException("commandTemplate is empty");
@@ -48,6 +54,22 @@ public class CommandBuilder {
 			}
 			result = result.replace("${" + entry.getKey() + "}", String.valueOf(entry.getValue()));
 		}
+		Set<String> unresolved = collectUnresolvedPlaceholders(result);
+		if (!unresolved.isEmpty()) {
+			throw new BizException("commandTemplate contains unresolved variables: " + String.join(", ", unresolved));
+		}
 		return result;
+	}
+
+	private Set<String> collectUnresolvedPlaceholders(String command) {
+		Set<String> placeholders = new LinkedHashSet<>();
+		Matcher matcher = PLACEHOLDER_PATTERN.matcher(command);
+		while (matcher.find()) {
+			String placeholder = matcher.group(1);
+			if (placeholder != null && !placeholder.isBlank()) {
+				placeholders.add(placeholder);
+			}
+		}
+		return placeholders;
 	}
 }

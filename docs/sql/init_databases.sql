@@ -151,13 +151,28 @@ INSERT INTO solver_definition (id, solver_code, solver_name, version, exec_mode,
 (2, 'CALCULIX', 'CalculiX Solver', '2.20', 'LOCAL', '/opt/calculix/bin/ccx', 1, '结构分析求解器', NOW(), NOW());
 
 INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, upload_mode, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
-(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', 'simpleFoam -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
+(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', '${openfoamApplication} -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
 (2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ZIP_ONLY', 'ccx ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
 
 INSERT INTO solver_profile_file_rule (id, profile_id, file_key, path_pattern, file_name_pattern, file_type, required_flag, sort_order, rule_json, description) VALUES
 (1, 1, 'input_archive', '**', '*.zip', 'ZIP', 1, 1, '{"allowSuffix":["zip"],"maxSizeMb":2048}', 'OpenFOAM算例压缩包'),
-(2, 1, 'dir_system', 'system/**', 'controlDict', 'FILE', 1, 2, NULL, 'OpenFOAM system 目录规则'),
-(3, 2, 'main_inp', '**', '*.inp', 'FILE', 1, 1, '{"allowSuffix":["inp"],"minCount":1,"maxCount":1}', 'CalculiX主输入文件');
+(2, 1, 'system_control_dict', 'system/controlDict', 'controlDict', 'FILE', 1, 2, '{"solverCodes":["OPENFOAM"],"deriveParam":{"name":"openfoamApplication","source":"fileContentRegex","pattern":"(?m)^\\\\s*application\\\\s+([^;]+?)\\\\s*;","group":1,"stripQuotes":true,"sanitizeRegex":"^[A-Za-z][A-Za-z0-9_+-]*$","required":true,"preprocess":[{"pattern":"(?s)/\\\\*.*?\\\\*/","replacement":" "},{"pattern":"(?m)//.*$","replacement":" "}]}}', 'OpenFOAM controlDict'),
+(3, 1, 'system_fv_schemes', 'system/fvSchemes', 'fvSchemes', 'FILE', 1, 3, '{"solverCodes":["OPENFOAM"]}', 'OpenFOAM fvSchemes'),
+(4, 1, 'system_fv_solution', 'system/fvSolution', 'fvSolution', 'FILE', 1, 4, '{"solverCodes":["OPENFOAM"]}', 'OpenFOAM fvSolution'),
+(5, 1, 'of_incompressible_u', '0/U', 'U', 'FILE', 1, 10, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM速度场'),
+(6, 1, 'of_incompressible_p', '0/p', 'p', 'FILE', 1, 11, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM压力场'),
+(7, 1, 'of_incompressible_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 12, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM transportProperties'),
+(8, 1, 'of_compressible_u', '0/U', 'U', 'FILE', 1, 20, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM速度场'),
+(9, 1, 'of_compressible_p', '0/p', 'p', 'FILE', 1, 21, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM压力场'),
+(10, 1, 'of_compressible_thermo', 'constant/thermophysicalProperties', 'thermophysicalProperties', 'FILE', 1, 22, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM thermophysicalProperties'),
+(11, 1, 'of_interfoam_u', '0/U', 'U', 'FILE', 1, 30, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam速度场'),
+(12, 1, 'of_interfoam_p_rgh', '0/p_rgh', 'p_rgh', 'FILE', 1, 31, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam p_rgh场'),
+(13, 1, 'of_interfoam_alpha', '0/alpha.*', 'alpha.*', 'FILE', 1, 32, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"],"minCount":1}', 'interFoam alpha相分数字段'),
+(14, 1, 'of_interfoam_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 33, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam transportProperties'),
+(15, 1, 'of_interfoam_g', 'constant/g', 'g', 'FILE', 1, 34, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam重力文件'),
+(16, 1, 'of_laplacian_t', '0/T', 'T', 'FILE', 1, 40, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["laplacianFoam"]}', 'laplacianFoam标量场'),
+(17, 1, 'of_laplacian_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 41, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["laplacianFoam"]}', 'laplacianFoam transportProperties'),
+(18, 2, 'main_inp', '**', '*.inp', 'FILE', 1, 1, '{"allowSuffix":["inp"],"minCount":1,"maxCount":1}', 'CalculiX主输入文件');
 
 -- =========================================================
 -- 3. task_db
