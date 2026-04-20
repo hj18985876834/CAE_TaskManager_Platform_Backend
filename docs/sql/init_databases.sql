@@ -366,6 +366,7 @@ CREATE TABLE compute_node (
     enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许参与调度',
     max_concurrency INT NOT NULL DEFAULT 1 COMMENT '最大并发任务数',
     running_count INT NOT NULL DEFAULT 0 COMMENT '当前运行任务数',
+    reserved_count INT NOT NULL DEFAULT 0 COMMENT '调度预占任务数',
     cpu_usage DECIMAL(5,2) DEFAULT 0.00 COMMENT 'CPU占用率',
     memory_usage DECIMAL(5,2) DEFAULT 0.00 COMMENT '内存占用率',
     last_heartbeat_time DATETIME DEFAULT NULL COMMENT '最近心跳时间',
@@ -377,7 +378,7 @@ CREATE TABLE compute_node (
     KEY idx_status (status),
     KEY idx_enabled (enabled),
     KEY idx_last_heartbeat_time (last_heartbeat_time),
-    KEY idx_status_enabled_running_count (status, enabled, running_count)
+    KEY idx_status_enabled_running_count (status, enabled, running_count, reserved_count)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计算节点表';
 
 -- -----------------------------
@@ -417,9 +418,9 @@ CREATE TABLE schedule_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='调度记录表';
 
 -- 初始化调度域数据
-INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, enabled, max_concurrency, running_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
-(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, 'ONLINE', 1, 4, 1, 23.50, 41.20, NOW(), NOW(), NOW()),
-(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, 'OFFLINE', 0, 2, 0, 0.00, 0.00, NOW(), NOW(), NOW());
+INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, enabled, max_concurrency, running_count, reserved_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
+(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, 'ONLINE', 1, 4, 1, 0, 23.50, 41.20, NOW(), NOW(), NOW()),
+(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, 'OFFLINE', 0, 2, 0, 0, 0.00, 0.00, NOW(), NOW(), NOW());
 
 INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enabled, created_at) VALUES
 (1, 1, 1, 'v10', 1, NOW()),
@@ -427,7 +428,7 @@ INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enab
 (3, 2, 1, 'v10', 0, NOW());
 
 INSERT INTO schedule_record (id, task_id, node_id, strategy_name, schedule_status, schedule_message, created_at) VALUES
-(1, 1, 1, 'LEAST_RUNNING', 'SUCCESS', 'node selected by least-running strategy', NOW()),
-(2, 2, 1, 'LEAST_RUNNING', 'SUCCESS', 'queued task pre-scheduled', NOW());
+(1, 1, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'node selected by fcfs-min-load strategy', NOW()),
+(2, 2, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'queued task pre-scheduled', NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;
