@@ -65,9 +65,9 @@ public class TaskQueryAppService {
 	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
 		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageMyTasks(request, userId);
-		Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache = new HashMap<>();
+		QueueReasonContext queueReasonContext = buildQueueReasonContext();
 		List<TaskListItemResponse> records = page.getRecords().stream()
-				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueSnapshotCache))
+				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueReasonContext))
 				.toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
@@ -75,9 +75,9 @@ public class TaskQueryAppService {
 	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
 		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageAdminTasks(request);
-		Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache = new HashMap<>();
+		QueueReasonContext queueReasonContext = buildQueueReasonContext();
 		List<TaskListItemResponse> records = page.getRecords().stream()
-				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueSnapshotCache))
+				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueReasonContext))
 				.toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
@@ -158,7 +158,7 @@ public class TaskQueryAppService {
 		return response;
 	}
 
-	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response, Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
+	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response, QueueReasonContext queueReasonContext) {
 		try {
 			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
 		} catch (Exception ignored) {
@@ -171,7 +171,7 @@ public class TaskQueryAppService {
 			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		} catch (Exception ignored) {
 		}
-		response.setQueueReason(resolveQueueReason(response.getSolverId(), response.getStatus(), queueSnapshotCache));
+		response.setQueueReason(resolveQueueReason(response.getTaskId(), response.getSolverId(), response.getStatus(), queueReasonContext));
 		return response;
 	}
 
@@ -188,16 +188,23 @@ public class TaskQueryAppService {
 			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		} catch (Exception ignored) {
 		}
-		response.setQueueReason(resolveQueueReason(response.getSolverId(), response.getStatus(), new HashMap<>()));
+		response.setQueueReason(resolveQueueReason(response.getTaskId(), response.getSolverId(), response.getStatus(), buildQueueReasonContext()));
 		return response;
 	}
 
-	private String resolveQueueReason(Long solverId, String status, Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
+	private String resolveQueueReason(Long taskId, Long solverId, String status, QueueReasonContext queueReasonContext) {
 		if (!TaskStatusEnum.QUEUED.name().equalsIgnoreCase(status)) {
 			return null;
 		}
+		if (queueReasonContext != null) {
+			Integer queueOrder = queueReasonContext.queuedTaskOrder().get(taskId);
+			if (queueOrder != null && queueOrder > 0) {
+				return "前方仍有更高优先级或更早提交任务";
+			}
+		}
 		try {
-			SchedulerClient.QueueNodeSnapshot snapshot = queueSnapshotCache.computeIfAbsent(
+			QueueReasonContext effectiveContext = queueReasonContext == null ? buildQueueReasonContext() : queueReasonContext;
+			SchedulerClient.QueueNodeSnapshot snapshot = effectiveContext.queueSnapshotCache().computeIfAbsent(
 					solverId,
 					key -> schedulerClient.getQueueNodeSnapshot(key)
 			);
@@ -215,5 +222,18 @@ public class TaskQueryAppService {
 		} catch (Exception ignored) {
 			return "排队中，等待调度器处理";
 		}
+	}
+
+	private QueueReasonContext buildQueueReasonContext() {
+		List<Task> queuedTasks = taskRepository.listByStatus(TaskStatusEnum.QUEUED.name());
+		Map<Long, Integer> queuedTaskOrder = new HashMap<>();
+		for (int i = 0; i < queuedTasks.size(); i++) {
+			queuedTaskOrder.put(queuedTasks.get(i).getId(), i);
+		}
+		return new QueueReasonContext(queuedTaskOrder, new HashMap<>());
+	}
+
+	private record QueueReasonContext(Map<Long, Integer> queuedTaskOrder,
+									  Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
 	}
 }
