@@ -218,6 +218,7 @@ public class TaskLifecycleManager {
 		String effectiveReason = reason == null || reason.isBlank() ? "admin retried task" : reason;
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.ADMIN.name(), adminUserId);
 		taskRepository.update(task);
+		schedulerClient.notifyTaskSubmitted(task.getId());
 
 		TaskSubmitResponse response = new TaskSubmitResponse();
 		response.setTaskId(task.getId());
