@@ -12,6 +12,7 @@ public class NodeListItemResponse {
 	private String status;
 	private Integer enabled;
 	private Integer runningCount;
+	private Integer reservedCount;
 	private Integer maxConcurrency;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
@@ -79,6 +80,14 @@ public class NodeListItemResponse {
 
 	public void setRunningCount(Integer runningCount) {
 		this.runningCount = runningCount;
+	}
+
+	public Integer getReservedCount() {
+		return reservedCount;
+	}
+
+	public void setReservedCount(Integer reservedCount) {
+		this.reservedCount = reservedCount;
 	}
 
 	public Integer getMaxConcurrency() {

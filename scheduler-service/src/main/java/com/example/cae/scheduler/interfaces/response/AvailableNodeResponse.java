@@ -6,6 +6,7 @@ public class AvailableNodeResponse {
 	private String nodeName;
 	private String host;
 	private Integer runningCount;
+	private Integer reservedCount;
 	private Integer maxConcurrency;
 
 	public Long getNodeId() {
@@ -46,6 +47,14 @@ public class AvailableNodeResponse {
 
 	public void setRunningCount(Integer runningCount) {
 		this.runningCount = runningCount;
+	}
+
+	public Integer getReservedCount() {
+		return reservedCount;
+	}
+
+	public void setReservedCount(Integer reservedCount) {
+		this.reservedCount = reservedCount;
 	}
 
 	public Integer getMaxConcurrency() {

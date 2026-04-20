@@ -43,11 +43,20 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markTaskScheduled(Long taskId, Long nodeId) {
+	@SuppressWarnings("unchecked")
+	public boolean markTaskScheduled(Long taskId, Long nodeId) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-scheduled";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
-		restTemplate.postForEntity(url, request, Result.class);
+		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		if (result == null || result.getData() == null) {
+			return false;
+		}
+		Object data = result.getData();
+		if (data instanceof Boolean bool) {
+			return bool;
+		}
+		return Boolean.parseBoolean(String.valueOf(data));
 	}
 
 	@Override
@@ -59,11 +68,12 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markTaskFailed(Long taskId, String failType, String reason) {
+	public void markTaskFailed(Long taskId, String failType, String reason, boolean recoverable) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/dispatch-failed";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("failType", failType);
 		request.put("reason", reason);
+		request.put("recoverable", recoverable);
 		restTemplate.postForEntity(url, request, Result.class);
 	}
 
@@ -74,5 +84,15 @@ public class TaskClientStub implements TaskClient {
 		request.put("nodeId", nodeId);
 		request.put("reason", reason);
 		restTemplate.postForEntity(url, request, Result.class);
+	}
+
+	@Override
+	public String getTaskStatus(Long taskId) {
+		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/status";
+		Result<String> result = restTemplate.getForObject(url, Result.class);
+		if (result == null || result.getData() == null) {
+			return null;
+		}
+		return String.valueOf(result.getData());
 	}
 }

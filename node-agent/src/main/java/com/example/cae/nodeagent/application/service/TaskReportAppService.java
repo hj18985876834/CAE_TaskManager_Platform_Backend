@@ -1,7 +1,6 @@
 package com.example.cae.nodeagent.application.service;
 
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
-import com.example.cae.nodeagent.infrastructure.client.SchedulerNodeClient;
 import com.example.cae.nodeagent.infrastructure.client.TaskReportClient;
 import org.springframework.stereotype.Service;
 
@@ -10,11 +9,9 @@ import java.io.File;
 @Service
 public class TaskReportAppService {
 	private final TaskReportClient taskReportClient;
-	private final SchedulerNodeClient schedulerNodeClient;
 
-	public TaskReportAppService(TaskReportClient taskReportClient, SchedulerNodeClient schedulerNodeClient) {
+	public TaskReportAppService(TaskReportClient taskReportClient) {
 		this.taskReportClient = taskReportClient;
-		this.schedulerNodeClient = schedulerNodeClient;
 	}
 
 	public void reportStatus(Long taskId, String status, String reason) {
@@ -41,7 +38,7 @@ public class TaskReportAppService {
 		taskReportClient.markFailed(taskId, failType, failMessage);
 	}
 
-	public void updateRunningCount(Integer delta) {
-		schedulerNodeClient.updateRunningCount(delta);
+	public void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable) {
+		taskReportClient.dispatchFailed(taskId, failType, reason, recoverable);
 	}
 }

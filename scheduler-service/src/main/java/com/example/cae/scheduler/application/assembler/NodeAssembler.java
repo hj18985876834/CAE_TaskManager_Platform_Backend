@@ -30,6 +30,7 @@ public final class NodeAssembler {
 		response.setEnabled(node.getEnabled());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
+		response.setReservedCount(node.getReservedCount());
 		response.setCpuUsage(node.getCpuUsage());
 		response.setMemoryUsage(node.getMemoryUsage());
 		response.setLastHeartbeatTime(node.getLastHeartbeatTime());
@@ -47,6 +48,7 @@ public final class NodeAssembler {
 		node.setEnabled(po.getEnabled());
 		node.setMaxConcurrency(po.getMaxConcurrency());
 		node.setRunningCount(po.getRunningCount());
+		node.setReservedCount(po.getReservedCount());
 		node.setCpuUsage(po.getCpuUsage());
 		node.setMemoryUsage(po.getMemoryUsage());
 		node.setLastHeartbeatTime(po.getLastHeartbeatTime());
@@ -66,6 +68,7 @@ public final class NodeAssembler {
 		po.setEnabled(node.getEnabled());
 		po.setMaxConcurrency(node.getMaxConcurrency());
 		po.setRunningCount(node.getRunningCount());
+		po.setReservedCount(node.getReservedCount());
 		po.setCpuUsage(node.getCpuUsage());
 		po.setMemoryUsage(node.getMemoryUsage());
 		po.setLastHeartbeatTime(node.getLastHeartbeatTime());

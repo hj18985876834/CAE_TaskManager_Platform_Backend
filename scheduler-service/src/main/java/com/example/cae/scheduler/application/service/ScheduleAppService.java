@@ -17,6 +17,7 @@ import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordReques
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -43,6 +44,7 @@ public class ScheduleAppService {
 		this.nodeAgentClient = nodeAgentClient;
 	}
 
+	@Transactional
 	public Long scheduleTask(TaskDTO task) {
 		if (task == null || task.getTaskId() == null || task.getSolverId() == null) {
 			throw new BizException(ErrorCodeConstants.INVALID_SCHEDULE_TASK, "invalid task for scheduling");
@@ -60,16 +62,20 @@ public class ScheduleAppService {
 			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 		}
 
-		selected.setRunningCount((selected.getRunningCount() == null ? 0 : selected.getRunningCount()) + 1);
-		computeNodeRepository.update(selected);
-		return selected.getId();
+		ComputeNode lockedNode = computeNodeRepository.findByIdForUpdate(selected.getId())
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		if (!lockedNode.reserveSlot()) {
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+		}
+		computeNodeRepository.update(lockedNode);
+		return lockedNode.getId();
 	}
 
 	public void confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage) {
 		ScheduleRecord success = ScheduleAssembler.newRecord(
 				taskId,
 				nodeId,
-				"FCFS_LEAST_LOAD",
+				"FCFS_MIN_LOAD",
 				"SUCCESS",
 				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch success" : scheduleMessage
 		);
@@ -80,23 +86,23 @@ public class ScheduleAppService {
 		ScheduleRecord failure = ScheduleAssembler.newRecord(
 				taskId,
 				nodeId,
-				"FCFS_LEAST_LOAD",
+				"FCFS_MIN_LOAD",
 				"FAILED",
 				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch failed" : scheduleMessage
 		);
 		scheduleRecordRepository.save(failure);
 	}
 
+	@Transactional
 	public void releaseNodeReservation(Long nodeId) {
 		if (nodeId == null) {
 			return;
 		}
-		ComputeNode node = computeNodeRepository.findById(nodeId).orElse(null);
+		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId).orElse(null);
 		if (node == null) {
 			return;
 		}
-		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
-		node.setRunningCount(Math.max(0, current - 1));
+		node.releaseReservation();
 		computeNodeRepository.update(node);
 	}
 
@@ -124,7 +130,7 @@ public class ScheduleAppService {
 		ScheduleRecord record = ScheduleAssembler.newRecord(
 				request.getTaskId(),
 				request.getNodeId(),
-				request.getStrategyName() == null || request.getStrategyName().isBlank() ? "FCFS_LEAST_LOAD" : request.getStrategyName(),
+				request.getStrategyName() == null || request.getStrategyName().isBlank() ? "FCFS_MIN_LOAD" : request.getStrategyName(),
 				request.getScheduleStatus() == null || request.getScheduleStatus().isBlank() ? "UNKNOWN" : request.getScheduleStatus(),
 				request.getScheduleMessage()
 		);

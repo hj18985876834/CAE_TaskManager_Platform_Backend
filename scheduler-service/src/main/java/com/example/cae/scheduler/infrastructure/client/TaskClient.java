@@ -7,11 +7,13 @@ import java.util.List;
 public interface TaskClient {
 	List<TaskDTO> listPendingTasks(Integer limit);
 
-	void markTaskScheduled(Long taskId, Long nodeId);
+	boolean markTaskScheduled(Long taskId, Long nodeId);
 
 	void markTaskDispatched(Long taskId, Long nodeId);
 
-	void markTaskFailed(Long taskId, String failType, String reason);
+	void markTaskFailed(Long taskId, String failType, String reason, boolean recoverable);
 
 	void markNodeOfflineTasksFailed(Long nodeId, String reason);
+
+	String getTaskStatus(Long taskId);
 }

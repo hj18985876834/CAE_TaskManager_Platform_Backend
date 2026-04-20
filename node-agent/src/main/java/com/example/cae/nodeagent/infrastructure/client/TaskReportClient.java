@@ -16,5 +16,6 @@ public interface TaskReportClient {
 	void markFinished(Long taskId);
 
 	void markFailed(Long taskId, String failType, String failMessage);
-}
 
+	void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable);
+}

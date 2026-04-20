@@ -1,17 +1,24 @@
 package com.example.cae.scheduler.application.scheduler;
 
-import com.example.cae.common.enums.FailTypeEnum;
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.enums.FailTypeEnum;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Set;
 
 @Component
 public class TaskScheduleJob {
+	private static final Logger log = LoggerFactory.getLogger(TaskScheduleJob.class);
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -31,22 +38,52 @@ public class TaskScheduleJob {
 			boolean dispatchAccepted = false;
 			try {
 				nodeId = taskScheduleManager.schedule(task);
-				taskClient.markTaskScheduled(task.getTaskId(), nodeId);
-				taskMarkedScheduled = true;
+				taskMarkedScheduled = taskClient.markTaskScheduled(task.getTaskId(), nodeId);
+				if (!taskMarkedScheduled) {
+					taskScheduleManager.releaseNodeReservation(nodeId);
+					continue;
+				}
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				dispatchAccepted = true;
-				taskClient.markTaskDispatched(task.getTaskId(), nodeId);
+				markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
 			} catch (Exception ex) {
 				if (nodeId != null && !dispatchAccepted) {
 					taskScheduleManager.releaseNodeReservation(nodeId);
 				}
 				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
-					taskClient.markTaskFailed(task.getTaskId(), FailTypeEnum.DISPATCH_ERROR.name(),
-							ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage());
+					String currentStatus = taskClient.getTaskStatus(task.getTaskId());
+					boolean alreadyAdvanced = currentStatus != null
+							&& Set.of("DISPATCHED", "RUNNING", "SUCCESS", "FAILED", "CANCELED", "TIMEOUT").contains(currentStatus);
+					if (!alreadyAdvanced) {
+						taskClient.markTaskFailed(
+								task.getTaskId(),
+								FailTypeEnum.DISPATCH_ERROR.name(),
+								ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
+								isRecoverableDispatchError(ex)
+						);
+					}
 				}
 				taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
 			}
 		}
+	}
+
+	private void markTaskDispatchedQuietly(Long taskId, Long nodeId) {
+		try {
+			taskClient.markTaskDispatched(taskId, nodeId);
+		} catch (Exception ex) {
+			log.warn("task marked dispatched by node-agent callback fallback, taskId={}, nodeId={}", taskId, nodeId, ex);
+		}
+	}
+
+	private boolean isRecoverableDispatchError(Exception ex) {
+		if (ex instanceof BizException bizException) {
+			return bizException.getCode() == ErrorCodeConstants.CONFLICT
+					|| bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
+					|| bizException.getCode() == ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE
+					|| bizException.getCode() == ErrorCodeConstants.NODE_AGENT_REJECTED;
+		}
+		return ex instanceof RestClientException;
 	}
 }

@@ -51,6 +51,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("params", task.getParams() == null ? java.util.Map.of() : task.getParams());
 
 		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		validateResult(result, "dispatch task");
 		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent dispatch response is empty");
 		}
@@ -73,6 +74,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("reason", reason);
 
 		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		validateResult(result, "cancel task");
 		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent cancel response is empty");
 		}
@@ -95,5 +97,14 @@ public class NodeAgentClientStub implements NodeAgentClient {
 			scheme = "http";
 		}
 		return scheme + "://" + node.getHost();
+	}
+
+	private void validateResult(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent " + action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage() == null ? "node-agent " + action + " failed" : result.getMessage());
+		}
 	}
 }

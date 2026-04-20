@@ -14,6 +14,7 @@ public class NodeDetailResponse {
 	private Integer enabled;
 	private Integer maxConcurrency;
 	private Integer runningCount;
+	private Integer reservedCount;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
@@ -89,6 +90,14 @@ public class NodeDetailResponse {
 
 	public void setRunningCount(Integer runningCount) {
 		this.runningCount = runningCount;
+	}
+
+	public Integer getReservedCount() {
+		return reservedCount;
+	}
+
+	public void setReservedCount(Integer reservedCount) {
+		this.reservedCount = reservedCount;
 	}
 
 	public BigDecimal getCpuUsage() {

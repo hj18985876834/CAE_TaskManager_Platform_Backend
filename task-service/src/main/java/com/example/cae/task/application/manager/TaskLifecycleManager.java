@@ -27,6 +27,8 @@ import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,10 +37,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 public class TaskLifecycleManager {
+	private static final Logger log = LoggerFactory.getLogger(TaskLifecycleManager.class);
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
@@ -267,9 +269,11 @@ public class TaskLifecycleManager {
 		if (shouldIgnoreReportedStatus(task, targetStatus)) {
 			return;
 		}
-		promoteScheduledTaskForNodeReport(task, targetStatus);
 		taskStatusDomainService.transfer(task, targetStatus, reason, operatorType, null);
 		taskRepository.update(task);
+		if (TaskStatusEnum.RUNNING.name().equalsIgnoreCase(targetStatus)) {
+			releaseReservationQuietly(task.getNodeId());
+		}
 	}
 
 	private String pickStatus(StatusReportRequest request) {
@@ -304,20 +308,6 @@ public class TaskLifecycleManager {
 			return true;
 		}
 		return task.isFinished();
-	}
-
-	private void promoteScheduledTaskForNodeReport(Task task, String targetStatus) {
-		if (task == null || targetStatus == null) {
-			return;
-		}
-		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
-			return;
-		}
-		if (!Set.of(TaskStatusEnum.RUNNING.name(), TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(),
-				TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(targetStatus.toUpperCase(Locale.ROOT))) {
-			return;
-		}
-		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "dispatch acknowledged by node report", OperatorTypeEnum.SYSTEM.name(), null);
 	}
 
 	private TaskFileResponse toTaskFileResponse(TaskFile file) {
@@ -427,5 +417,16 @@ public class TaskLifecycleManager {
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
+	}
+
+	private void releaseReservationQuietly(Long nodeId) {
+		if (nodeId == null) {
+			return;
+		}
+		try {
+			schedulerClient.releaseNodeReservation(nodeId);
+		} catch (Exception ex) {
+			log.warn("failed to release node reservation, nodeId={}", nodeId, ex);
+		}
 	}
 }

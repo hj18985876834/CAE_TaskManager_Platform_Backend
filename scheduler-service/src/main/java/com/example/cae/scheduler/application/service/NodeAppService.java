@@ -20,6 +20,7 @@ import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -61,6 +62,7 @@ public class NodeAppService {
 			}
 			node.markOnline();
 			node.setLastHeartbeatTime(LocalDateTime.now());
+			node.setReservedCount(node.getReservedCount() == null ? 0 : node.getReservedCount());
 			computeNodeRepository.update(node);
 			nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
 					mergeCapabilities(node.getId(), request.getSolverIds(), null));
@@ -72,6 +74,7 @@ public class NodeAppService {
 		node.markOnline();
 		node.enable();
 		node.setRunningCount(0);
+		node.setReservedCount(0);
 		node.setLastHeartbeatTime(LocalDateTime.now());
 		computeNodeRepository.save(node);
 		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
@@ -169,6 +172,7 @@ public class NodeAppService {
 		computeNodeRepository.findByNodeCode(nodeCode).ifPresent(node -> {
 			node.markOffline();
 			node.setRunningCount(0);
+			node.setReservedCount(0);
 			node.setCpuUsage(BigDecimal.ZERO);
 			node.setMemoryUsage(BigDecimal.ZERO);
 			computeNodeRepository.update(node);
@@ -195,15 +199,36 @@ public class NodeAppService {
 				.toList();
 	}
 
-	public void updateRunningCount(Long nodeId, Integer delta) {
-		if (nodeId == null || delta == null || delta == 0) {
+	@Transactional
+	public void reserveReservation(Long nodeId) {
+		if (nodeId == null) {
 			return;
 		}
-		ComputeNode node = computeNodeRepository.findById(nodeId)
+		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
-		int current = node.getRunningCount() == null ? 0 : node.getRunningCount();
-		node.setRunningCount(Math.max(0, current + delta));
+		if (!node.reserveSlot()) {
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+		}
 		computeNodeRepository.update(node);
+	}
+
+	@Transactional
+	public void releaseReservation(Long nodeId) {
+		if (nodeId == null) {
+			return;
+		}
+		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		node.releaseReservation();
+		computeNodeRepository.update(node);
+	}
+
+	/**
+	 * @deprecated runningCount should be updated by heartbeat reports instead of manual +/- operations.
+	 */
+	@Deprecated
+	public void updateRunningCount(Long nodeId, Integer delta) {
+		// Keep the legacy endpoint compatible while moving scheduling capacity management to reservedCount.
 	}
 
 	public String getNodeToken(Long nodeId) {
@@ -248,6 +273,7 @@ public class NodeAppService {
 		response.setEnabled(node.getEnabled());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
+		response.setReservedCount(node.getReservedCount());
 		response.setCpuUsage(node.getCpuUsage());
 		response.setMemoryUsage(node.getMemoryUsage());
 		response.setLastHeartbeatTime(node.getLastHeartbeatTime());
@@ -261,6 +287,7 @@ public class NodeAppService {
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
 		response.setRunningCount(node.getRunningCount());
+		response.setReservedCount(node.getReservedCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		return response;
 	}

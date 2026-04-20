@@ -10,6 +10,8 @@ import java.util.Optional;
 public interface ComputeNodeRepository {
 	Optional<ComputeNode> findById(Long nodeId);
 
+	Optional<ComputeNode> findByIdForUpdate(Long nodeId);
+
 	Optional<ComputeNode> findByNodeCode(String nodeCode);
 
 	Optional<ComputeNode> findByNodeToken(String nodeToken);

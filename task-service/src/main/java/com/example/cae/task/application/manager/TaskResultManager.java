@@ -20,9 +20,6 @@ import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Locale;
-import java.util.Set;
-
 @Service
 public class TaskResultManager {
 	private final TaskRepository taskRepository;
@@ -85,7 +82,9 @@ public class TaskResultManager {
 		if (shouldIgnoreTerminalReport(task, target)) {
 			return;
 		}
-		promoteScheduledTaskForNodeTerminal(task, target);
+		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for terminal report: " + task.getStatus());
+		}
 		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 	}
@@ -93,13 +92,18 @@ public class TaskResultManager {
 	@Transactional
 	public void failTask(Long taskId, String failType, String failMessage) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		if (shouldIgnoreTerminalReport(task, TaskStatusEnum.FAILED.name())) {
+		String targetStatus = TaskStatusEnum.TIMEOUT.name().equalsIgnoreCase(failType)
+				? TaskStatusEnum.TIMEOUT.name()
+				: TaskStatusEnum.FAILED.name();
+		if (shouldIgnoreTerminalReport(task, targetStatus)) {
 			return;
 		}
-		promoteScheduledTaskForNodeTerminal(task, TaskStatusEnum.FAILED.name());
+		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for fail report: " + task.getStatus());
+		}
 		task.setFailType(failType);
 		task.setFailMessage(failMessage);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), failMessage, OperatorTypeEnum.NODE.name(), null);
+		taskStatusDomainService.transfer(task, targetStatus, failMessage, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 	}
 
@@ -111,19 +115,5 @@ public class TaskResultManager {
 			return true;
 		}
 		return task.isFinished();
-	}
-
-	private void promoteScheduledTaskForNodeTerminal(Task task, String targetStatus) {
-		if (task == null || targetStatus == null) {
-			return;
-		}
-		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
-			return;
-		}
-		if (!Set.of(TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(),
-				TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(targetStatus.toUpperCase(Locale.ROOT))) {
-			return;
-		}
-		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "dispatch acknowledged by node result report", OperatorTypeEnum.SYSTEM.name(), null);
 	}
 }

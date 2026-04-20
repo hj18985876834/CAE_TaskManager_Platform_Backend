@@ -17,10 +17,10 @@ public class FcfsLeastLoadStrategy implements ScheduleStrategy {
 		}
 		return nodes.stream()
 				.min(Comparator
-						.comparing(ComputeNode::getRunningCount, Comparator.nullsLast(Integer::compareTo))
+						.comparing(ComputeNode::getTotalLoad)
+						.thenComparing(ComputeNode::getRunningCount, Comparator.nullsLast(Integer::compareTo))
 						.thenComparing(ComputeNode::getCpuUsage, Comparator.nullsLast(BigDecimal::compareTo))
 						.thenComparing(ComputeNode::getMemoryUsage, Comparator.nullsLast(BigDecimal::compareTo)))
 				.orElse(null);
 	}
 }
-

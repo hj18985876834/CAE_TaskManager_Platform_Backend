@@ -45,8 +45,8 @@ public class TaskDispatchManager {
 			throw new BizException(409, "task already running");
 		}
 		ExecutionContext context = executionContextAssembler.fromDispatchRequest(request);
-		taskReportManager.onTaskAccepted(request.getTaskId());
 		try {
+			taskReportManager.onTaskAccepted(request.getTaskId());
 			taskExecutor.execute(() -> taskExecuteManager.execute(context));
 		} catch (RuntimeException ex) {
 			taskRuntimeRegistry.finish(request.getTaskId());

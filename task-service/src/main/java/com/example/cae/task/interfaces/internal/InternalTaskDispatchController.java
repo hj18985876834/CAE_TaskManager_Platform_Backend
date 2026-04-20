@@ -31,13 +31,17 @@ public class InternalTaskDispatchController {
 		return Result.success(taskDispatchManager.listQueuedTasks(limit));
 	}
 
+	@GetMapping("/{taskId}/status")
+	public Result<String> getTaskStatus(@PathVariable("taskId") Long taskId) {
+		return Result.success(taskDispatchManager.getTaskStatus(taskId));
+	}
+
 	@PostMapping("/{taskId}/mark-scheduled")
-	public Result<Void> markScheduled(@PathVariable("taskId") Long taskId,
+	public Result<Boolean> markScheduled(@PathVariable("taskId") Long taskId,
 								 @RequestBody(required = false) TaskNodeMarkRequest request,
 							 @RequestParam(value = "nodeId", required = false) Long nodeId) {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
-		taskDispatchManager.markScheduled(taskId, effectiveNodeId);
-		return Result.success();
+		return Result.success(taskDispatchManager.markScheduled(taskId, effectiveNodeId));
 	}
 
 	@PostMapping("/{taskId}/mark-dispatched")
@@ -51,7 +55,7 @@ public class InternalTaskDispatchController {
 
 	@PostMapping("/{taskId}/dispatch-failed")
 	public Result<Void> markFailed(@PathVariable("taskId") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
-		taskDispatchManager.markFailed(taskId, request.getFailType(), request.getReason());
+		taskDispatchManager.markFailed(taskId, request.getFailType(), request.getReason(), request.getRecoverable());
 		return Result.success();
 	}
 

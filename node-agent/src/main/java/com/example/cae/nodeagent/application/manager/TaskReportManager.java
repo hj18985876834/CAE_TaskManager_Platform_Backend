@@ -25,6 +25,7 @@ public class TaskReportManager {
 
 	public void onTaskAccepted(Long taskId) {
 		logSeqMap.put(taskId, new AtomicInteger(1));
+		taskReportAppService.reportStatus(taskId, "DISPATCHED", "node-agent accepted dispatch");
 	}
 
 	public void reportRunning(ExecutionContext context) {
@@ -57,6 +58,13 @@ public class TaskReportManager {
 		taskReportAppService.markFailed(context.getTaskId(), failType, ex.getMessage());
 	}
 
+	public void reportPreRunFailure(ExecutionContext context, Exception ex) {
+		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
+				? "node-agent prepare task failed"
+				: ex.getMessage();
+		taskReportAppService.dispatchFailed(context.getTaskId(), FailTypeEnum.EXECUTOR_START_ERROR.name(), message, false);
+	}
+
 	public void reportCanceled(ExecutionContext context, String reason) {
 		String message = reason == null || reason.isBlank() ? "task canceled" : reason;
 		taskReportAppService.reportStatus(context.getTaskId(), "CANCELED", message);
@@ -65,6 +73,5 @@ public class TaskReportManager {
 	public void completeTask(Long taskId) {
 		logSeqMap.remove(taskId);
 		taskRuntimeRegistry.finish(taskId);
-		taskReportAppService.updateRunningCount(-1);
 	}
 }

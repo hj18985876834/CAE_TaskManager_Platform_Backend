@@ -95,6 +95,19 @@ public class TaskReportClientImpl implements TaskReportClient {
 		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 
+	@Override
+	public void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable) {
+		String url = UriComponentsBuilder
+				.fromHttpUrl(taskBaseUrl() + "/internal/tasks/{taskId}/dispatch-failed")
+				.buildAndExpand(taskId)
+				.toUriString();
+		Map<String, Object> body = new HashMap<>();
+		body.put("failType", failType);
+		body.put("reason", reason);
+		body.put("recoverable", recoverable);
+		restTemplate.postForEntity(url, withToken(body), Object.class);
+	}
+
 	private String taskBaseUrl() {
 		return nodeAgentConfig.getTaskBaseUrl();
 	}

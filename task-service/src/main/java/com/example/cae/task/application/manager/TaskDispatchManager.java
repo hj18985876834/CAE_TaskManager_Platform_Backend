@@ -13,8 +13,11 @@ import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +27,7 @@ import java.util.Set;
 
 @Service
 public class TaskDispatchManager {
+	private static final Logger log = LoggerFactory.getLogger(TaskDispatchManager.class);
 	private static final Set<String> NODE_OFFLINE_AFFECTED_STATUSES = Set.of(
 			TaskStatusEnum.SCHEDULED.name(),
 			TaskStatusEnum.DISPATCHED.name(),
@@ -33,17 +37,20 @@ public class TaskDispatchManager {
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
+	private final SchedulerClient schedulerClient;
 	private final SolverClient solverClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskDispatchManager(TaskRepository taskRepository,
 						   TaskFileRepository taskFileRepository,
 						   TaskStatusDomainService taskStatusDomainService,
+						   SchedulerClient schedulerClient,
 						   SolverClient solverClient,
 						   TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
+		this.schedulerClient = schedulerClient;
 		this.solverClient = solverClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
@@ -60,7 +67,7 @@ public class TaskDispatchManager {
 	}
 
 	@Transactional
-	public void markScheduled(Long taskId, Long nodeId) {
+	public boolean markScheduled(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
@@ -69,13 +76,14 @@ public class TaskDispatchManager {
 			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
 					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
 					.contains(task.getStatus())) {
-				return;
+				return false;
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for scheduling: " + task.getStatus());
 		}
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
+		return true;
 	}
 
 	@Transactional
@@ -98,20 +106,32 @@ public class TaskDispatchManager {
 	}
 
 	@Transactional
-	public void markFailed(Long taskId, String failType, String reason) {
+	public void markFailed(Long taskId, String failType, String reason, Boolean recoverable) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		if (!TaskStatusEnum.SCHEDULED.name().equals(task.getStatus())) {
-			if (Set.of(TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
+		if (!Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(task.getStatus())) {
+			if (Set.of(TaskStatusEnum.QUEUED.name(), TaskStatusEnum.RUNNING.name(),
 					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
 					.contains(task.getStatus())) {
 				return;
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
 		}
+		Long nodeId = task.getNodeId();
 		task.setFailType(failType);
 		task.setFailMessage(reason);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.FAILED.name(), reason, OperatorTypeEnum.SYSTEM.name(), null);
+		taskStatusDomainService.transfer(task,
+				Boolean.TRUE.equals(recoverable) ? TaskStatusEnum.QUEUED.name() : TaskStatusEnum.FAILED.name(),
+				reason,
+				OperatorTypeEnum.SYSTEM.name(),
+				null);
 		taskRepository.update(task);
+		releaseReservationQuietly(nodeId);
+	}
+
+	public String getTaskStatus(Long taskId) {
+		return taskRepository.findById(taskId)
+				.map(Task::getStatus)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 	}
 
 	@Transactional
@@ -224,5 +244,16 @@ public class TaskDispatchManager {
 			// keep dispatch payload resilient when params are malformed.
 		}
 		return Map.of();
+	}
+
+	private void releaseReservationQuietly(Long nodeId) {
+		if (nodeId == null) {
+			return;
+		}
+		try {
+			schedulerClient.releaseNodeReservation(nodeId);
+		} catch (Exception ex) {
+			log.warn("failed to release node reservation, nodeId={}", nodeId, ex);
+		}
 	}
 }

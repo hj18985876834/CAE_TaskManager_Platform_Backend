@@ -11,6 +11,7 @@ public class NodeDTO {
     private Double cpuUsage;
     private Double memoryUsage;
     private Integer runningCount;
+    private Integer reservedCount;
     private java.util.List<Long> solverIds;
 
     public Long getNodeId() {
@@ -59,6 +60,14 @@ public class NodeDTO {
 
     public void setRunningCount(Integer runningCount) {
         this.runningCount = runningCount;
+    }
+
+    public Integer getReservedCount() {
+        return reservedCount;
+    }
+
+    public void setReservedCount(Integer reservedCount) {
+        this.reservedCount = reservedCount;
     }
 
     public String getNodeName() {

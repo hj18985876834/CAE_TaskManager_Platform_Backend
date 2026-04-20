@@ -69,14 +69,7 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 
 	@Override
 	public void updateRunningCount(Integer delta) {
-		if (delta == null || delta == 0 || nodeAgentConfig.getNodeId() == null) {
-			return;
-		}
-		String url = nodeAgentConfig.getSchedulerBaseUrl() + "/internal/nodes/" + nodeAgentConfig.getNodeId() + "/running-count";
-		Map<String, Object> body = new HashMap<>();
-		body.put("delta", delta);
-		Result<?> result = restTemplate.postForObject(url, body, Result.class);
-		validateResult(result, "update running count");
+		// runningCount is now sourced from heartbeat reports instead of manual +/- operations.
 	}
 
 	private void validateResult(Result<?> result, String action) {

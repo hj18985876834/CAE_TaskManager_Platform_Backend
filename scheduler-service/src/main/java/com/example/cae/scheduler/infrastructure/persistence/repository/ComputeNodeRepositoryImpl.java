@@ -26,6 +26,11 @@ public class ComputeNodeRepositoryImpl implements ComputeNodeRepository {
 	}
 
 	@Override
+	public Optional<ComputeNode> findByIdForUpdate(Long nodeId) {
+		return Optional.ofNullable(computeNodeMapper.selectByIdForUpdate(nodeId)).map(NodeAssembler::fromPO);
+	}
+
+	@Override
 	public Optional<ComputeNode> findByNodeCode(String nodeCode) {
 		return Optional.ofNullable(computeNodeMapper.selectByNodeCode(nodeCode)).map(NodeAssembler::fromPO);
 	}

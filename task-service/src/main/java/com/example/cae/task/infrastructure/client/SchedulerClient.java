@@ -33,6 +33,14 @@ public class SchedulerClient {
 		restTemplate.postForEntity(url, body, Result.class);
 	}
 
+	public void releaseNodeReservation(Long nodeId) {
+		if (nodeId == null) {
+			return;
+		}
+		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/release-reservation";
+		restTemplate.postForEntity(url, null, Result.class);
+	}
+
 	@SuppressWarnings("unchecked")
 	public String getNodeName(Long nodeId) {
 		if (nodeId == null) {
@@ -111,9 +119,11 @@ public class SchedulerClient {
 			}
 			onlineCount++;
 			Integer runningCount = toInteger(nodeMap.get("runningCount"));
+			Integer reservedCount = toInteger(nodeMap.get("reservedCount"));
 			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
 			if (runningCount != null && maxConcurrency != null && maxConcurrency > 0) {
-				totalLoad = totalLoad.add(BigDecimal.valueOf(runningCount)
+				int effectiveLoad = runningCount + (reservedCount == null ? 0 : reservedCount);
+				totalLoad = totalLoad.add(BigDecimal.valueOf(effectiveLoad)
 						.divide(BigDecimal.valueOf(maxConcurrency), 4, RoundingMode.HALF_UP));
 				loadSamples++;
 			}

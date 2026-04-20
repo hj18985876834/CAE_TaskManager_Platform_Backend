@@ -13,6 +13,7 @@ public class ComputeNode {
 	private Integer enabled;
 	private Integer maxConcurrency;
 	private Integer runningCount;
+	private Integer reservedCount;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
@@ -51,7 +52,34 @@ public class ComputeNode {
 	}
 
 	public boolean canDispatch() {
-		return isOnline() && isEnabled() && this.runningCount != null && this.maxConcurrency != null && this.runningCount < this.maxConcurrency;
+		return isOnline()
+				&& isEnabled()
+				&& this.maxConcurrency != null
+				&& getTotalLoad() < this.maxConcurrency;
+	}
+
+	public boolean reserveSlot() {
+		if (!canDispatch()) {
+			return false;
+		}
+		this.reservedCount = currentReservedCount() + 1;
+		return true;
+	}
+
+	public void releaseReservation() {
+		this.reservedCount = Math.max(0, currentReservedCount() - 1);
+	}
+
+	public int getTotalLoad() {
+		return currentRunningCount() + currentReservedCount();
+	}
+
+	private int currentRunningCount() {
+		return this.runningCount == null ? 0 : this.runningCount;
+	}
+
+	private int currentReservedCount() {
+		return this.reservedCount == null ? 0 : this.reservedCount;
 	}
 
 	public Long getId() {
@@ -124,6 +152,14 @@ public class ComputeNode {
 
 	public void setRunningCount(Integer runningCount) {
 		this.runningCount = runningCount;
+	}
+
+	public Integer getReservedCount() {
+		return reservedCount;
+	}
+
+	public void setReservedCount(Integer reservedCount) {
+		this.reservedCount = reservedCount;
 	}
 
 	public BigDecimal getCpuUsage() {
