@@ -156,9 +156,17 @@ public class TaskDispatchManager {
 
 	private void enrichExecutionMeta(Task task, TaskDTO dto) {
 		try {
-			String solverCode = solverClient.getSolverCode(task.getSolverId());
-			if (solverCode != null && !solverCode.isBlank()) {
-				dto.setSolverCode(solverCode);
+			SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
+			if (solverMeta != null) {
+				if (solverMeta.getSolverCode() != null && !solverMeta.getSolverCode().isBlank()) {
+					dto.setSolverCode(solverMeta.getSolverCode());
+				}
+				if (solverMeta.getExecMode() != null && !solverMeta.getExecMode().isBlank()) {
+					dto.setSolverExecMode(solverMeta.getExecMode());
+				}
+				if (solverMeta.getExecPath() != null && !solverMeta.getExecPath().isBlank()) {
+					dto.setSolverExecPath(solverMeta.getExecPath());
+				}
 			}
 		} catch (Exception ignored) {
 			// keep queued API resilient even if solver-service is temporarily unavailable.

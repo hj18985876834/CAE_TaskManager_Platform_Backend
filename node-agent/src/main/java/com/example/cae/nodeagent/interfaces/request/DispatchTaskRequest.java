@@ -10,6 +10,8 @@ public class DispatchTaskRequest {
 	private String taskNo;
 	private Long solverId;
 	private String solverCode;
+	private String solverExecMode;
+	private String solverExecPath;
 	private Long profileId;
 	private String taskType;
 	private String commandTemplate;
@@ -48,6 +50,22 @@ public class DispatchTaskRequest {
 
 	public void setSolverCode(String solverCode) {
 		this.solverCode = solverCode;
+	}
+
+	public String getSolverExecMode() {
+		return solverExecMode;
+	}
+
+	public void setSolverExecMode(String solverExecMode) {
+		this.solverExecMode = solverExecMode;
+	}
+
+	public String getSolverExecPath() {
+		return solverExecPath;
+	}
+
+	public void setSolverExecPath(String solverExecPath) {
+		this.solverExecPath = solverExecPath;
 	}
 
 	public Long getProfileId() {
@@ -106,4 +124,3 @@ public class DispatchTaskRequest {
 		this.params = params;
 	}
 }
-

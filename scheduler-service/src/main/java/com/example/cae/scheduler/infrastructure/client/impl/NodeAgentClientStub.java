@@ -39,7 +39,9 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("taskId", task.getTaskId());
 		request.put("taskNo", task.getTaskNo());
 		request.put("solverId", task.getSolverId());
-		request.put("solverCode", task.getSolverCode() == null || task.getSolverCode().isBlank() ? "MOCK" : task.getSolverCode());
+		request.put("solverCode", task.getSolverCode());
+		request.put("solverExecMode", task.getSolverExecMode());
+		request.put("solverExecPath", task.getSolverExecPath());
 		request.put("profileId", task.getProfileId());
 		request.put("taskType", task.getTaskType());
 		request.put("commandTemplate", task.getCommandTemplate());

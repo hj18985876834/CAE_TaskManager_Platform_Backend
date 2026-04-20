@@ -152,7 +152,7 @@ INSERT INTO solver_definition (id, solver_code, solver_name, version, exec_mode,
 
 INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, upload_mode, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
 (1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', '${openfoamApplication} -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
-(2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ZIP_ONLY', 'ccx ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
+(2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ZIP_ONLY', '${solverExecPath} ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
 
 INSERT INTO solver_profile_file_rule (id, profile_id, file_key, path_pattern, file_name_pattern, file_type, required_flag, sort_order, rule_json, description) VALUES
 (1, 1, 'input_archive', '**', '*.zip', 'ZIP', 1, 1, '{"allowSuffix":["zip"],"maxSizeMb":2048}', 'OpenFOAM算例压缩包'),

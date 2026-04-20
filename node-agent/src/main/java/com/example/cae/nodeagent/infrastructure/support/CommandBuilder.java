@@ -38,6 +38,8 @@ public class CommandBuilder {
 		variables.put("taskNo", context.getTaskNo());
 		variables.put("solverId", context.getSolverId());
 		variables.put("solverCode", context.getSolverCode());
+		variables.put("solverExecMode", context.getSolverExecMode());
+		variables.put("solverExecPath", context.getSolverExecPath());
 		variables.put("profileId", context.getProfileId());
 		variables.put("taskType", context.getTaskType());
 		variables.put("workDir", context.getWorkDir());

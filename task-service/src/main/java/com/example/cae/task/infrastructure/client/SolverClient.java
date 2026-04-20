@@ -98,21 +98,27 @@ public class SolverClient {
 	}
 
 	public String getSolverCode(Long solverId) {
-		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
-		Result<?> result = restTemplate.getForObject(url, Result.class);
-		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
-			return null;
-		}
-		return toString(map.get("solverCode"));
+		SolverMeta solverMeta = getSolverMeta(solverId);
+		return solverMeta == null ? null : solverMeta.getSolverCode();
 	}
 
 	public String getSolverName(Long solverId) {
+		SolverMeta solverMeta = getSolverMeta(solverId);
+		return solverMeta == null ? null : solverMeta.getSolverName();
+	}
+
+	public SolverMeta getSolverMeta(Long solverId) {
 		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
 			return null;
 		}
-		return toString(map.get("solverName"));
+		SolverMeta solverMeta = new SolverMeta();
+		solverMeta.setSolverCode(toString(map.get("solverCode")));
+		solverMeta.setSolverName(toString(map.get("solverName")));
+		solverMeta.setExecMode(toString(map.get("execMode")));
+		solverMeta.setExecPath(toString(map.get("execPath")));
+		return solverMeta;
 	}
 
 	public ProfileExecutionMeta getProfileExecutionMeta(Long profileId) {
@@ -227,6 +233,45 @@ public class SolverClient {
 
 		public void setAllowSuffix(List<String> allowSuffix) {
 			this.allowSuffix = allowSuffix;
+		}
+	}
+
+	public static class SolverMeta {
+		private String solverCode;
+		private String solverName;
+		private String execMode;
+		private String execPath;
+
+		public String getSolverCode() {
+			return solverCode;
+		}
+
+		public void setSolverCode(String solverCode) {
+			this.solverCode = solverCode;
+		}
+
+		public String getSolverName() {
+			return solverName;
+		}
+
+		public void setSolverName(String solverName) {
+			this.solverName = solverName;
+		}
+
+		public String getExecMode() {
+			return execMode;
+		}
+
+		public void setExecMode(String execMode) {
+			this.execMode = execMode;
+		}
+
+		public String getExecPath() {
+			return execPath;
+		}
+
+		public void setExecPath(String execPath) {
+			this.execPath = execPath;
 		}
 	}
 }

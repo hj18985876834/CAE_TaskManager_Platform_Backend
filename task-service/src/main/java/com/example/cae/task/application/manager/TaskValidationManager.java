@@ -85,7 +85,8 @@ public class TaskValidationManager {
         List<TaskFile> files = taskFileRepository.listByTaskId(taskId);
         Long profileSolverId = solverClient.getProfileSolverId(task.getProfileId());
         String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
-        String solverCode = solverClient.getSolverCode(task.getSolverId());
+        SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
+        String solverCode = solverMeta == null ? null : solverMeta.getSolverCode();
         List<FileRuleDTO> rules = solverClient.getFileRules(task.getProfileId());
         List<TaskValidateResponse.ValidationIssue> issues = new ArrayList<>();
         Map<String, Object> taskParams = parseTaskParams(task.getParamsJson());
@@ -103,7 +104,7 @@ public class TaskValidationManager {
                 throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
             }
             List<RuleDefinition> ruleDefinitions = buildRuleDefinitions(rules, issues);
-            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverCode, taskParams, issues);
+            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverMeta, taskParams, issues);
             if (!issues.isEmpty()) {
                 throw new BizException(ErrorCodeConstants.TASK_VALIDATION_FAILED, "task file validation failed", buildInvalidResponse(task, issues));
             }
@@ -131,7 +132,7 @@ public class TaskValidationManager {
     private ValidationOutcome validateArchiveAndRules(Task task,
                                                       List<TaskFile> files,
                                                       List<RuleDefinition> ruleDefinitions,
-                                                      String solverCode,
+                                                      SolverClient.SolverMeta solverMeta,
                                                       Map<String, Object> taskParams,
                                                       List<TaskValidateResponse.ValidationIssue> issues) {
         String archiveFileKey = resolveArchiveFileKey(ruleDefinitions);
@@ -158,7 +159,7 @@ public class TaskValidationManager {
             return null;
         }
 
-        Map<String, Object> validationVariables = buildValidationVariables(task, solverCode, taskParams);
+        Map<String, Object> validationVariables = buildValidationVariables(task, solverMeta, taskParams);
         DerivationOutcome derivationOutcome = deriveValidationVariables(ruleDefinitions, extracted, validationVariables, issues);
 
         for (RuleDefinition ruleDefinition : ruleDefinitions) {
@@ -210,7 +211,7 @@ public class TaskValidationManager {
     }
 
     private Map<String, Object> buildValidationVariables(Task task,
-                                                         String solverCode,
+                                                         SolverClient.SolverMeta solverMeta,
                                                          Map<String, Object> taskParams) {
         Map<String, Object> variables = new LinkedHashMap<>();
         if (taskParams != null && !taskParams.isEmpty()) {
@@ -227,8 +228,16 @@ public class TaskValidationManager {
                 variables.put("taskType", task.getTaskType());
             }
         }
-        if (solverCode != null && !solverCode.isBlank()) {
-            variables.put("solverCode", solverCode);
+        if (solverMeta != null) {
+            if (solverMeta.getSolverCode() != null && !solverMeta.getSolverCode().isBlank()) {
+                variables.put("solverCode", solverMeta.getSolverCode());
+            }
+            if (solverMeta.getExecMode() != null && !solverMeta.getExecMode().isBlank()) {
+                variables.put("solverExecMode", solverMeta.getExecMode());
+            }
+            if (solverMeta.getExecPath() != null && !solverMeta.getExecPath().isBlank()) {
+                variables.put("solverExecPath", solverMeta.getExecPath());
+            }
         }
         return variables;
     }

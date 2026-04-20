@@ -12,6 +12,8 @@ public class ExecutionContextBuildService {
 		context.setTaskNo(request.getTaskNo());
 		context.setSolverId(request.getSolverId());
 		context.setSolverCode(request.getSolverCode());
+		context.setSolverExecMode(request.getSolverExecMode());
+		context.setSolverExecPath(request.getSolverExecPath());
 		context.setProfileId(request.getProfileId());
 		context.setTaskType(request.getTaskType());
 		context.setCommandTemplate(request.getCommandTemplate());
@@ -22,4 +24,3 @@ public class ExecutionContextBuildService {
 		return context;
 	}
 }
-
