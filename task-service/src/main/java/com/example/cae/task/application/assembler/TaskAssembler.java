@@ -62,6 +62,7 @@ public class TaskAssembler {
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
+		response.setCanCancel(canCancel(task));
 		response.setCanRetry(canRetry(task));
 		response.setParams(parseJsonMap(task.getParamsJson()));
 		response.setFailType(task.getFailType());
@@ -83,6 +84,7 @@ public class TaskAssembler {
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
 		response.setNodeId(task.getNodeId());
+		response.setCanCancel(canCancel(task));
 		response.setCanRetry(canRetry(task));
 		response.setSubmitTime(task.getSubmitTime());
 		response.setStartTime(task.getStartTime());
@@ -112,6 +114,14 @@ public class TaskAssembler {
 		}
 		return TaskStatusEnum.FAILED.name().equals(task.getStatus())
 				|| TaskStatusEnum.TIMEOUT.name().equals(task.getStatus());
+	}
+
+	private boolean canCancel(Task task) {
+		if (task == null || task.getStatus() == null) {
+			return false;
+		}
+		return TaskStatusEnum.QUEUED.name().equals(task.getStatus())
+				|| TaskStatusEnum.RUNNING.name().equals(task.getStatus());
 	}
 
 	public TaskPO toPO(Task task) {

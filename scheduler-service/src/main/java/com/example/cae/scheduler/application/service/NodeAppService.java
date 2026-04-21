@@ -9,6 +9,7 @@ import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.service.NodeDomainService;
+import com.example.cae.scheduler.infrastructure.client.SolverClient;
 import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
@@ -40,13 +41,16 @@ public class NodeAppService {
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final NodeDomainService nodeDomainService;
+	private final SolverClient solverClient;
 
 	public NodeAppService(ComputeNodeRepository computeNodeRepository,
 						  NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
-						  NodeDomainService nodeDomainService) {
+						  NodeDomainService nodeDomainService,
+						  SolverClient solverClient) {
 		this.computeNodeRepository = computeNodeRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.nodeDomainService = nodeDomainService;
+		this.solverClient = solverClient;
 	}
 
 	public Long registerNode(NodeRegisterRequest request) {
@@ -158,13 +162,7 @@ public class NodeAppService {
 		}
 		computeNodeRepository.findById(nodeId).orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		return nodeSolverCapabilityRepository.listByNodeId(nodeId).stream()
-				.map(capability -> {
-					NodeSolverResponse response = new NodeSolverResponse();
-					response.setSolverId(capability.getSolverId());
-					response.setSolverVersion(capability.getSolverVersion());
-					response.setEnabled(capability.getEnabled());
-					return response;
-				})
+				.map(this::toNodeSolverResponse)
 				.toList();
 	}
 
@@ -252,13 +250,21 @@ public class NodeAppService {
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
-		response.setSolvers(capabilities.stream().map(capability -> {
-			NodeSolverResponse solver = new NodeSolverResponse();
-			solver.setSolverId(capability.getSolverId());
-			solver.setSolverVersion(capability.getSolverVersion());
-			solver.setEnabled(capability.getEnabled());
-			return solver;
-		}).toList());
+		response.setSolvers(capabilities.stream().map(this::toNodeSolverResponse).toList());
+		return response;
+	}
+
+	private NodeSolverResponse toNodeSolverResponse(NodeSolverCapability capability) {
+		NodeSolverResponse response = new NodeSolverResponse();
+		response.setSolverId(capability.getSolverId());
+		response.setSolverVersion(capability.getSolverVersion());
+		response.setEnabled(capability.getEnabled());
+		if (capability.getSolverId() != null) {
+			SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(capability.getSolverId());
+			if (solverMeta != null) {
+				response.setSolverName(solverMeta.getSolverName());
+			}
+		}
 		return response;
 	}
 

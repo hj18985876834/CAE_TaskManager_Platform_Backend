@@ -17,6 +17,7 @@ public class TaskDetailResponse {
 	private Integer priority;
 	private Long nodeId;
 	private String nodeName;
+	private Boolean canCancel;
 	private Boolean canRetry;
 	private String queueReason;
 	private Map<String, Object> params;
@@ -128,6 +129,14 @@ public class TaskDetailResponse {
 
 	public void setNodeName(String nodeName) {
 		this.nodeName = nodeName;
+	}
+
+	public Boolean getCanCancel() {
+		return canCancel;
+	}
+
+	public void setCanCancel(Boolean canCancel) {
+		this.canCancel = canCancel;
 	}
 
 	public Boolean getCanRetry() {

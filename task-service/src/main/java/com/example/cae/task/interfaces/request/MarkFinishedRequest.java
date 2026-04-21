@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.AssertTrue;
+
+import java.util.Set;
 
 public class MarkFinishedRequest {
 	@NotNull(message = "nodeId不能为空")
@@ -27,5 +30,13 @@ public class MarkFinishedRequest {
 
 	public void setFinalStatus(String finalStatus) {
 		this.finalStatus = finalStatus;
+	}
+
+	@AssertTrue(message = "finalStatus只允许为SUCCESS、TIMEOUT或CANCELED")
+	public boolean isFinalStatusAllowed() {
+		if (finalStatus == null || finalStatus.isBlank()) {
+			return true;
+		}
+		return Set.of("SUCCESS", "TIMEOUT", "CANCELED").contains(finalStatus.trim().toUpperCase());
 	}
 }

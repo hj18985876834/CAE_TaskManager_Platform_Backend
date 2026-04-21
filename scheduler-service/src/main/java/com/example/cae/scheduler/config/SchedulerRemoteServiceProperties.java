@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "cae.remote")
 public class SchedulerRemoteServiceProperties {
 	private String taskBaseUrl = "http://localhost:8083";
+	private String solverBaseUrl = "http://localhost:8082";
 	private String nodeAgentScheme = "http";
 
 	public String getTaskBaseUrl() {
@@ -15,6 +16,14 @@ public class SchedulerRemoteServiceProperties {
 
 	public void setTaskBaseUrl(String taskBaseUrl) {
 		this.taskBaseUrl = taskBaseUrl;
+	}
+
+	public String getSolverBaseUrl() {
+		return solverBaseUrl;
+	}
+
+	public void setSolverBaseUrl(String solverBaseUrl) {
+		this.solverBaseUrl = solverBaseUrl;
 	}
 
 	public String getNodeAgentScheme() {

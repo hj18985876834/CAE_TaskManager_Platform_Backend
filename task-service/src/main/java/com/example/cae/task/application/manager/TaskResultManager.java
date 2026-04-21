@@ -20,6 +20,8 @@ import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
+
 @Service
 public class TaskResultManager {
 	private final TaskRepository taskRepository;
@@ -78,7 +80,7 @@ public class TaskResultManager {
 	@Transactional
 	public void finishTask(Long taskId, String finalStatus) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		String target = finalStatus == null || finalStatus.isBlank() ? TaskStatusEnum.SUCCESS.name() : finalStatus;
+		String target = normalizeAllowedFinalStatus(finalStatus);
 		if (shouldIgnoreTerminalReport(task, target)) {
 			return;
 		}
@@ -115,5 +117,15 @@ public class TaskResultManager {
 			return true;
 		}
 		return task.isFinished();
+	}
+
+	private String normalizeAllowedFinalStatus(String finalStatus) {
+		String target = finalStatus == null || finalStatus.isBlank()
+				? TaskStatusEnum.SUCCESS.name()
+				: finalStatus.trim().toUpperCase();
+		if (!Set.of(TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(target)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported finalStatus: " + target);
+		}
+		return target;
 	}
 }

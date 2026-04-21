@@ -429,6 +429,7 @@ INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enab
 
 INSERT INTO schedule_record (id, task_id, node_id, strategy_name, schedule_status, schedule_message, created_at) VALUES
 (1, 1, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'node selected by fcfs-min-load strategy', NOW()),
-(2, 2, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'queued task pre-scheduled', NOW());
+(2, 2, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'queued task pre-scheduled', NOW()),
+(3, 3, NULL, 'FCFS_MIN_LOAD', 'FAILED', 'no available node', NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;

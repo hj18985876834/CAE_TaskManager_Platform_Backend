@@ -20,4 +20,5 @@ spring:
 cae:
   remote:
     task-base-url: ${TASK_SERVICE_BASE_URL:http://localhost:8083}
+    solver-base-url: ${SOLVER_SERVICE_BASE_URL:http://localhost:8082}
     node-agent-scheme: ${NODE_AGENT_SCHEME:http}

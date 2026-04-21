@@ -13,6 +13,7 @@ import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
+import com.example.cae.scheduler.infrastructure.client.SolverClient;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
@@ -29,26 +30,30 @@ public class ScheduleAppService {
 	private final ScheduleDomainService scheduleDomainService;
 	private final ScheduleStrategy scheduleStrategy;
 	private final NodeAgentClient nodeAgentClient;
+	private final SolverClient solverClient;
 
 	public ScheduleAppService(ComputeNodeRepository computeNodeRepository,
 							NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
 							ScheduleRecordRepository scheduleRecordRepository,
 							ScheduleDomainService scheduleDomainService,
 							ScheduleStrategy scheduleStrategy,
-							NodeAgentClient nodeAgentClient) {
+							NodeAgentClient nodeAgentClient,
+							SolverClient solverClient) {
 		this.computeNodeRepository = computeNodeRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.scheduleRecordRepository = scheduleRecordRepository;
 		this.scheduleDomainService = scheduleDomainService;
 		this.scheduleStrategy = scheduleStrategy;
 		this.nodeAgentClient = nodeAgentClient;
+		this.solverClient = solverClient;
 	}
 
 	@Transactional
 	public Long scheduleTask(TaskDTO task) {
-		if (task == null || task.getTaskId() == null || task.getSolverId() == null) {
+		if (task == null || task.getTaskId() == null || task.getSolverId() == null || task.getProfileId() == null) {
 			throw new BizException(ErrorCodeConstants.INVALID_SCHEDULE_TASK, "invalid task for scheduling");
 		}
+		validateSolverAndProfile(task);
 
 		List<ComputeNode> onlineNodes = computeNodeRepository.listByStatus("ONLINE");
 		List<ComputeNode> availableNodes = scheduleDomainService.filterAvailableNodes(
@@ -69,6 +74,30 @@ public class ScheduleAppService {
 		}
 		computeNodeRepository.update(lockedNode);
 		return lockedNode.getId();
+	}
+
+	private void validateSolverAndProfile(TaskDTO task) {
+		SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
+		if (solverMeta == null || solverMeta.getSolverId() == null) {
+			throw new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found: " + task.getSolverId());
+		}
+		if (!solverMeta.isEnabled()) {
+			throw new BizException(
+					ErrorCodeConstants.SOLVER_DISABLED,
+					"solver is disabled: " + (solverMeta.getSolverName() == null ? task.getSolverId() : solverMeta.getSolverName())
+			);
+		}
+
+		SolverClient.ProfileMeta profileMeta = solverClient.getProfileMeta(task.getProfileId());
+		if (profileMeta == null || profileMeta.getProfileId() == null) {
+			throw new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found: " + task.getProfileId());
+		}
+		if (!profileMeta.isEnabled()) {
+			throw new BizException(
+					ErrorCodeConstants.PROFILE_DISABLED,
+					"profile is disabled: " + (profileMeta.getProfileName() == null ? task.getProfileId() : profileMeta.getProfileName())
+			);
+		}
 	}
 
 	public void confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage) {
