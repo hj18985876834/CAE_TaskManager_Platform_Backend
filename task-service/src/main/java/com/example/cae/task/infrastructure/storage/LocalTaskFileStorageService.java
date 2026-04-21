@@ -98,6 +98,15 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		}
 	}
 
+	@Override
+	public void deleteTaskRuntimeArtifacts(Long taskId) {
+		if (taskId == null) {
+			return;
+		}
+		deleteDirectory(Path.of(taskPathResolver.resolveLogDir(taskId)), "delete task runtime artifacts failed");
+		deleteDirectory(Path.of(taskPathResolver.resolveResultDir(taskId)), "delete task runtime artifacts failed");
+	}
+
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
@@ -120,5 +129,22 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		}
 		int idx = fileName.lastIndexOf('.');
 		return idx > 0 ? fileName.substring(0, idx) : fileName;
+	}
+
+	private void deleteDirectory(Path dir, String errorMessage) {
+		if (dir == null || !Files.exists(dir)) {
+			return;
+		}
+		try (var stream = Files.walk(dir)) {
+			stream.sorted(Comparator.reverseOrder()).forEach(path -> {
+				try {
+					Files.deleteIfExists(path);
+				} catch (IOException ex) {
+					throw new IllegalStateException(errorMessage, ex);
+				}
+			});
+		} catch (IOException ex) {
+			throw new IllegalStateException(errorMessage, ex);
+		}
 	}
 }

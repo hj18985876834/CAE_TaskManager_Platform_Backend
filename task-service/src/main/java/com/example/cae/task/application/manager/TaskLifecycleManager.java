@@ -11,7 +11,10 @@ import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.domain.model.TaskStatusHistory;
 import com.example.cae.task.domain.service.TaskDomainService;
 import com.example.cae.task.domain.repository.TaskFileRepository;
+import com.example.cae.task.domain.repository.TaskLogRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
+import com.example.cae.task.domain.repository.TaskResultFileRepository;
+import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
@@ -44,9 +47,13 @@ public class TaskLifecycleManager {
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
 	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
+	private final TaskLogRepository taskLogRepository;
+	private final TaskResultSummaryRepository taskResultSummaryRepository;
+	private final TaskResultFileRepository taskResultFileRepository;
 	private final TaskDomainService taskDomainService;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final TaskValidationDomainService taskValidationDomainService;
+	private final TaskValidationManager taskValidationManager;
 	private final TaskFileStorageService taskFileStorageService;
 	private final TaskAssembler taskAssembler;
 	private final TaskNoGenerator taskNoGenerator;
@@ -57,9 +64,13 @@ public class TaskLifecycleManager {
 	public TaskLifecycleManager(TaskRepository taskRepository,
 								TaskFileRepository taskFileRepository,
 								TaskStatusHistoryRepository taskStatusHistoryRepository,
+								TaskLogRepository taskLogRepository,
+								TaskResultSummaryRepository taskResultSummaryRepository,
+								TaskResultFileRepository taskResultFileRepository,
 								TaskDomainService taskDomainService,
 								TaskStatusDomainService taskStatusDomainService,
 								TaskValidationDomainService taskValidationDomainService,
+								TaskValidationManager taskValidationManager,
 								TaskFileStorageService taskFileStorageService,
 								TaskAssembler taskAssembler,
 								TaskNoGenerator taskNoGenerator,
@@ -69,9 +80,13 @@ public class TaskLifecycleManager {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
+		this.taskLogRepository = taskLogRepository;
+		this.taskResultSummaryRepository = taskResultSummaryRepository;
+		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskDomainService = taskDomainService;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.taskValidationDomainService = taskValidationDomainService;
+		this.taskValidationManager = taskValidationManager;
 		this.taskFileStorageService = taskFileStorageService;
 		this.taskAssembler = taskAssembler;
 		this.taskNoGenerator = taskNoGenerator;
@@ -215,6 +230,9 @@ public class TaskLifecycleManager {
 			throw new BizException(ErrorCodeConstants.TASK_RETRY_NOT_ALLOWED, "only failed or timeout tasks can be retried");
 		}
 
+		resetTaskExecutionArtifacts(task.getId());
+		taskValidationManager.rebuildValidatedWorkspace(task.getId());
+		task = loadTask(taskId);
 		String effectiveReason = reason == null || reason.isBlank() ? "admin retried task" : reason;
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.ADMIN.name(), adminUserId);
 		taskRepository.update(task);
@@ -375,6 +393,13 @@ public class TaskLifecycleManager {
 		taskFileStorageService.deleteTaskArtifacts(task.getId());
 		task.setDeletedFlag(1);
 		taskRepository.update(task);
+	}
+
+	private void resetTaskExecutionArtifacts(Long taskId) {
+		taskLogRepository.deleteByTaskId(taskId);
+		taskResultFileRepository.deleteByTaskId(taskId);
+		taskResultSummaryRepository.deleteByTaskId(taskId);
+		taskFileStorageService.deleteTaskRuntimeArtifacts(taskId);
 	}
 
 	private void ensureTaskUpdateRequestValid(UpdateTaskRequest request) {

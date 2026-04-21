@@ -11,5 +11,6 @@ public interface TaskResultFileRepository {
 	List<TaskResultFile> listByTaskId(Long taskId);
 
 	Optional<TaskResultFile> findById(Long fileId);
-}
 
+	void deleteByTaskId(Long taskId);
+}

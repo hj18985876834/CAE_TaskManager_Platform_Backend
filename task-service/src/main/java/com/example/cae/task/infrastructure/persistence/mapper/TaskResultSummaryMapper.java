@@ -1,6 +1,7 @@
 package com.example.cae.task.infrastructure.persistence.mapper;
 
 import com.example.cae.task.infrastructure.persistence.entity.TaskResultSummaryPO;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -16,5 +17,7 @@ public interface TaskResultSummaryMapper {
 
 	@Update("UPDATE task_result_summary SET success_flag = #{successFlag}, duration_seconds = #{durationSeconds}, summary_text = #{summaryText}, metrics_json = #{metricsJson} WHERE id = #{id}")
 	int updateById(TaskResultSummaryPO po);
-}
 
+	@Delete("DELETE FROM task_result_summary WHERE task_id = #{taskId}")
+	int deleteByTaskId(Long taskId);
+}

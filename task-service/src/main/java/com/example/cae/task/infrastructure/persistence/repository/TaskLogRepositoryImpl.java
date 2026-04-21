@@ -27,5 +27,9 @@ public class TaskLogRepositoryImpl implements TaskLogRepository {
 	public List<TaskLogChunk> listByTaskIdAndSeq(Long taskId, Integer fromSeq, Integer pageSize) {
 		return taskLogChunkMapper.selectByTaskIdAndSeq(taskId, fromSeq, pageSize).stream().map(taskLogAssembler::fromPO).toList();
 	}
-}
 
+	@Override
+	public void deleteByTaskId(Long taskId) {
+		taskLogChunkMapper.deleteByTaskId(taskId);
+	}
+}

@@ -33,6 +33,11 @@ public class TaskResultSummaryRepositoryImpl implements TaskResultSummaryReposit
 		return Optional.ofNullable(taskResultSummaryMapper.selectByTaskId(taskId)).map(this::toDomain);
 	}
 
+	@Override
+	public void deleteByTaskId(Long taskId) {
+		taskResultSummaryMapper.deleteByTaskId(taskId);
+	}
+
 	private TaskResultSummary toDomain(TaskResultSummaryPO po) {
 		TaskResultSummary summary = new TaskResultSummary();
 		summary.setId(po.getId());
@@ -56,4 +61,3 @@ public class TaskResultSummaryRepositoryImpl implements TaskResultSummaryReposit
 		return po;
 	}
 }
-

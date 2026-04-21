@@ -8,5 +8,6 @@ public interface TaskLogRepository {
 	void save(TaskLogChunk chunk);
 
 	List<TaskLogChunk> listByTaskIdAndSeq(Long taskId, Integer fromSeq, Integer pageSize);
-}
 
+	void deleteByTaskId(Long taskId);
+}

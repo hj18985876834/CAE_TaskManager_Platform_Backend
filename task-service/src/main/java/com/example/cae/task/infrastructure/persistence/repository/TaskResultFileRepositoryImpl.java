@@ -38,6 +38,11 @@ public class TaskResultFileRepositoryImpl implements TaskResultFileRepository {
 		return Optional.ofNullable(taskResultFileMapper.selectById(fileId)).map(this::toDomain);
 	}
 
+	@Override
+	public void deleteByTaskId(Long taskId) {
+		taskResultFileMapper.deleteByTaskId(taskId);
+	}
+
 	private TaskResultFile toDomain(TaskResultFilePO po) {
 		TaskResultFile file = new TaskResultFile();
 		file.setId(po.getId());
@@ -50,4 +55,3 @@ public class TaskResultFileRepositoryImpl implements TaskResultFileRepository {
 		return file;
 	}
 }
-

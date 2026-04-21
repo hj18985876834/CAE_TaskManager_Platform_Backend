@@ -8,5 +8,6 @@ public interface TaskResultSummaryRepository {
 	void saveOrUpdate(TaskResultSummary summary);
 
 	Optional<TaskResultSummary> findByTaskId(Long taskId);
-}
 
+	void deleteByTaskId(Long taskId);
+}

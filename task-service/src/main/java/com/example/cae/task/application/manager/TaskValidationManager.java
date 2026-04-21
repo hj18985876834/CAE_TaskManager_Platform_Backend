@@ -82,7 +82,33 @@ public class TaskValidationManager {
     @Transactional
     public TaskValidateResponse validateTask(Long taskId, Long userId) {
         Task task = loadAndCheckOwner(taskId, userId);
-        List<TaskFile> files = taskFileRepository.listByTaskId(taskId);
+        taskValidationDomainService.checkTaskEditable(task);
+        ValidationOutcome validationOutcome = validateTaskWorkspace(task);
+
+        mergeDerivedParams(task, validationOutcome);
+        if (!TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
+            taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
+        }
+        taskRepository.update(task);
+
+        TaskValidateResponse response = new TaskValidateResponse();
+        response.setTaskId(taskId);
+        response.setValid(Boolean.TRUE);
+        response.setStatus(task.getStatus());
+        response.setIssues(List.of());
+        return response;
+    }
+
+    @Transactional
+    public void rebuildValidatedWorkspace(Long taskId) {
+        Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+        ValidationOutcome validationOutcome = validateTaskWorkspace(task);
+        mergeDerivedParams(task, validationOutcome);
+        taskRepository.update(task);
+    }
+
+    private ValidationOutcome validateTaskWorkspace(Task task) {
+        List<TaskFile> files = taskFileRepository.listByTaskId(task.getId());
         Long profileSolverId = solverClient.getProfileSolverId(task.getProfileId());
         String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
         SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
@@ -93,7 +119,6 @@ public class TaskValidationManager {
         ValidationOutcome validationOutcome = null;
 
         try {
-            taskValidationDomainService.checkTaskEditable(task);
             if (profileSolverId == null) {
                 throw new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found");
             }
@@ -114,19 +139,7 @@ public class TaskValidationManager {
             }
             throw ex;
         }
-
-        mergeDerivedParams(task, validationOutcome);
-        if (!TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
-            taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
-        }
-        taskRepository.update(task);
-
-        TaskValidateResponse response = new TaskValidateResponse();
-        response.setTaskId(taskId);
-        response.setValid(Boolean.TRUE);
-        response.setStatus(task.getStatus());
-        response.setIssues(List.of());
-        return response;
+        return validationOutcome;
     }
 
     private ValidationOutcome validateArchiveAndRules(Task task,

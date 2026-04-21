@@ -13,4 +13,6 @@ public interface TaskFileStorageService {
 	void deleteFile(String storagePath);
 
 	void deleteTaskArtifacts(Long taskId);
+
+	void deleteTaskRuntimeArtifacts(Long taskId);
 }
