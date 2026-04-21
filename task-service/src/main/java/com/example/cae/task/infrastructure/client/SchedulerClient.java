@@ -8,6 +8,8 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -137,6 +139,35 @@ public class SchedulerClient {
 	}
 
 	@SuppressWarnings("unchecked")
+	public List<ScheduleRecordItem> listTaskScheduleRecords(Long taskId) {
+		if (taskId == null) {
+			return List.of();
+		}
+		String url = schedulerServiceBaseUrl + "/api/tasks/" + taskId + "/schedules";
+		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		if (result == null || !(result.getData() instanceof List<?> rows)) {
+			return List.of();
+		}
+		List<ScheduleRecordItem> records = new ArrayList<>();
+		for (Object row : rows) {
+			if (!(row instanceof Map<?, ?> map)) {
+				continue;
+			}
+			ScheduleRecordItem item = new ScheduleRecordItem();
+			item.setId(toLong(map.get("id")));
+			item.setTaskId(toLong(map.get("taskId")));
+			item.setNodeId(toLong(map.get("nodeId")));
+			item.setNodeName(toString(map.get("nodeName")));
+			item.setStrategyName(toString(map.get("strategyName")));
+			item.setScheduleStatus(toString(map.get("scheduleStatus")));
+			item.setScheduleMessage(toString(map.get("scheduleMessage")));
+			item.setCreatedAt(toLocalDateTime(map.get("createdAt")));
+			records.add(item);
+		}
+		return records;
+	}
+
+	@SuppressWarnings("unchecked")
 	public boolean verifyNodeToken(Long nodeId, String nodeToken) {
 		String url = UriComponentsBuilder
 				.fromHttpUrl(schedulerServiceBaseUrl + "/internal/nodes/{nodeId}/token/verify")
@@ -162,6 +193,31 @@ public class SchedulerClient {
 			return number.intValue();
 		}
 		return Integer.parseInt(String.valueOf(value));
+	}
+
+	private Long toLong(Object value) {
+		if (value == null) {
+			return null;
+		}
+		if (value instanceof Number number) {
+			return number.longValue();
+		}
+		return Long.parseLong(String.valueOf(value));
+	}
+
+	private String toString(Object value) {
+		return value == null ? null : String.valueOf(value);
+	}
+
+	private LocalDateTime toLocalDateTime(Object value) {
+		if (value == null) {
+			return null;
+		}
+		try {
+			return LocalDateTime.parse(String.valueOf(value));
+		} catch (Exception ex) {
+			return null;
+		}
 	}
 
 	public static class NodeSummary {
@@ -217,6 +273,81 @@ public class SchedulerClient {
 
 		public void setOnlineEnabledCapableNodeCount(Integer onlineEnabledCapableNodeCount) {
 			this.onlineEnabledCapableNodeCount = onlineEnabledCapableNodeCount;
+		}
+	}
+
+	public static class ScheduleRecordItem {
+		private Long id;
+		private Long taskId;
+		private Long nodeId;
+		private String nodeName;
+		private String strategyName;
+		private String scheduleStatus;
+		private String scheduleMessage;
+		private LocalDateTime createdAt;
+
+		public Long getId() {
+			return id;
+		}
+
+		public void setId(Long id) {
+			this.id = id;
+		}
+
+		public Long getTaskId() {
+			return taskId;
+		}
+
+		public void setTaskId(Long taskId) {
+			this.taskId = taskId;
+		}
+
+		public Long getNodeId() {
+			return nodeId;
+		}
+
+		public void setNodeId(Long nodeId) {
+			this.nodeId = nodeId;
+		}
+
+		public String getNodeName() {
+			return nodeName;
+		}
+
+		public void setNodeName(String nodeName) {
+			this.nodeName = nodeName;
+		}
+
+		public String getStrategyName() {
+			return strategyName;
+		}
+
+		public void setStrategyName(String strategyName) {
+			this.strategyName = strategyName;
+		}
+
+		public String getScheduleStatus() {
+			return scheduleStatus;
+		}
+
+		public void setScheduleStatus(String scheduleStatus) {
+			this.scheduleStatus = scheduleStatus;
+		}
+
+		public String getScheduleMessage() {
+			return scheduleMessage;
+		}
+
+		public void setScheduleMessage(String scheduleMessage) {
+			this.scheduleMessage = scheduleMessage;
+		}
+
+		public LocalDateTime getCreatedAt() {
+			return createdAt;
+		}
+
+		public void setCreatedAt(LocalDateTime createdAt) {
+			this.createdAt = createdAt;
 		}
 	}
 }

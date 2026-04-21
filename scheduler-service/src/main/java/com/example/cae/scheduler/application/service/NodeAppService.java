@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Base64;
@@ -280,6 +281,8 @@ public class NodeAppService {
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
 		response.setReservedCount(node.getReservedCount());
+		response.setEffectiveLoad(node.getTotalLoad());
+		response.setLoadRatio(resolveLoadRatio(node));
 		response.setCpuUsage(node.getCpuUsage());
 		response.setMemoryUsage(node.getMemoryUsage());
 		response.setLastHeartbeatTime(node.getLastHeartbeatTime());
@@ -295,7 +298,16 @@ public class NodeAppService {
 		response.setRunningCount(node.getRunningCount());
 		response.setReservedCount(node.getReservedCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
+		response.setEffectiveLoad(node.getTotalLoad());
 		return response;
+	}
+
+	private BigDecimal resolveLoadRatio(ComputeNode node) {
+		if (node == null || node.getMaxConcurrency() == null || node.getMaxConcurrency() <= 0) {
+			return BigDecimal.ZERO;
+		}
+		return BigDecimal.valueOf(node.getTotalLoad())
+				.divide(BigDecimal.valueOf(node.getMaxConcurrency()), 4, RoundingMode.HALF_UP);
 	}
 
 	private String composeHost(String host) {

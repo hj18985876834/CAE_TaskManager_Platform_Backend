@@ -1,6 +1,7 @@
 package com.example.cae.task.interfaces.response;
 
 import java.util.Map;
+import java.util.List;
 import java.time.LocalDateTime;
 
 public class TaskDetailResponse {
@@ -23,6 +24,8 @@ public class TaskDetailResponse {
 	private Map<String, Object> params;
 	private String failType;
 	private String failMessage;
+	private List<TaskStatusHistoryResponse> statusHistory;
+	private List<TaskScheduleRecordResponse> scheduleRecords;
 	private LocalDateTime submitTime;
 	private LocalDateTime startTime;
 	private LocalDateTime endTime;
@@ -177,6 +180,22 @@ public class TaskDetailResponse {
 
 	public void setFailMessage(String failMessage) {
 		this.failMessage = failMessage;
+	}
+
+	public List<TaskStatusHistoryResponse> getStatusHistory() {
+		return statusHistory;
+	}
+
+	public void setStatusHistory(List<TaskStatusHistoryResponse> statusHistory) {
+		this.statusHistory = statusHistory;
+	}
+
+	public List<TaskScheduleRecordResponse> getScheduleRecords() {
+		return scheduleRecords;
+	}
+
+	public void setScheduleRecords(List<TaskScheduleRecordResponse> scheduleRecords) {
+		this.scheduleRecords = scheduleRecords;
 	}
 
 	public LocalDateTime getSubmitTime() {

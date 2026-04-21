@@ -20,6 +20,7 @@ import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskScheduleRecordResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
 import com.example.cae.task.interfaces.response.TaskDashboardSummaryResponse;
 import org.springframework.stereotype.Service;
@@ -189,6 +190,29 @@ public class TaskQueryAppService {
 		} catch (Exception ignored) {
 		}
 		response.setQueueReason(resolveQueueReason(response.getTaskId(), response.getSolverId(), response.getStatus(), buildQueueReasonContext()));
+		response.setStatusHistory(taskStatusHistoryRepository.listByTaskId(response.getTaskId()).stream()
+				.map(this::toStatusHistoryResponse)
+				.toList());
+		try {
+			response.setScheduleRecords(schedulerClient.listTaskScheduleRecords(response.getTaskId()).stream()
+					.map(this::toTaskScheduleRecordResponse)
+					.toList());
+		} catch (Exception ignored) {
+			response.setScheduleRecords(List.of());
+		}
+		return response;
+	}
+
+	private TaskScheduleRecordResponse toTaskScheduleRecordResponse(SchedulerClient.ScheduleRecordItem item) {
+		TaskScheduleRecordResponse response = new TaskScheduleRecordResponse();
+		response.setId(item.getId());
+		response.setTaskId(item.getTaskId());
+		response.setNodeId(item.getNodeId());
+		response.setNodeName(item.getNodeName());
+		response.setStrategyName(item.getStrategyName());
+		response.setScheduleStatus(item.getScheduleStatus());
+		response.setScheduleMessage(item.getScheduleMessage());
+		response.setCreatedAt(item.getCreatedAt());
 		return response;
 	}
 

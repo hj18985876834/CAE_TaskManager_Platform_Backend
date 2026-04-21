@@ -148,7 +148,10 @@ public class ScheduleAppService {
 		long offset = (long) (pageNum - 1) * pageSize;
 
 		PageResult<ScheduleRecord> page = scheduleRecordRepository.page(request, offset, pageSize);
-		List<ScheduleRecordResponse> records = page.getRecords().stream().map(ScheduleAssembler::toResponse).toList();
+		List<ScheduleRecordResponse> records = page.getRecords().stream()
+				.map(ScheduleAssembler::toResponse)
+				.map(this::enrichScheduleRecordResponse)
+				.toList();
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
 	}
 
@@ -170,6 +173,19 @@ public class ScheduleAppService {
 		if (taskId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
-		return scheduleRecordRepository.listByTaskId(taskId).stream().map(ScheduleAssembler::toResponse).toList();
+		return scheduleRecordRepository.listByTaskId(taskId).stream()
+				.map(ScheduleAssembler::toResponse)
+				.map(this::enrichScheduleRecordResponse)
+				.toList();
+	}
+
+	private ScheduleRecordResponse enrichScheduleRecordResponse(ScheduleRecordResponse response) {
+		if (response == null || response.getNodeId() == null) {
+			return response;
+		}
+		computeNodeRepository.findById(response.getNodeId())
+				.map(ComputeNode::getNodeName)
+				.ifPresent(response::setNodeName);
+		return response;
 	}
 }

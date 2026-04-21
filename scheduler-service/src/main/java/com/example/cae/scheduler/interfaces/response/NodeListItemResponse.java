@@ -14,6 +14,8 @@ public class NodeListItemResponse {
 	private Integer runningCount;
 	private Integer reservedCount;
 	private Integer maxConcurrency;
+	private Integer effectiveLoad;
+	private java.math.BigDecimal loadRatio;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
@@ -96,6 +98,22 @@ public class NodeListItemResponse {
 
 	public void setMaxConcurrency(Integer maxConcurrency) {
 		this.maxConcurrency = maxConcurrency;
+	}
+
+	public Integer getEffectiveLoad() {
+		return effectiveLoad;
+	}
+
+	public void setEffectiveLoad(Integer effectiveLoad) {
+		this.effectiveLoad = effectiveLoad;
+	}
+
+	public java.math.BigDecimal getLoadRatio() {
+		return loadRatio;
+	}
+
+	public void setLoadRatio(java.math.BigDecimal loadRatio) {
+		this.loadRatio = loadRatio;
 	}
 
 	public BigDecimal getCpuUsage() {

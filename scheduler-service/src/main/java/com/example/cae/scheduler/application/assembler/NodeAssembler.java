@@ -5,6 +5,9 @@ import com.example.cae.scheduler.infrastructure.persistence.entity.ComputeNodePO
 import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 public final class NodeAssembler {
 	private NodeAssembler() {
 	}
@@ -31,6 +34,8 @@ public final class NodeAssembler {
 		response.setMaxConcurrency(node.getMaxConcurrency());
 		response.setRunningCount(node.getRunningCount());
 		response.setReservedCount(node.getReservedCount());
+		response.setEffectiveLoad(node.getTotalLoad());
+		response.setLoadRatio(resolveLoadRatio(node));
 		response.setCpuUsage(node.getCpuUsage());
 		response.setMemoryUsage(node.getMemoryUsage());
 		response.setLastHeartbeatTime(node.getLastHeartbeatTime());
@@ -75,5 +80,13 @@ public final class NodeAssembler {
 		po.setCreatedAt(node.getCreatedAt());
 		po.setUpdatedAt(node.getUpdatedAt());
 		return po;
+	}
+
+	private static BigDecimal resolveLoadRatio(ComputeNode node) {
+		if (node == null || node.getMaxConcurrency() == null || node.getMaxConcurrency() <= 0) {
+			return BigDecimal.ZERO;
+		}
+		return BigDecimal.valueOf(node.getTotalLoad())
+				.divide(BigDecimal.valueOf(node.getMaxConcurrency()), 4, RoundingMode.HALF_UP);
 	}
 }
