@@ -29,8 +29,8 @@ public class TaskScheduleManager {
 		scheduleAppService.recordScheduleFailure(taskId, nodeId, message);
 	}
 
-	public void releaseNodeReservation(Long nodeId) {
-		scheduleAppService.releaseNodeReservation(nodeId);
+	public void releaseNodeReservation(Long nodeId, Long taskId) {
+		scheduleAppService.releaseNodeReservation(nodeId, taskId);
 	}
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {

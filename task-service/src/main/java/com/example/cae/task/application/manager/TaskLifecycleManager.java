@@ -281,7 +281,7 @@ public class TaskLifecycleManager {
 		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.RUNNING.name(), reason, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
-		releaseReservationQuietly(task.getNodeId());
+		releaseReservationQuietly(task.getNodeId(), task.getId());
 	}
 
 	private String pickStatus(StatusReportRequest request) {
@@ -423,14 +423,14 @@ public class TaskLifecycleManager {
 		return idx < 0 ? "" : fileName.substring(idx + 1);
 	}
 
-	private void releaseReservationQuietly(Long nodeId) {
-		if (nodeId == null) {
+	private void releaseReservationQuietly(Long nodeId, Long taskId) {
+		if (nodeId == null || taskId == null) {
 			return;
 		}
 		try {
-			schedulerClient.releaseNodeReservation(nodeId);
+			schedulerClient.releaseNodeReservation(nodeId, taskId);
 		} catch (Exception ex) {
-			log.warn("failed to release node reservation, nodeId={}", nodeId, ex);
+			log.warn("failed to release node reservation, nodeId={}, taskId={}", nodeId, taskId, ex);
 		}
 	}
 }

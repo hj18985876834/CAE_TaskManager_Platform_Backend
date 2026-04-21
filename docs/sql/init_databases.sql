@@ -387,7 +387,25 @@ CREATE TABLE compute_node (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计算节点表';
 
 -- -----------------------------
--- 表 13：node_solver_capability
+-- 表 13：node_reservation
+-- -----------------------------
+DROP TABLE IF EXISTS node_reservation;
+CREATE TABLE node_reservation (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    node_id BIGINT NOT NULL COMMENT '节点ID',
+    task_id BIGINT NOT NULL COMMENT '任务ID',
+    status VARCHAR(20) NOT NULL COMMENT 'RESERVED / RELEASED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    released_at DATETIME DEFAULT NULL COMMENT '释放时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_node_task (node_id, task_id),
+    KEY idx_node_status (node_id, status),
+    KEY idx_task_id (task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点预占记录表';
+
+-- -----------------------------
+-- 表 14：node_solver_capability
 -- -----------------------------
 DROP TABLE IF EXISTS node_solver_capability;
 CREATE TABLE node_solver_capability (
@@ -404,7 +422,7 @@ CREATE TABLE node_solver_capability (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点求解器能力表';
 
 -- -----------------------------
--- 表 14：schedule_record
+-- 表 15：schedule_record
 -- -----------------------------
 DROP TABLE IF EXISTS schedule_record;
 CREATE TABLE schedule_record (

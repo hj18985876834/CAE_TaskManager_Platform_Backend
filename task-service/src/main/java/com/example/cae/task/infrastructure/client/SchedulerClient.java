@@ -35,12 +35,14 @@ public class SchedulerClient {
 		restTemplate.postForEntity(url, body, Result.class);
 	}
 
-	public void releaseNodeReservation(Long nodeId) {
-		if (nodeId == null) {
+	public void releaseNodeReservation(Long nodeId, Long taskId) {
+		if (nodeId == null || taskId == null) {
 			return;
 		}
 		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/release-reservation";
-		restTemplate.postForEntity(url, null, Result.class);
+		Map<String, Object> body = new java.util.HashMap<>();
+		body.put("taskId", taskId);
+		restTemplate.postForEntity(url, body, Result.class);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -37,7 +37,7 @@ public class TaskScheduleJob {
 				nodeId = taskScheduleManager.schedule(task);
 				taskMarkedScheduled = taskClient.markTaskScheduled(task.getTaskId(), nodeId);
 				if (!taskMarkedScheduled) {
-					taskScheduleManager.releaseNodeReservation(nodeId);
+					taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
 					continue;
 				}
 				markTaskDispatchedQuietly(task.getTaskId(), nodeId);
@@ -46,7 +46,7 @@ public class TaskScheduleJob {
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
 			} catch (Exception ex) {
 				if (nodeId != null && !dispatchAccepted) {
-					taskScheduleManager.releaseNodeReservation(nodeId);
+					taskScheduleManager.releaseNodeReservation(nodeId, task == null ? null : task.getTaskId());
 				}
 				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
 					String currentStatus = taskClient.getTaskStatus(task.getTaskId());

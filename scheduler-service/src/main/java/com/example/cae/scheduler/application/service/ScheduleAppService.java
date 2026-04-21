@@ -6,8 +6,10 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.assembler.ScheduleAssembler;
 import com.example.cae.scheduler.domain.model.ComputeNode;
+import com.example.cae.scheduler.domain.model.NodeReservation;
 import com.example.cae.scheduler.domain.model.ScheduleRecord;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
+import com.example.cae.scheduler.domain.repository.NodeReservationRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
@@ -25,6 +27,7 @@ import java.util.List;
 @Service
 public class ScheduleAppService {
 	private final ComputeNodeRepository computeNodeRepository;
+	private final NodeReservationRepository nodeReservationRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
 	private final ScheduleDomainService scheduleDomainService;
@@ -33,6 +36,7 @@ public class ScheduleAppService {
 	private final SolverClient solverClient;
 
 	public ScheduleAppService(ComputeNodeRepository computeNodeRepository,
+							NodeReservationRepository nodeReservationRepository,
 							NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
 							ScheduleRecordRepository scheduleRecordRepository,
 							ScheduleDomainService scheduleDomainService,
@@ -40,6 +44,7 @@ public class ScheduleAppService {
 							NodeAgentClient nodeAgentClient,
 							SolverClient solverClient) {
 		this.computeNodeRepository = computeNodeRepository;
+		this.nodeReservationRepository = nodeReservationRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.scheduleRecordRepository = scheduleRecordRepository;
 		this.scheduleDomainService = scheduleDomainService;
@@ -69,10 +74,24 @@ public class ScheduleAppService {
 
 		ComputeNode lockedNode = computeNodeRepository.findByIdForUpdate(selected.getId())
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(lockedNode.getId(), task.getTaskId()).orElse(null);
+		if (reservation != null && reservation.isReserved()) {
+			return lockedNode.getId();
+		}
 		if (!lockedNode.reserveSlot()) {
 			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 		}
 		computeNodeRepository.update(lockedNode);
+		if (reservation == null) {
+			NodeReservation newReservation = new NodeReservation();
+			newReservation.setNodeId(lockedNode.getId());
+			newReservation.setTaskId(task.getTaskId());
+			newReservation.markReserved();
+			nodeReservationRepository.save(newReservation);
+		} else {
+			reservation.markReserved();
+			nodeReservationRepository.update(reservation);
+		}
 		return lockedNode.getId();
 	}
 
@@ -123,8 +142,12 @@ public class ScheduleAppService {
 	}
 
 	@Transactional
-	public void releaseNodeReservation(Long nodeId) {
-		if (nodeId == null) {
+	public void releaseNodeReservation(Long nodeId, Long taskId) {
+		if (nodeId == null || taskId == null) {
+			return;
+		}
+		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
+		if (reservation == null || !reservation.isReserved()) {
 			return;
 		}
 		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId).orElse(null);
@@ -133,6 +156,8 @@ public class ScheduleAppService {
 		}
 		node.releaseReservation();
 		computeNodeRepository.update(node);
+		reservation.markReleased();
+		nodeReservationRepository.update(reservation);
 	}
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {

@@ -130,7 +130,7 @@ public class TaskDispatchManager {
 				OperatorTypeEnum.SYSTEM.name(),
 				null);
 		taskRepository.update(task);
-		releaseReservationQuietly(nodeId);
+		releaseReservationQuietly(nodeId, taskId);
 	}
 
 	private void ensureTaskBoundToNode(Task task, Long nodeId) {
@@ -260,14 +260,14 @@ public class TaskDispatchManager {
 		return Map.of();
 	}
 
-	private void releaseReservationQuietly(Long nodeId) {
-		if (nodeId == null) {
+	private void releaseReservationQuietly(Long nodeId, Long taskId) {
+		if (nodeId == null || taskId == null) {
 			return;
 		}
 		try {
-			schedulerClient.releaseNodeReservation(nodeId);
+			schedulerClient.releaseNodeReservation(nodeId, taskId);
 		} catch (Exception ex) {
-			log.warn("failed to release node reservation, nodeId={}", nodeId, ex);
+			log.warn("failed to release node reservation, nodeId={}, taskId={}", nodeId, taskId, ex);
 		}
 	}
 }

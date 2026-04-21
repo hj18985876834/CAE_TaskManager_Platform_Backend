@@ -3,6 +3,7 @@ package com.example.cae.scheduler.interfaces.internal;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.interfaces.request.NodeReservationRequest;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,15 +24,15 @@ public class InternalNodeReservationController {
 
 	@PostMapping("/{nodeId}/reserve")
 	public Result<Void> reserve(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
-								@RequestBody(required = false) NodeReservationRequest request) {
-		nodeAppService.reserveReservation(nodeId);
+								@Valid @RequestBody NodeReservationRequest request) {
+		nodeAppService.reserveReservation(nodeId, request.getTaskId());
 		return Result.success();
 	}
 
 	@PostMapping("/{nodeId}/release-reservation")
 	public Result<Void> releaseReservation(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
-										   @RequestBody(required = false) NodeReservationRequest request) {
-		nodeAppService.releaseReservation(nodeId);
+										   @Valid @RequestBody NodeReservationRequest request) {
+		nodeAppService.releaseReservation(nodeId, request.getTaskId());
 		return Result.success();
 	}
 }
