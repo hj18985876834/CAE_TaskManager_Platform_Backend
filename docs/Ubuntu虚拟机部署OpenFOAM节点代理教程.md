@@ -64,7 +64,7 @@
 所以：
 
 - Ubuntu 宿主机本身不必再单独安装 OpenFOAM
-- 只要节点镜像能成功构建，容器内就已经具备 `simpleFoam`
+- 只要节点镜像能成功构建，容器内就已经具备 OpenFOAM 运行环境和常见求解器命令
 
 ### 2.4 OpenFOAM 当前默认绑定的是 solverId=1
 
@@ -482,17 +482,19 @@ docker logs -f cae-node-1
 
 ### 10.2 注意：上传包必须是“可直接求解”的 OpenFOAM Case
 
-当前默认模板命令是：
+当前默认演示模板命令是：
 
 ```text
-simpleFoam -case ${taskDir}
+${openfoamApplication} -case ${taskDir}; code=$?; mkdir -p ${outputDir}; cp -r ${taskDir}/[0-9]* ${taskDir}/postProcessing ${outputDir}/ 2>/dev/null || true; exit $code
 ```
 
 这意味着：
 
-- 节点只会直接运行 `simpleFoam`
+- 节点会先从 `system/controlDict` 中读取 `application` 字段，解析出 `${openfoamApplication}`
+- 节点只会直接运行该求解器命令
 - 不会自动先运行 `blockMesh`
 - 不会自动先运行 `decomposePar`
+- 求解完成后会尝试把时间步目录和 `postProcessing` 复制到 `${outputDir}`，便于平台展示结果文件
 
 所以你用于演示的 ZIP 包必须尽量满足以下条件之一：
 
@@ -503,7 +505,7 @@ simpleFoam -case ${taskDir}
 
 - `blockMeshDict`
 
-但还没有真正生成网格，那么直接运行 `simpleFoam` 会失败。
+但还没有真正生成网格，那么直接运行 `controlDict.application` 对应的求解器也会失败。
 
 ### 10.3 推荐的演示做法
 
@@ -515,30 +517,30 @@ simpleFoam -case ${taskDir}
 - 选择 OpenFOAM 对应模板
 - 提交任务
 
-### 10.4 如果你希望先执行 blockMesh 再执行 simpleFoam
+### 10.4 如果你希望先执行 blockMesh 再执行求解器
 
 你可以把模板命令改成类似：
 
 ```text
-bash -lc "blockMesh -case ${taskDir} && simpleFoam -case ${taskDir}"
+bash -lc "blockMesh -case ${taskDir} && ${openfoamApplication} -case ${taskDir}; code=\$?; mkdir -p ${outputDir}; cp -r ${taskDir}/[0-9]* ${taskDir}/postProcessing ${outputDir}/ 2>/dev/null || true; exit \$code"
 ```
 
 如果你还希望把日志同时落到本地文件，推荐改成：
 
 ```text
-bash -lc "set -o pipefail; simpleFoam -case ${taskDir} 2>&1 | tee ${logDir}/simpleFoam.log"
+bash -lc "set -o pipefail; ${openfoamApplication} -case ${taskDir} 2>&1 | tee ${logDir}/${openfoamApplication}.log; code=\${PIPESTATUS[0]}; mkdir -p ${outputDir}; cp -r ${taskDir}/[0-9]* ${taskDir}/postProcessing ${outputDir}/ 2>/dev/null || true; exit \$code"
 ```
 
 这样你就可以在 Ubuntu 容器中直接：
 
 ```bash
-tail -f /cae-data/workspaces/<taskId>/log/simpleFoam.log
+tail -f /cae-data/workspaces/<taskId>/log/<application>.log
 ```
 
 但要注意：
 
 - 这需要你在平台的模板配置中修改 `commandTemplate`
-- 如果你不改模板，默认只是 `simpleFoam -case ${taskDir}`
+- 如果你不改模板，默认会直接执行 `controlDict.application` 指定的求解器，并在结束后把关键结果复制到 `${outputDir}`
 
 ## 11. 第七步：任务运行时怎么查看
 
@@ -611,7 +613,7 @@ ls -R /cae-data/workspaces/123
 3. 任务成功上传并校验通过
 4. 任务提交后进入排队
 5. 调度器把任务派发到 Ubuntu 节点
-6. Ubuntu 节点开始执行 `simpleFoam`
+6. Ubuntu 节点开始执行 `controlDict.application` 指定的求解器
 7. 平台能看到任务日志持续增长
 8. 最终任务状态进入 `SUCCESS` 或可解释的 `FAILED`
 
@@ -628,7 +630,7 @@ ${outputDir}/**/*
 
 也就是说，只要你的执行命令或后处理脚本把结果写到 `output` 目录或其子目录下，平台就可以自动上报这些结果文件。
 
-需要注意的是，OpenFOAM 默认结果通常仍然写在 case 目录本身，而不是平台约定的 `output`。因此如果你希望平台“结果文件列表”里直接看到这些文件，仍然建议在模板命令中增加一步，把需要展示或下载的关键结果复制、导出或软链接到 `${outputDir}` 下。
+需要注意的是，OpenFOAM 默认结果通常仍然写在 case 目录本身，而不是平台约定的 `output`。当前初始化的演示模板已经在求解结束后尝试把时间步目录和 `postProcessing` 复制到 `${outputDir}`；如果你有更多结果目录需要展示，仍然可以在模板命令中继续补充复制、导出或软链接步骤。
 
 ### 13.2 当前上传校验规则比真实求解要求更宽松
 

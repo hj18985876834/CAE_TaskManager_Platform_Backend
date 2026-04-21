@@ -17,7 +17,7 @@ SET @openfoam_profile_id = (
 );
 
 UPDATE solver_task_profile
-SET command_template = '${openfoamApplication} -case ${taskDir}'
+SET command_template = '${openfoamApplication} -case ${taskDir}; code=$?; mkdir -p ${outputDir}; cp -r ${taskDir}/[0-9]* ${taskDir}/postProcessing ${outputDir}/ 2>/dev/null || true; exit $code'
 WHERE id = @openfoam_profile_id;
 
 DELETE FROM solver_profile_file_rule
