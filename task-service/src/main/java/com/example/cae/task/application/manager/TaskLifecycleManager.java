@@ -242,20 +242,6 @@ public class TaskLifecycleManager {
 		return staleTasks.size();
 	}
 
-	public void markScheduled(Long taskId, Long nodeId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		task.bindNode(nodeId);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
-		taskRepository.update(task);
-	}
-
-	public void markDispatched(Long taskId, Long nodeId) {
-		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		task.bindNode(nodeId);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
-		taskRepository.update(task);
-	}
-
 	@Transactional
 	public void reportStatus(Long taskId, StatusReportRequest request) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));

@@ -3,6 +3,8 @@ package com.example.cae.scheduler.application.service;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
+import com.example.cae.scheduler.domain.model.ComputeNode;
+import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
@@ -16,6 +18,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -102,11 +107,81 @@ class ScheduleAppServiceTest {
 		assertEquals("FAILED", captor.getValue().getScheduleStatus());
 	}
 
+	@Test
+	void scheduleTaskShouldReserveSelectedNodeSlot() {
+		TaskDTO task = buildTask();
+		ComputeNode selected = buildNode(4, 1);
+		ComputeNode locked = buildNode(4, 1);
+		NodeSolverCapability capability = buildCapability(task.getSolverId(), selected.getId());
+		stubEnabledSolverAndProfile(task);
+		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
+		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
+		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
+		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
+		when(computeNodeRepository.findByIdForUpdate(selected.getId())).thenReturn(Optional.of(locked));
+
+		Long nodeId = scheduleAppService.scheduleTask(task);
+
+		assertEquals(selected.getId(), nodeId);
+		ArgumentCaptor<ComputeNode> captor = ArgumentCaptor.forClass(ComputeNode.class);
+		verify(computeNodeRepository).update(captor.capture());
+		assertEquals(1, captor.getValue().getReservedCount());
+	}
+
+	@Test
+	void scheduleTaskShouldRejectWhenLockedNodeHasNoCapacity() {
+		TaskDTO task = buildTask();
+		ComputeNode selected = buildNode(1, 0);
+		ComputeNode locked = buildNode(1, 1);
+		NodeSolverCapability capability = buildCapability(task.getSolverId(), selected.getId());
+		stubEnabledSolverAndProfile(task);
+		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
+		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
+		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
+		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
+		when(computeNodeRepository.findByIdForUpdate(selected.getId())).thenReturn(Optional.of(locked));
+
+		BizException exception = assertThrows(BizException.class, () -> scheduleAppService.scheduleTask(task));
+
+		assertEquals(ErrorCodeConstants.NO_AVAILABLE_NODE, exception.getCode());
+	}
+
 	private TaskDTO buildTask() {
 		TaskDTO task = new TaskDTO();
 		task.setTaskId(1001L);
 		task.setSolverId(11L);
 		task.setProfileId(21L);
 		return task;
+	}
+
+	private void stubEnabledSolverAndProfile(TaskDTO task) {
+		SolverClient.SolverMeta solverMeta = new SolverClient.SolverMeta();
+		solverMeta.setSolverId(task.getSolverId());
+		solverMeta.setEnabled(1);
+		SolverClient.ProfileMeta profileMeta = new SolverClient.ProfileMeta();
+		profileMeta.setProfileId(task.getProfileId());
+		profileMeta.setEnabled(1);
+		when(solverClient.getSolverMeta(task.getSolverId())).thenReturn(solverMeta);
+		when(solverClient.getProfileMeta(task.getProfileId())).thenReturn(profileMeta);
+	}
+
+	private ComputeNode buildNode(int maxConcurrency, int totalLoad) {
+		ComputeNode node = new ComputeNode();
+		node.setId(31L);
+		node.setNodeCode("node-31");
+		node.setStatus("ONLINE");
+		node.setEnabled(1);
+		node.setMaxConcurrency(maxConcurrency);
+		node.setRunningCount(totalLoad);
+		node.setReservedCount(0);
+		return node;
+	}
+
+	private NodeSolverCapability buildCapability(Long solverId, Long nodeId) {
+		NodeSolverCapability capability = new NodeSolverCapability();
+		capability.setSolverId(solverId);
+		capability.setNodeId(nodeId);
+		capability.setEnabled(1);
+		return capability;
 	}
 }
