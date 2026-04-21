@@ -14,8 +14,8 @@ public class TaskReportAppService {
 		this.taskReportClient = taskReportClient;
 	}
 
-	public void reportStatus(Long taskId, String status, String reason) {
-		taskReportClient.reportStatus(taskId, status, reason);
+	public void reportRunning(Long taskId, String reason) {
+		taskReportClient.reportRunning(taskId, reason);
 	}
 
 	public void reportLog(Long taskId, Integer seqNo, String content) {

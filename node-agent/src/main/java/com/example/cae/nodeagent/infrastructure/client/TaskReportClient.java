@@ -5,7 +5,7 @@ import com.example.cae.nodeagent.domain.model.ExecutionResult;
 import java.io.File;
 
 public interface TaskReportClient {
-	void reportStatus(Long taskId, String status, String reason);
+	void reportRunning(Long taskId, String reason);
 
 	void reportLog(Long taskId, Integer seqNo, String content);
 

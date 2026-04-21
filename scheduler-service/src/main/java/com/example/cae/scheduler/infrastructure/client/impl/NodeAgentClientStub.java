@@ -11,6 +11,7 @@ import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -89,14 +90,41 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		if (node == null || node.getHost() == null || node.getHost().isBlank()) {
 			throw new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node host is empty");
 		}
-		if (node.getHost().startsWith("http://") || node.getHost().startsWith("https://")) {
-			return node.getHost();
-		}
+		String host = node.getHost().trim();
+		Integer port = node.getPort();
 		String scheme = remoteServiceProperties.getNodeAgentScheme();
 		if (scheme == null || scheme.isBlank()) {
 			scheme = "http";
 		}
-		return scheme + "://" + node.getHost();
+		if (host.startsWith("http://") || host.startsWith("https://")) {
+			URI uri = URI.create(host);
+			if (uri.getPort() > 0 || port == null || port <= 0) {
+				return stripTrailingSlash(host);
+			}
+			return stripTrailingSlash(host) + ":" + port;
+		}
+		if (hasExplicitPort(host)) {
+			return scheme + "://" + stripTrailingSlash(host);
+		}
+		if (port == null || port <= 0) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "node port is empty");
+		}
+		return scheme + "://" + stripTrailingSlash(host) + ":" + port;
+	}
+
+	private boolean hasExplicitPort(String host) {
+		return host != null && host.matches("^[^/]+:\\d+$");
+	}
+
+	private String stripTrailingSlash(String value) {
+		if (value == null) {
+			return null;
+		}
+		int end = value.length();
+		while (end > 0 && value.charAt(end - 1) == '/') {
+			end--;
+		}
+		return value.substring(0, end);
 	}
 
 	private void validateResult(Result<?> result, String action) {

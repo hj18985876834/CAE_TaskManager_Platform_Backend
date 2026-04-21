@@ -32,11 +32,11 @@ public class MarkFinishedRequest {
 		this.finalStatus = finalStatus;
 	}
 
-	@AssertTrue(message = "finalStatus只允许为SUCCESS、TIMEOUT或CANCELED")
+	@AssertTrue(message = "finalStatus只允许为SUCCESS或TIMEOUT")
 	public boolean isFinalStatusAllowed() {
 		if (finalStatus == null || finalStatus.isBlank()) {
 			return true;
 		}
-		return Set.of("SUCCESS", "TIMEOUT", "CANCELED").contains(finalStatus.trim().toUpperCase());
+		return Set.of("SUCCESS", "TIMEOUT").contains(finalStatus.trim().toUpperCase());
 	}
 }

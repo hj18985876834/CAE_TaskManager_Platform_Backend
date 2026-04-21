@@ -17,6 +17,6 @@ public enum TaskStatusEnum {
     }
 
     public boolean canCancel() {
-        return this == QUEUED || this == RUNNING;
+        return this == QUEUED;
     }
 }

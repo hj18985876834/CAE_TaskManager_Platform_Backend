@@ -7,8 +7,6 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
@@ -18,7 +16,6 @@ import java.util.Set;
 
 @Component
 public class TaskScheduleJob {
-	private static final Logger log = LoggerFactory.getLogger(TaskScheduleJob.class);
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -43,9 +40,9 @@ public class TaskScheduleJob {
 					taskScheduleManager.releaseNodeReservation(nodeId);
 					continue;
 				}
+				markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				dispatchAccepted = true;
-				markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
 			} catch (Exception ex) {
 				if (nodeId != null && !dispatchAccepted) {
@@ -54,10 +51,11 @@ public class TaskScheduleJob {
 				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
 					String currentStatus = taskClient.getTaskStatus(task.getTaskId());
 					boolean alreadyAdvanced = currentStatus != null
-							&& Set.of("DISPATCHED", "RUNNING", "SUCCESS", "FAILED", "CANCELED", "TIMEOUT").contains(currentStatus);
+							&& Set.of("RUNNING", "SUCCESS", "FAILED", "CANCELED", "TIMEOUT").contains(currentStatus);
 					if (!alreadyAdvanced) {
 						taskClient.markTaskFailed(
 								task.getTaskId(),
+								nodeId,
 								FailTypeEnum.DISPATCH_ERROR.name(),
 								ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
 								isRecoverableDispatchError(ex)
@@ -70,11 +68,7 @@ public class TaskScheduleJob {
 	}
 
 	private void markTaskDispatchedQuietly(Long taskId, Long nodeId) {
-		try {
-			taskClient.markTaskDispatched(taskId, nodeId);
-		} catch (Exception ex) {
-			log.warn("task marked dispatched by node-agent callback fallback, taskId={}, nodeId={}", taskId, nodeId, ex);
-		}
+		taskClient.markTaskDispatched(taskId, nodeId);
 	}
 
 	private boolean isRecoverableDispatchError(Exception ex) {

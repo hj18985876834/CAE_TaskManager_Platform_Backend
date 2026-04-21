@@ -68,9 +68,10 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markTaskFailed(Long taskId, String failType, String reason, boolean recoverable) {
+	public void markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/dispatch-failed";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
+		request.put("nodeId", nodeId);
 		request.put("failType", failType);
 		request.put("reason", reason);
 		request.put("recoverable", recoverable);

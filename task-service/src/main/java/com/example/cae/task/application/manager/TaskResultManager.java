@@ -123,7 +123,7 @@ public class TaskResultManager {
 		String target = finalStatus == null || finalStatus.isBlank()
 				? TaskStatusEnum.SUCCESS.name()
 				: finalStatus.trim().toUpperCase();
-		if (!Set.of(TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.TIMEOUT.name(), TaskStatusEnum.CANCELED.name()).contains(target)) {
+		if (!Set.of(TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.TIMEOUT.name()).contains(target)) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported finalStatus: " + target);
 		}
 		return target;

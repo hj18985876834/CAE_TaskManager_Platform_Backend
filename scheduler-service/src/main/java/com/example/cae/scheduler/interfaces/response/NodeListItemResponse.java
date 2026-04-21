@@ -9,6 +9,7 @@ public class NodeListItemResponse {
 	private String nodeCode;
 	private String nodeName;
 	private String host;
+	private Integer port;
 	private String status;
 	private Integer enabled;
 	private Integer runningCount;
@@ -58,6 +59,14 @@ public class NodeListItemResponse {
 
 	public void setHost(String host) {
 		this.host = host;
+	}
+
+	public Integer getPort() {
+		return port;
+	}
+
+	public void setPort(Integer port) {
+		this.port = port;
 	}
 
 	public String getStatus() {

@@ -31,6 +31,7 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		body.put("nodeCode", nodeInfo.getNodeCode());
 		body.put("nodeName", nodeInfo.getNodeName());
 		body.put("host", nodeInfo.getHost());
+		body.put("port", nodeInfo.getPort());
 		body.put("maxConcurrency", nodeInfo.getMaxConcurrency());
 		body.put("solvers", toSolverItems(nodeInfo.getSolverIds()));
 		Result<Object> result = restTemplate.postForObject(url, body, Result.class);

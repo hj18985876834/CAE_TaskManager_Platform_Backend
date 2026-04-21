@@ -192,13 +192,6 @@ public class TaskLifecycleManager {
 		if (!taskDomainService.canCancel(task)) {
 			throw new BizException(ErrorCodeConstants.TASK_CANCEL_NOT_ALLOWED, "task cannot be canceled in current status");
 		}
-		if (TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
-			if (task.getNodeId() == null) {
-				throw new BizException(ErrorCodeConstants.TASK_NOT_BOUND_TO_NODE, "running task is not bound to node");
-			}
-			schedulerClient.cancelTaskOnNode(task.getNodeId(), taskId, reason);
-			return;
-		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.CANCELED.name(), reason, OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 	}
@@ -263,22 +256,32 @@ public class TaskLifecycleManager {
 	@Transactional
 	public void reportStatus(Long taskId, StatusReportRequest request) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		if (request != null && request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
+		if (request == null || request.getNodeId() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status report request is required");
+		}
+		if (task.getNodeId() == null) {
+			throw new BizException(ErrorCodeConstants.TASK_NOT_BOUND_TO_NODE, "task is not bound to node");
+		}
+		if (!task.getNodeId().equals(request.getNodeId())) {
+			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "reported node does not match task bound node");
+		}
+		if (request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
 		}
 		String targetStatus = pickStatus(request);
 		String reason = pickReason(request);
-		String operatorType = request == null || request.getOperatorType() == null || request.getOperatorType().isBlank()
-				? OperatorTypeEnum.NODE.name()
-				: request.getOperatorType();
-		if (shouldIgnoreReportedStatus(task, targetStatus)) {
+		if (!TaskStatusEnum.RUNNING.name().equalsIgnoreCase(targetStatus)) {
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "status-report only supports RUNNING");
+		}
+		if (TaskStatusEnum.RUNNING.name().equalsIgnoreCase(task.getStatus())) {
 			return;
 		}
-		taskStatusDomainService.transfer(task, targetStatus, reason, operatorType, null);
-		taskRepository.update(task);
-		if (TaskStatusEnum.RUNNING.name().equalsIgnoreCase(targetStatus)) {
-			releaseReservationQuietly(task.getNodeId());
+		if (!TaskStatusEnum.DISPATCHED.name().equals(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for running report: " + task.getStatus());
 		}
+		taskStatusDomainService.transfer(task, TaskStatusEnum.RUNNING.name(), reason, OperatorTypeEnum.NODE.name(), null);
+		taskRepository.update(task);
+		releaseReservationQuietly(task.getNodeId());
 	}
 
 	private String pickStatus(StatusReportRequest request) {
@@ -302,17 +305,6 @@ public class TaskLifecycleManager {
 			return request.getChangeReason();
 		}
 		return request.getReason();
-	}
-
-	private boolean shouldIgnoreReportedStatus(Task task, String targetStatus) {
-		if (task == null || targetStatus == null) {
-			return false;
-		}
-		String currentStatus = task.getStatus();
-		if (targetStatus.equalsIgnoreCase(currentStatus)) {
-			return true;
-		}
-		return task.isFinished();
 	}
 
 	private TaskFileResponse toTaskFileResponse(TaskFile file) {

@@ -28,12 +28,12 @@ public class TaskReportClientImpl implements TaskReportClient {
 	}
 
 	@Override
-	public void reportStatus(Long taskId, String status, String reason) {
+	public void reportRunning(Long taskId, String reason) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/status-report";
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("fromStatus", null);
-		body.put("toStatus", status);
+		body.put("toStatus", "RUNNING");
 		body.put("changeReason", reason);
 		body.put("operatorType", "NODE");
 		restTemplate.postForEntity(url, withToken(body), Object.class);
@@ -102,6 +102,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 				.buildAndExpand(taskId)
 				.toUriString();
 		Map<String, Object> body = new HashMap<>();
+		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("failType", failType);
 		body.put("reason", reason);
 		body.put("recoverable", recoverable);

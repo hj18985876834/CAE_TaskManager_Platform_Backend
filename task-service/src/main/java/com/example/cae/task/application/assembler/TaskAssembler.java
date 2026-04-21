@@ -120,8 +120,7 @@ public class TaskAssembler {
 		if (task == null || task.getStatus() == null) {
 			return false;
 		}
-		return TaskStatusEnum.QUEUED.name().equals(task.getStatus())
-				|| TaskStatusEnum.RUNNING.name().equals(task.getStatus());
+		return TaskStatusEnum.QUEUED.name().equals(task.getStatus());
 	}
 
 	public TaskPO toPO(Task task) {

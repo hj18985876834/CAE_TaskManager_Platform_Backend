@@ -5,6 +5,8 @@ import com.example.cae.nodeagent.application.service.TaskReportAppService;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
 import com.example.cae.nodeagent.infrastructure.process.ProcessTimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -14,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class TaskReportManager {
+	private static final Logger log = LoggerFactory.getLogger(TaskReportManager.class);
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
 	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
@@ -25,11 +28,10 @@ public class TaskReportManager {
 
 	public void onTaskAccepted(Long taskId) {
 		logSeqMap.put(taskId, new AtomicInteger(1));
-		taskReportAppService.reportStatus(taskId, "DISPATCHED", "node-agent accepted dispatch");
 	}
 
 	public void reportRunning(ExecutionContext context) {
-		taskReportAppService.reportStatus(context.getTaskId(), "RUNNING", "node-agent start execute");
+		taskReportAppService.reportRunning(context.getTaskId(), "node-agent start execute");
 	}
 
 	public void pushLog(Long taskId, Integer seqNo, String line) {
@@ -66,8 +68,9 @@ public class TaskReportManager {
 	}
 
 	public void reportCanceled(ExecutionContext context, String reason) {
-		String message = reason == null || reason.isBlank() ? "task canceled" : reason;
-		taskReportAppService.reportStatus(context.getTaskId(), "CANCELED", message);
+		log.info("task cancel report ignored in first-version status contract, taskId={}, reason={}",
+				context == null ? null : context.getTaskId(),
+				reason == null || reason.isBlank() ? "task canceled" : reason);
 	}
 
 	public void completeTask(Long taskId) {

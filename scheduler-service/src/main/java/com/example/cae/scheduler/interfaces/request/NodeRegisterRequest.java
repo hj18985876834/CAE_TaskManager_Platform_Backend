@@ -18,6 +18,9 @@ public class NodeRegisterRequest {
 	@NotBlank(message = "host不能为空")
 	@Size(max = 128, message = "host长度不能超过128")
 	private String host;
+	@NotNull(message = "port不能为空")
+	@Positive(message = "port必须大于0")
+	private Integer port;
 	@NotNull(message = "maxConcurrency不能为空")
 	@Positive(message = "maxConcurrency必须大于0")
 	private Integer maxConcurrency;
@@ -46,6 +49,14 @@ public class NodeRegisterRequest {
 
 	public void setHost(String host) {
 		this.host = host;
+	}
+
+	public Integer getPort() {
+		return port;
+	}
+
+	public void setPort(Integer port) {
+		this.port = port;
 	}
 
 	public Integer getMaxConcurrency() {

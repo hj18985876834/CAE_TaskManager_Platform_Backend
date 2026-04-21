@@ -5,6 +5,7 @@ public class AvailableNodeResponse {
 	private String nodeCode;
 	private String nodeName;
 	private String host;
+	private Integer port;
 	private Integer runningCount;
 	private Integer reservedCount;
 	private Integer maxConcurrency;
@@ -40,6 +41,14 @@ public class AvailableNodeResponse {
 
 	public void setHost(String host) {
 		this.host = host;
+	}
+
+	public Integer getPort() {
+		return port;
+	}
+
+	public void setPort(Integer port) {
+		this.port = port;
 	}
 
 	public Integer getRunningCount() {

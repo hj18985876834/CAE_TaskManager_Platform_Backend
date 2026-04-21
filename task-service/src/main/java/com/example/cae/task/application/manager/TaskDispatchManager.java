@@ -96,27 +96,32 @@ public class TaskDispatchManager {
 			if (Set.of(TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
 					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
 					.contains(task.getStatus())) {
+				ensureTaskBoundToNode(task, nodeId);
 				return;
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch confirm: " + task.getStatus());
 		}
-		task.bindNode(nodeId);
+		ensureTaskBoundToNode(task, nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
 	}
 
 	@Transactional
-	public void markFailed(Long taskId, String failType, String reason, Boolean recoverable) {
+	public void markFailed(Long taskId, Long nodeId, String failType, String reason, Boolean recoverable) {
+		if (nodeId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
+		}
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (!Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(task.getStatus())) {
-			if (Set.of(TaskStatusEnum.QUEUED.name(), TaskStatusEnum.RUNNING.name(),
-					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
-					.contains(task.getStatus())) {
+			if (Boolean.TRUE.equals(recoverable) && TaskStatusEnum.QUEUED.name().equals(task.getStatus())) {
+				return;
+			}
+			if (!Boolean.TRUE.equals(recoverable) && TaskStatusEnum.FAILED.name().equals(task.getStatus())) {
 				return;
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
 		}
-		Long nodeId = task.getNodeId();
+		ensureTaskBoundToNode(task, nodeId);
 		task.setFailType(failType);
 		task.setFailMessage(reason);
 		taskStatusDomainService.transfer(task,
@@ -126,6 +131,15 @@ public class TaskDispatchManager {
 				null);
 		taskRepository.update(task);
 		releaseReservationQuietly(nodeId);
+	}
+
+	private void ensureTaskBoundToNode(Task task, Long nodeId) {
+		if (task == null || task.getNodeId() == null) {
+			throw new BizException(ErrorCodeConstants.TASK_NOT_BOUND_TO_NODE, "task is not bound to node");
+		}
+		if (!task.getNodeId().equals(nodeId)) {
+			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "nodeId does not match task bound node");
+		}
 	}
 
 	public String getTaskStatus(Long taskId) {

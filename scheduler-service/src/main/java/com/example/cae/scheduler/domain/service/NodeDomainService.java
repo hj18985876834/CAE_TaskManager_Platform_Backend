@@ -16,6 +16,9 @@ public class NodeDomainService {
 		if (request.getMaxConcurrency() == null || request.getMaxConcurrency() < 1) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid maxConcurrency");
 		}
+		if (request.getPort() == null || request.getPort() < 1 || request.getPort() > 65535) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid port");
+		}
 	}
 
 	public void validateHeartbeatRequest(NodeHeartbeatRequest request) {

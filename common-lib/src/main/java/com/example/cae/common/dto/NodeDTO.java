@@ -5,6 +5,7 @@ public class NodeDTO {
     private String nodeCode;
     private String nodeName;
     private String host;
+    private Integer port;
     private String status;
     private Integer enabled;
     private Integer maxConcurrency;
@@ -36,6 +37,14 @@ public class NodeDTO {
 
     public void setHost(String host) {
         this.host = host;
+    }
+
+    public Integer getPort() {
+        return port;
+    }
+
+    public void setPort(Integer port) {
+        this.port = port;
     }
 
     public Double getCpuUsage() {

@@ -28,7 +28,8 @@ public class NodeInfoCollector {
 		NodeInfo info = new NodeInfo();
 		info.setNodeCode(nodeAgentConfig.getNodeCode());
 		info.setNodeName(nodeAgentConfig.getNodeName());
-		info.setHost(resolveHostWithPort());
+		info.setHost(resolveHost());
+		info.setPort(nodeAgentConfig.getNodePort());
 		info.setMaxConcurrency(nodeAgentConfig.getMaxConcurrency());
 		info.setCpuUsage(collectCpuUsage());
 		info.setMemoryUsage(collectMemoryUsage());
@@ -68,7 +69,7 @@ public class NodeInfoCollector {
 				.setScale(2, RoundingMode.HALF_UP);
 	}
 
-	private String resolveHostWithPort() {
+	private String resolveHost() {
 		if (nodeAgentConfig.getAdvertisedHost() != null && !nodeAgentConfig.getAdvertisedHost().isBlank()) {
 			return nodeAgentConfig.getAdvertisedHost();
 		}
@@ -78,6 +79,6 @@ public class NodeInfoCollector {
 		} catch (Exception ex) {
 			host = "127.0.0.1";
 		}
-		return host + ":" + nodeAgentConfig.getNodePort();
+		return host;
 	}
 }

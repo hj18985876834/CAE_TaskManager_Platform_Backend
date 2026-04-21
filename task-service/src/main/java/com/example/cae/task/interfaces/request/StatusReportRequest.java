@@ -88,4 +88,15 @@ public class StatusReportRequest {
 	public boolean isTargetStatusPresent() {
 		return (toStatus != null && !toStatus.isBlank()) || (status != null && !status.isBlank());
 	}
+
+	@AssertTrue(message = "status-report首版只允许回传RUNNING")
+	public boolean isRunningOnly() {
+		String target = null;
+		if (toStatus != null && !toStatus.isBlank()) {
+			target = toStatus;
+		} else if (status != null && !status.isBlank()) {
+			target = status;
+		}
+		return target == null || "RUNNING".equalsIgnoreCase(target.trim());
+	}
 }

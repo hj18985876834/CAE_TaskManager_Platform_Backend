@@ -9,13 +9,17 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 -- Adjust these demo host values for your runtime environment.
 -- Local single-machine example:
---   SET @NODE1_HOST = '127.0.0.1:8085';
+--   SET @NODE1_HOST = '127.0.0.1';
+--   SET @NODE1_PORT = 8085;
 --   SET @TASK_STORAGE_ROOT = '/data/tasks';
 -- Docker Compose example:
---   SET @NODE1_HOST = 'node-agent:8085';
+--   SET @NODE1_HOST = 'node-agent';
+--   SET @NODE1_PORT = 8085;
 --   SET @TASK_STORAGE_ROOT = '/app/data/tasks';
-SET @NODE1_HOST = '127.0.0.1:8085';
-SET @NODE2_HOST = '127.0.0.1:8086';
+SET @NODE1_HOST = '127.0.0.1';
+SET @NODE1_PORT = 8085;
+SET @NODE2_HOST = '127.0.0.1';
+SET @NODE2_PORT = 8086;
 SET @TASK_STORAGE_ROOT = '/data/tasks';
 
 -- =========================================================
@@ -362,6 +366,7 @@ CREATE TABLE compute_node (
     node_name VARCHAR(100) NOT NULL COMMENT '节点名称',
     node_token VARCHAR(255) NOT NULL COMMENT '节点凭证',
     host VARCHAR(100) NOT NULL COMMENT 'IP或主机名',
+    port INT NOT NULL COMMENT 'node-agent监听端口',
     status VARCHAR(20) NOT NULL COMMENT 'ONLINE / OFFLINE',
     enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否允许参与调度',
     max_concurrency INT NOT NULL DEFAULT 1 COMMENT '最大并发任务数',
@@ -418,9 +423,9 @@ CREATE TABLE schedule_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='调度记录表';
 
 -- 初始化调度域数据
-INSERT INTO compute_node (id, node_code, node_name, node_token, host, status, enabled, max_concurrency, running_count, reserved_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
-(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, 'ONLINE', 1, 4, 1, 0, 23.50, 41.20, NOW(), NOW(), NOW()),
-(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, 'OFFLINE', 0, 2, 0, 0, 0.00, 0.00, NOW(), NOW(), NOW());
+INSERT INTO compute_node (id, node_code, node_name, node_token, host, port, status, enabled, max_concurrency, running_count, reserved_count, cpu_usage, memory_usage, last_heartbeat_time, created_at, updated_at) VALUES
+(1, 'NODE-001', '计算节点-1', 'node-token-001', @NODE1_HOST, @NODE1_PORT, 'ONLINE', 1, 4, 1, 0, 23.50, 41.20, NOW(), NOW(), NOW()),
+(2, 'NODE-002', '计算节点-2', 'node-token-002', @NODE2_HOST, @NODE2_PORT, 'OFFLINE', 0, 2, 0, 0, 0.00, 0.00, NOW(), NOW(), NOW());
 
 INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enabled, created_at) VALUES
 (1, 1, 1, 'v10', 1, NOW()),

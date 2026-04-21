@@ -61,6 +61,7 @@ public class NodeAppService {
 			ComputeNode node = existingNode.get();
 			node.setNodeName(request.getNodeName());
 			node.setHost(request.getHost());
+			node.setPort(request.getPort());
 			node.setMaxConcurrency(request.getMaxConcurrency());
 			if (node.getNodeToken() == null || node.getNodeToken().isBlank()) {
 				node.setNodeToken(generateNodeToken(node.getNodeCode()));
@@ -92,6 +93,7 @@ public class NodeAppService {
 		registerRequest.setNodeCode(request == null ? null : request.getNodeCode());
 		registerRequest.setNodeName(request == null ? null : request.getNodeName());
 		registerRequest.setHost(composeHost(request == null ? null : request.getHost()));
+		registerRequest.setPort(request == null ? null : request.getPort());
 		registerRequest.setMaxConcurrency(request == null ? null : request.getMaxConcurrency());
 		registerRequest.setSolverIds(extractSolverIds(request));
 
@@ -276,6 +278,7 @@ public class NodeAppService {
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
+		response.setPort(node.getPort());
 		response.setStatus(node.getStatus());
 		response.setEnabled(node.getEnabled());
 		response.setMaxConcurrency(node.getMaxConcurrency());
@@ -295,6 +298,7 @@ public class NodeAppService {
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());
 		response.setHost(node.getHost());
+		response.setPort(node.getPort());
 		response.setRunningCount(node.getRunningCount());
 		response.setReservedCount(node.getReservedCount());
 		response.setMaxConcurrency(node.getMaxConcurrency());
