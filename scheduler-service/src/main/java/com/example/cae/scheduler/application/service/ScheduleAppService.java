@@ -3,6 +3,7 @@ package com.example.cae.scheduler.application.service;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.manager.NodeCapacityManager;
@@ -26,10 +27,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class ScheduleAppService {
+	private static final Set<String> DISPATCH_FAILURE_RELEASE_TARGETS = Set.of("QUEUED", "FAILED");
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
@@ -127,6 +130,19 @@ public class ScheduleAppService {
 				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch failed" : scheduleMessage
 		);
 		scheduleRecordRepository.save(failure);
+	}
+
+	@Transactional
+	public TaskStatusAckDTO handleDispatchFailure(Long taskId, Long nodeId, String failType, String reason, boolean recoverable) {
+		if (taskId == null || nodeId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId and nodeId are required");
+		}
+		TaskStatusAckDTO ack = taskClient.markTaskFailed(taskId, nodeId, failType, reason, recoverable);
+		if (ack != null && DISPATCH_FAILURE_RELEASE_TARGETS.contains(ack.getStatus())) {
+			releaseNodeReservation(nodeId, taskId);
+			recordScheduleFailure(taskId, nodeId, reason);
+		}
+		return ack;
 	}
 
 	@Transactional

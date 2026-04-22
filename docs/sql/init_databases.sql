@@ -312,13 +312,15 @@ INSERT INTO sim_task (id, task_no, task_name, user_id, solver_id, profile_id, ta
 
 INSERT INTO task_status_history (id, task_id, from_status, to_status, change_reason, operator_type, operator_id, created_at) VALUES
 (1, 1, NULL, 'CREATED', 'task created', 'USER', 1, NOW()),
-(2, 1, 'CREATED', 'QUEUED', 'task submitted', 'USER', 1, NOW()),
-(3, 1, 'QUEUED', 'SCHEDULED', 'scheduler selected node', 'SYSTEM', NULL, NOW()),
-(4, 1, 'SCHEDULED', 'DISPATCHED', 'task dispatched', 'SYSTEM', NULL, NOW()),
-(5, 1, 'DISPATCHED', 'RUNNING', 'node started', 'NODE', 1, NOW()),
-(6, 1, 'RUNNING', 'SUCCESS', 'node finished', 'NODE', 1, NOW()),
-(7, 2, NULL, 'CREATED', 'task created', 'USER', 2, NOW()),
-(8, 2, 'CREATED', 'QUEUED', 'task submitted', 'USER', 2, NOW());
+(2, 1, 'CREATED', 'VALIDATED', 'validation passed', 'USER', 1, NOW()),
+(3, 1, 'VALIDATED', 'QUEUED', 'task submitted', 'USER', 1, NOW()),
+(4, 1, 'QUEUED', 'SCHEDULED', 'scheduler selected node', 'SYSTEM', NULL, NOW()),
+(5, 1, 'SCHEDULED', 'DISPATCHED', 'task dispatched', 'SYSTEM', NULL, NOW()),
+(6, 1, 'DISPATCHED', 'RUNNING', 'node started', 'NODE', 1, NOW()),
+(7, 1, 'RUNNING', 'SUCCESS', 'node finished', 'NODE', 1, NOW()),
+(8, 2, NULL, 'CREATED', 'task created', 'USER', 2, NOW()),
+(9, 2, 'CREATED', 'VALIDATED', 'validation passed', 'USER', 2, NOW()),
+(10, 2, 'VALIDATED', 'QUEUED', 'task submitted', 'USER', 2, NOW());
 
 INSERT INTO task_file (id, task_id, file_role, file_key, origin_name, storage_path, unpack_dir, relative_path, archive_flag, file_size, file_suffix, checksum, created_at) VALUES
 (1, 1, 'ARCHIVE', 'input_archive', 'case-1.zip', CONCAT(@TASK_STORAGE_ROOT, '/1/input/case-1.zip'), CONCAT(@TASK_STORAGE_ROOT, '/1/workdir'), NULL, 1, 102400, 'zip', 'md5-demo-001', NOW()),
@@ -441,7 +443,6 @@ INSERT INTO node_solver_capability (id, node_id, solver_id, solver_version, enab
 
 INSERT INTO schedule_record (id, task_id, node_id, strategy_name, schedule_status, schedule_message, created_at) VALUES
 (1, 1, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'node selected by fcfs-min-load strategy', NOW()),
-(2, 2, 1, 'FCFS_MIN_LOAD', 'SUCCESS', 'queued task pre-scheduled', NOW()),
-(3, 3, NULL, 'FCFS_MIN_LOAD', 'FAILED', 'no available node', NOW());
+(2, 2, NULL, 'FCFS_MIN_LOAD', 'FAILED', 'no available node', NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;

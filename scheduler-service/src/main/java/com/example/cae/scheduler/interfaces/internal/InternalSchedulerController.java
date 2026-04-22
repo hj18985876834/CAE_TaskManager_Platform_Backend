@@ -1,8 +1,10 @@
 package com.example.cae.scheduler.interfaces.internal;
 
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
+import com.example.cae.scheduler.interfaces.request.InternalTaskDispatchFailureRequest;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
@@ -42,6 +44,18 @@ public class InternalSchedulerController {
 	public Result<Void> createScheduleRecord(@Valid @RequestBody InternalScheduleRecordRequest request) {
 		scheduleAppService.recordSchedule(request);
 		return Result.success();
+	}
+
+	@PostMapping("/tasks/{taskId}/dispatch-failed")
+	public Result<TaskStatusAckDTO> dispatchFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+												   @Valid @RequestBody InternalTaskDispatchFailureRequest request) {
+		return Result.success(scheduleAppService.handleDispatchFailure(
+				taskId,
+				request.getNodeId(),
+				request.getFailType(),
+				request.getReason(),
+				Boolean.TRUE.equals(request.getRecoverable())
+		));
 	}
 
 	@GetMapping("/tasks/{taskId}/schedules")

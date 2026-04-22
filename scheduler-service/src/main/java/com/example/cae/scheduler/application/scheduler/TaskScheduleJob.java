@@ -47,11 +47,11 @@ public class TaskScheduleJob {
 				TaskDispatchAckDTO dispatchAck = markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
 			} catch (Exception ex) {
-				if (nodeId != null && !dispatchAccepted) {
+				if (nodeId != null && !taskMarkedScheduled) {
 					taskScheduleManager.releaseNodeReservation(nodeId, task == null ? null : task.getTaskId());
 				}
 				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
-					taskClient.markTaskFailed(
+					taskScheduleManager.handleDispatchFailure(
 							task.getTaskId(),
 							nodeId,
 							FailTypeEnum.DISPATCH_ERROR.name(),
@@ -59,7 +59,9 @@ public class TaskScheduleJob {
 							isRecoverableDispatchError(ex)
 					);
 				}
-				taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
+				if (!(taskMarkedScheduled && !dispatchAccepted)) {
+					taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
+				}
 			}
 		}
 	}

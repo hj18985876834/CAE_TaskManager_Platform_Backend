@@ -4,6 +4,7 @@ import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 
 import java.util.Map;
 import java.util.List;
@@ -17,7 +18,7 @@ public interface TaskClient {
 
 	TaskDispatchAckDTO markTaskDispatched(Long taskId, Long nodeId);
 
-	void markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable);
+	TaskStatusAckDTO markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable);
 
 	int markNodeOfflineTasksFailed(Long nodeId, String reason);
 }

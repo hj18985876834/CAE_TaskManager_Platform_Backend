@@ -17,7 +17,7 @@ public class ResultFileReportRequest {
 	@Size(max = 255, message = "fileName长度不能超过255")
 	private String fileName;
 	@NotBlank(message = "storagePath不能为空")
-	@Size(max = 512, message = "storagePath长度不能超过512")
+	@Size(max = 500, message = "storagePath长度不能超过500")
 	private String storagePath;
 	@NotNull(message = "fileSize不能为空")
 	@Min(value = 0, message = "fileSize不能小于0")

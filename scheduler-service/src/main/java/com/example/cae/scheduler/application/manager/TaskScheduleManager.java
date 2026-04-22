@@ -1,6 +1,7 @@
 package com.example.cae.scheduler.application.manager;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
@@ -31,6 +32,10 @@ public class TaskScheduleManager {
 
 	public void releaseNodeReservation(Long nodeId, Long taskId) {
 		scheduleAppService.releaseNodeReservation(nodeId, taskId);
+	}
+
+	public TaskStatusAckDTO handleDispatchFailure(Long taskId, Long nodeId, String failType, String reason, boolean recoverable) {
+		return scheduleAppService.handleDispatchFailure(taskId, nodeId, failType, reason, recoverable);
 	}
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {

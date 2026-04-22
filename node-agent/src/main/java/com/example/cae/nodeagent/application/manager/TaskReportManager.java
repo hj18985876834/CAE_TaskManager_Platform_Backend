@@ -1,5 +1,7 @@
 package com.example.cae.nodeagent.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.nodeagent.application.service.TaskReportAppService;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
@@ -17,6 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class TaskReportManager {
 	private static final Logger log = LoggerFactory.getLogger(TaskReportManager.class);
+	private static final int RUNNING_REPORT_MAX_ATTEMPTS = 50;
+	private static final long RUNNING_REPORT_RETRY_INTERVAL_MS = 100L;
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
 	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
@@ -31,7 +35,22 @@ public class TaskReportManager {
 	}
 
 	public void reportRunning(ExecutionContext context) {
-		taskReportAppService.reportRunning(context.getTaskId(), "node-agent start execute");
+		BizException lastException = null;
+		for (int attempt = 1; attempt <= RUNNING_REPORT_MAX_ATTEMPTS; attempt++) {
+			try {
+				taskReportAppService.reportRunning(context.getTaskId(), "node-agent start execute");
+				return;
+			} catch (BizException ex) {
+				lastException = ex;
+				if (!shouldRetryRunningReport(ex) || attempt == RUNNING_REPORT_MAX_ATTEMPTS) {
+					throw ex;
+				}
+				sleepBeforeRetry(context.getTaskId(), attempt, ex);
+			}
+		}
+		if (lastException != null) {
+			throw lastException;
+		}
 	}
 
 	public void pushLog(Long taskId, Integer seqNo, String line) {
@@ -68,7 +87,6 @@ public class TaskReportManager {
 				? "node-agent prepare task failed"
 				: ex.getMessage();
 		taskReportAppService.dispatchFailed(context.getTaskId(), FailTypeEnum.EXECUTOR_START_ERROR.name(), message, false);
-		releaseReservationQuietly(context.getTaskId());
 	}
 
 	public void reportCanceled(ExecutionContext context, String reason) {
@@ -82,11 +100,25 @@ public class TaskReportManager {
 		taskRuntimeRegistry.finish(taskId);
 	}
 
-	private void releaseReservationQuietly(Long taskId) {
-		try {
-			taskReportAppService.releaseReservation(taskId);
-		} catch (Exception ex) {
-			log.warn("failed to release reservation after pre-run failure, taskId={}", taskId, ex);
+	private boolean shouldRetryRunningReport(BizException ex) {
+		if (ex == null || ex.getCode() == null) {
+			return false;
 		}
+		return ex.getCode() == ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL
+				|| ex.getCode() == ErrorCodeConstants.TASK_STATUS_MISMATCH
+				|| ex.getCode() == ErrorCodeConstants.CONFLICT;
+	}
+
+	private void sleepBeforeRetry(Long taskId, int attempt, BizException ex) {
+		try {
+			Thread.sleep(RUNNING_REPORT_RETRY_INTERVAL_MS);
+		} catch (InterruptedException interruptedException) {
+			Thread.currentThread().interrupt();
+			throw new BizException(
+					ErrorCodeConstants.BAD_GATEWAY,
+					"running report retry interrupted, taskId=" + taskId
+			);
+		}
+		log.debug("retry running report, taskId={}, attempt={}, reason={}", taskId, attempt, ex.getMessage());
 	}
 }

@@ -69,18 +69,21 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 	}
 
 	@Override
-	public void releaseReservation(Long taskId) {
+	public void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable) {
 		if (taskId == null) {
 			return;
 		}
 		String url = nodeAgentConfig.getSchedulerBaseUrl()
-				+ "/internal/nodes/" + nodeAgentConfig.getNodeId() + "/release-reservation";
+				+ "/internal/tasks/" + taskId + "/dispatch-failed";
 		Map<String, Object> body = new HashMap<>();
-		body.put("taskId", taskId);
+		body.put("nodeId", nodeAgentConfig.getNodeId());
+		body.put("failType", failType);
+		body.put("reason", reason);
+		body.put("recoverable", recoverable);
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
 		Result<?> result = restTemplate.postForObject(url, new HttpEntity<>(body, headers), Result.class);
-		validateResult(result, "release reservation");
+		validateResult(result, "dispatch failed");
 	}
 
 	private void validateResult(Result<?> result, String action) {

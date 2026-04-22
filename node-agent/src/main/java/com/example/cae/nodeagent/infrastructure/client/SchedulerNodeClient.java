@@ -7,5 +7,5 @@ public interface SchedulerNodeClient {
 
 	void heartbeat(NodeInfo nodeInfo);
 
-	void releaseReservation(Long taskId);
+	void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable);
 }

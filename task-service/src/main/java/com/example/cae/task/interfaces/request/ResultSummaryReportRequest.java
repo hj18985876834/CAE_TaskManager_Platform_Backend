@@ -15,7 +15,7 @@ public class ResultSummaryReportRequest {
 	private Boolean success;
 	@Min(value = 0, message = "durationSeconds不能小于0")
 	private Integer durationSeconds;
-	@Size(max = 2000, message = "summaryText长度不能超过2000")
+	@Size(max = 500, message = "summaryText长度不能超过500")
 	private String summaryText;
 	private Map<String, Object> metrics;
 

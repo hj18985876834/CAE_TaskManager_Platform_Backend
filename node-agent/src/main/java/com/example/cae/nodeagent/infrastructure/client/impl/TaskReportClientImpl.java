@@ -1,6 +1,9 @@
 package com.example.cae.nodeagent.infrastructure.client.impl;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.constant.HeaderConstants;
+import com.example.cae.common.exception.BizException;
+import com.example.cae.common.response.Result;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
 import com.example.cae.nodeagent.infrastructure.client.TaskReportClient;
@@ -36,7 +39,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("toStatus", "RUNNING");
 		body.put("changeReason", reason);
 		body.put("operatorType", "NODE");
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report running");
 	}
 
 	@Override
@@ -46,7 +49,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("seqNo", seqNo);
 		body.put("logContent", content);
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report log");
 	}
 
 	@Override
@@ -58,7 +61,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("durationSeconds", result.getDurationSeconds());
 		body.put("summaryText", result.getSummaryText());
 		body.put("metrics", result.getMetrics());
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report result summary");
 	}
 
 	@Override
@@ -70,7 +73,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("fileName", file == null ? null : file.getName());
 		body.put("storagePath", file == null ? null : pathMappingSupport.toWindowsPath(file.getAbsolutePath()));
 		body.put("fileSize", file == null ? null : file.length());
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report result file");
 	}
 
 	@Override
@@ -84,7 +87,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("finalStatus", finalStatus);
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "mark finished");
 	}
 
 	@Override
@@ -97,21 +100,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("failType", failType);
 		body.put("failMessage", failMessage);
-		restTemplate.postForEntity(url, withToken(body), Object.class);
-	}
-
-	@Override
-	public void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable) {
-		String url = UriComponentsBuilder
-				.fromHttpUrl(taskBaseUrl() + "/internal/tasks/{taskId}/dispatch-failed")
-				.buildAndExpand(taskId)
-				.toUriString();
-		Map<String, Object> body = new HashMap<>();
-		body.put("nodeId", nodeAgentConfig.getNodeId());
-		body.put("failType", failType);
-		body.put("reason", reason);
-		body.put("recoverable", recoverable);
-		restTemplate.postForEntity(url, withToken(body), Object.class);
+		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "mark failed");
 	}
 
 	private String taskBaseUrl() {
@@ -144,5 +133,14 @@ public class TaskReportClientImpl implements TaskReportClient {
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
 		return new HttpEntity<>(body, headers);
+	}
+
+	private void validateResult(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
+		}
 	}
 }

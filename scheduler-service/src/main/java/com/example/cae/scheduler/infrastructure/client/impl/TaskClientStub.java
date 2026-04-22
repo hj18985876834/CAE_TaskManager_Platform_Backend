@@ -1,9 +1,12 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
@@ -42,6 +45,7 @@ public class TaskClientStub implements TaskClient {
 				}
 		);
 		Result<List<TaskDTO>> body = response.getBody();
+		ensureSuccess(body, "list queued tasks");
 		if (body == null || body.getData() == null) {
 			return List.of();
 		}
@@ -66,6 +70,7 @@ public class TaskClientStub implements TaskClient {
 				}
 		);
 		Result<List<TaskBasicDTO>> body = response.getBody();
+		ensureSuccess(body, "get task basics");
 		if (body == null || body.getData() == null) {
 			return Map.of();
 		}
@@ -86,6 +91,7 @@ public class TaskClientStub implements TaskClient {
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ensureSuccess(result, "mark task scheduled");
 		if (result == null || result.getData() == null) {
 			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
 			response.setClaimed(Boolean.FALSE);
@@ -115,6 +121,7 @@ public class TaskClientStub implements TaskClient {
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ensureSuccess(result, "mark task dispatched");
 		if (result == null || result.getData() == null) {
 			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
 			response.setTaskId(taskId);
@@ -136,14 +143,23 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable) {
+	public TaskStatusAckDTO markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/dispatch-failed";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		request.put("failType", failType);
 		request.put("reason", reason);
 		request.put("recoverable", recoverable);
-		restTemplate.postForEntity(url, request, Result.class);
+		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ensureSuccess(result, "mark task dispatch failed");
+		TaskStatusAckDTO response = new TaskStatusAckDTO();
+		response.setTaskId(taskId);
+		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
+			return response;
+		}
+		response.setTaskId(toLong(map.get("taskId"), taskId));
+		response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
+		return response;
 	}
 
 	@Override
@@ -153,6 +169,7 @@ public class TaskClientStub implements TaskClient {
 		request.put("nodeId", nodeId);
 		request.put("reason", reason);
 		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ensureSuccess(result, "mark node offline tasks failed");
 		if (result == null || result.getData() == null) {
 			return 0;
 		}
@@ -194,6 +211,15 @@ public class TaskClientStub implements TaskClient {
 			return Integer.parseInt(String.valueOf(value));
 		} catch (NumberFormatException ex) {
 			return defaultValue;
+		}
+	}
+
+	private void ensureSuccess(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
 		}
 	}
 }

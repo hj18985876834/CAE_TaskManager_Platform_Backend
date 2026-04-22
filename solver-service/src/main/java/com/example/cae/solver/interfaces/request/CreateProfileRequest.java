@@ -12,23 +12,24 @@ public class CreateProfileRequest {
 	@Positive(message = "solverId必须大于0")
 	private Long solverId;
 	@NotBlank(message = "profileCode不能为空")
-	@Size(max = 64, message = "profileCode长度不能超过64")
+	@Size(max = 50, message = "profileCode长度不能超过50")
 	private String profileCode;
 	@NotBlank(message = "taskType不能为空")
-	@Size(max = 64, message = "taskType长度不能超过64")
+	@Size(max = 50, message = "taskType长度不能超过50")
 	private String taskType;
 	@NotBlank(message = "profileName不能为空")
-	@Size(max = 128, message = "profileName长度不能超过128")
+	@Size(max = 100, message = "profileName长度不能超过100")
 	private String profileName;
 	@NotBlank(message = "uploadMode不能为空")
 	@Size(max = 32, message = "uploadMode长度不能超过32")
 	private String uploadMode;
 	@NotBlank(message = "commandTemplate不能为空")
+	@Size(max = 255, message = "commandTemplate长度不能超过255")
 	private String commandTemplate;
 	private String paramsSchema;
 	private String paramsSchemaJson;
 	@NotBlank(message = "parserName不能为空")
-	@Size(max = 128, message = "parserName长度不能超过128")
+	@Size(max = 100, message = "parserName长度不能超过100")
 	private String parserName;
 	@NotNull(message = "timeoutSeconds不能为空")
 	@Positive(message = "timeoutSeconds必须大于0")
@@ -135,4 +136,3 @@ public class CreateProfileRequest {
 		this.description = description;
 	}
 }
-

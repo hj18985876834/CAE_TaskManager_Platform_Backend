@@ -46,10 +46,6 @@ public class TaskReportAppService {
 	}
 
 	public void dispatchFailed(Long taskId, String failType, String reason, boolean recoverable) {
-		taskReportClient.dispatchFailed(taskId, failType, reason, recoverable);
-	}
-
-	public void releaseReservation(Long taskId) {
-		schedulerNodeClient.releaseReservation(taskId);
+		schedulerNodeClient.dispatchFailed(taskId, failType, reason, recoverable);
 	}
 }
