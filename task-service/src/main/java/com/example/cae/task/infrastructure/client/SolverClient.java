@@ -69,13 +69,14 @@ public class SolverClient {
 
 	public List<FileRuleDTO> getFileRules(Long profileId) {
 		Map<String, Object> profileMap = getInternalProfileMap(profileId);
-		if (profileMap == null || !(profileMap.get("fileRules") instanceof List<?> rows)) {
-			return List.of();
+		Object rowsObject = profileMap.get("fileRules");
+		if (!(rowsObject instanceof List<?> rows)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get internal profile fileRules response is invalid");
 		}
 		List<FileRuleDTO> rules = new ArrayList<>();
 		for (Object row : rows) {
 			if (!(row instanceof Map<?, ?> map)) {
-				continue;
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get internal profile fileRules row is invalid");
 			}
 			FileRuleDTO dto = new FileRuleDTO();
 			dto.setRuleId(toLong(map.get("ruleId")));
@@ -104,7 +105,7 @@ public class SolverClient {
 	public UploadSpecMeta getUploadSpecMeta(Long profileId) {
 		Object data = getUploadSpec(profileId);
 		if (!(data instanceof Map<?, ?> dataMap)) {
-			return null;
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get upload spec response data is invalid");
 		}
 		Map<String, Object> map = (Map<String, Object>) dataMap;
 		UploadSpecMeta meta = new UploadSpecMeta();
@@ -140,8 +141,8 @@ public class SolverClient {
 		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get solver meta");
-		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
-			return null;
+		if (!(result.getData() instanceof Map<?, ?> map)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get solver meta response data is invalid");
 		}
 		SolverMeta solverMeta = new SolverMeta();
 		solverMeta.setSolverCode(toString(map.get("solverCode")));
@@ -154,9 +155,6 @@ public class SolverClient {
 
 	public ProfileExecutionMeta getProfileExecutionMeta(Long profileId) {
 		Map<String, Object> map = getInternalProfileMap(profileId);
-		if (map == null) {
-			return null;
-		}
 		ProfileExecutionMeta meta = new ProfileExecutionMeta();
 		meta.setCommandTemplate(toString(map.get("commandTemplate")));
 		meta.setParserName(toString(map.get("parserName")));
@@ -169,8 +167,8 @@ public class SolverClient {
 		String url = solverServiceBaseUrl + "/internal/profiles/" + profileId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get internal profile");
-		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
-			return null;
+		if (!(result.getData() instanceof Map<?, ?> map)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get internal profile response data is invalid");
 		}
 		return (Map<String, Object>) map;
 	}

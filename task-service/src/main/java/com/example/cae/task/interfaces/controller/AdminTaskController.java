@@ -7,7 +7,7 @@ import com.example.cae.task.application.service.TaskQueryAppService;
 import com.example.cae.task.interfaces.request.RetryTaskRequest;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
-import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
@@ -33,7 +33,7 @@ public class AdminTaskController {
 	}
 
 	@GetMapping
-	public Result<PageResult<TaskListItemResponse>> pageAdminTasks(@Valid TaskListQueryRequest request) {
+	public Result<PageResult<AdminTaskListItemResponse>> pageAdminTasks(@Valid TaskListQueryRequest request) {
 		return Result.success(taskQueryAppService.pageAdminTasks(request));
 	}
 

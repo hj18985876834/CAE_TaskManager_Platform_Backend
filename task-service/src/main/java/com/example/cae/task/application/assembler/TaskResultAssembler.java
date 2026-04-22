@@ -1,5 +1,7 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.TaskResultFile;
 import com.example.cae.task.domain.model.TaskResultSummary;
@@ -54,8 +56,8 @@ public class TaskResultAssembler {
 				return (Map<String, Object>) map;
 			}
 		} catch (Exception ignored) {
-			// keep result query resilient even if stored metrics are malformed.
+			throw new BizException(ErrorCodeConstants.CONFLICT, "stored result metricsJson is invalid");
 		}
-		return Map.of();
+		throw new BizException(ErrorCodeConstants.CONFLICT, "stored result metricsJson is invalid");
 	}
 }

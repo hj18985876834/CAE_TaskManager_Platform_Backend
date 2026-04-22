@@ -14,10 +14,12 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
+import com.example.cae.task.infrastructure.client.UserClient;
 import com.example.cae.task.infrastructure.support.TaskQueryBuilder;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
+import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
@@ -42,6 +44,7 @@ public class TaskQueryAppService {
 	private final TaskQueryBuilder taskQueryBuilder;
 	private final SolverClient solverClient;
 	private final SchedulerClient schedulerClient;
+	private final UserClient userClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
 
 	public TaskQueryAppService(TaskRepository taskRepository,
@@ -52,6 +55,7 @@ public class TaskQueryAppService {
 							   TaskQueryBuilder taskQueryBuilder,
 							   SolverClient solverClient,
 							   SchedulerClient schedulerClient,
+							   UserClient userClient,
 							   TaskStoragePathSupport taskStoragePathSupport) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
@@ -61,6 +65,7 @@ public class TaskQueryAppService {
 		this.taskQueryBuilder = taskQueryBuilder;
 		this.solverClient = solverClient;
 		this.schedulerClient = schedulerClient;
+		this.userClient = userClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
@@ -74,12 +79,13 @@ public class TaskQueryAppService {
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
-	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
+	public PageResult<AdminTaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
 		request = taskQueryBuilder.sanitize(request);
 		PageResult<Task> page = taskRepository.pageAdminTasks(request);
 		QueueReasonContext queueReasonContext = buildQueueReasonContext();
-		List<TaskListItemResponse> records = page.getRecords().stream()
-				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueReasonContext))
+		Map<Long, String> usernameMap = buildUsernameMap(page.getRecords());
+		List<AdminTaskListItemResponse> records = page.getRecords().stream()
+				.map(task -> enrichAdminTaskListItem(taskAssembler.toAdminListItemResponse(task), queueReasonContext, usernameMap))
 				.toList();
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
@@ -105,13 +111,9 @@ public class TaskQueryAppService {
 	public List<TaskScheduleRecordResponse> getTaskScheduleRecords(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
-		try {
-			return schedulerClient.listTaskScheduleRecords(taskId).stream()
-					.map(item -> toTaskScheduleRecordResponse(item, task.getTaskNo()))
-					.toList();
-		} catch (Exception ignored) {
-			return List.of();
-		}
+		return schedulerClient.listTaskScheduleRecords(taskId).stream()
+				.map(item -> toTaskScheduleRecordResponse(item, task.getTaskNo()))
+				.toList();
 	}
 
 	public List<TaskBasicDTO> listTaskBasics(List<Long> taskIds) {
@@ -131,13 +133,7 @@ public class TaskQueryAppService {
 		long queuedTaskCount = taskRepository.countByStatus(TaskStatusEnum.QUEUED.name());
 		long successTaskCount = taskRepository.countByStatus(TaskStatusEnum.SUCCESS.name());
 		long finishedTaskCount = taskRepository.countFinished();
-
-		SchedulerClient.NodeSummary nodeSummary;
-		try {
-			nodeSummary = schedulerClient.getOnlineNodeSummary();
-		} catch (Exception ignored) {
-			nodeSummary = SchedulerClient.NodeSummary.empty();
-		}
+		SchedulerClient.NodeSummary nodeSummary = schedulerClient.getOnlineNodeSummary();
 
 		TaskDashboardSummaryResponse response = new TaskDashboardSummaryResponse();
 		response.setTotalTaskCount(totalTaskCount);
@@ -184,46 +180,26 @@ public class TaskQueryAppService {
 	}
 
 	private TaskListItemResponse enrichTaskListItem(TaskListItemResponse response, QueueReasonContext queueReasonContext) {
-		try {
-			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
-		} catch (Exception ignored) {
-		}
-		try {
-			response.setProfileName(solverClient.getProfileName(response.getProfileId()));
-		} catch (Exception ignored) {
-		}
-		try {
-			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
-		} catch (Exception ignored) {
-		}
+		response.setSolverName(solverClient.getSolverName(response.getSolverId()));
+		response.setProfileName(solverClient.getProfileName(response.getProfileId()));
+		response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		response.setQueueReason(resolveQueueReason(response.getTaskId(), response.getSolverId(), response.getStatus(), queueReasonContext));
 		return response;
 	}
 
+	private AdminTaskListItemResponse enrichAdminTaskListItem(AdminTaskListItemResponse response,
+															  QueueReasonContext queueReasonContext,
+															  Map<Long, String> usernameMap) {
+		enrichTaskListItem(response, queueReasonContext);
+		response.setUsername(usernameMap.get(response.getUserId()));
+		return response;
+	}
+
 	private TaskDetailResponse enrichTaskDetail(TaskDetailResponse response) {
-		try {
-			response.setSolverName(solverClient.getSolverName(response.getSolverId()));
-		} catch (Exception ignored) {
-		}
-		try {
-			response.setProfileName(solverClient.getProfileName(response.getProfileId()));
-		} catch (Exception ignored) {
-		}
-		try {
-			response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
-		} catch (Exception ignored) {
-		}
+		response.setSolverName(solverClient.getSolverName(response.getSolverId()));
+		response.setProfileName(solverClient.getProfileName(response.getProfileId()));
+		response.setNodeName(schedulerClient.getNodeName(response.getNodeId()));
 		response.setQueueReason(resolveQueueReason(response.getTaskId(), response.getSolverId(), response.getStatus(), buildQueueReasonContext()));
-		response.setStatusHistory(taskStatusHistoryRepository.listByTaskId(response.getTaskId()).stream()
-				.map(this::toStatusHistoryResponse)
-				.toList());
-		try {
-			response.setScheduleRecords(schedulerClient.listTaskScheduleRecords(response.getTaskId()).stream()
-					.map(item -> toTaskScheduleRecordResponse(item, response.getTaskNo()))
-					.toList());
-		} catch (Exception ignored) {
-			response.setScheduleRecords(List.of());
-		}
 		return response;
 	}
 
@@ -280,6 +256,20 @@ public class TaskQueryAppService {
 			queuedTaskOrder.put(queuedTasks.get(i).getId(), i);
 		}
 		return new QueueReasonContext(queuedTaskOrder, new HashMap<>());
+	}
+
+	private Map<Long, String> buildUsernameMap(List<Task> tasks) {
+		Map<Long, String> usernameMap = new HashMap<>();
+		if (tasks == null || tasks.isEmpty()) {
+			return usernameMap;
+		}
+		for (Task task : tasks) {
+			if (task == null || task.getUserId() == null || usernameMap.containsKey(task.getUserId())) {
+				continue;
+			}
+			usernameMap.put(task.getUserId(), userClient.getUsername(task.getUserId()));
+		}
+		return usernameMap;
 	}
 
 	private record QueueReasonContext(Map<Long, Integer> queuedTaskOrder,

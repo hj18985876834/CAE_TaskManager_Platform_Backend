@@ -940,6 +940,8 @@ task-service/src/main/java/com/example/cae/task/interfaces/response/
   作用：任务提交或重试后的返回结构。
 - `TaskListItemResponse.java`
   作用：任务分页列表项，承载列表展示字段以及 `queueReason`、`canRetry` 等衍生信息。
+- `AdminTaskListItemResponse.java`
+  作用：管理员任务分页列表项，在普通列表字段基础上补充 `userId`、`username`、`failType`。
 - `TaskDetailResponse.java`
   作用：任务详情返回结构，包含基础任务信息、调度/执行相关字段和可解释信息。
 - `TaskFileResponse.java`

@@ -1158,13 +1158,17 @@ node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/support/
 - `${solverCode}`
 - `${profileId}`
 - `${taskType}`
-- `${workDir}`
 - `${taskDir}`
 - `${inputDir}`
 - `${outputDir}`
 - `${logDir}`
 
 同时还会把 `params` 中的键值也并入替换。
+
+注意：
+
+- `${workDir}` 已不再作为对外模板占位符支持；
+- 校验与执行统一以 `${taskDir}` 对应的 `unpackDir` 作为实际执行目录。
 
 最终：
 

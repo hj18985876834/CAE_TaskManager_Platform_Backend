@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 public class TaskRemoteServiceProperties {
 	private String solverBaseUrl = "http://localhost:8082";
 	private String schedulerBaseUrl = "http://localhost:8084";
+	private String userBaseUrl = "http://localhost:8081";
 
 	public String getSolverBaseUrl() {
 		return solverBaseUrl;
@@ -23,5 +24,13 @@ public class TaskRemoteServiceProperties {
 
 	public void setSchedulerBaseUrl(String schedulerBaseUrl) {
 		this.schedulerBaseUrl = schedulerBaseUrl;
+	}
+
+	public String getUserBaseUrl() {
+		return userBaseUrl;
+	}
+
+	public void setUserBaseUrl(String userBaseUrl) {
+		this.userBaseUrl = userBaseUrl;
 	}
 }

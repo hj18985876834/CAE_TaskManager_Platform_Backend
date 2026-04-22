@@ -230,10 +230,6 @@ public class ScheduleAppService {
 		if (taskIds.isEmpty()) {
 			return Map.of();
 		}
-		try {
-			return taskClient.getTaskBasics(taskIds);
-		} catch (Exception ignored) {
-			return Map.of();
-		}
+		return taskClient.getTaskBasics(taskIds);
 	}
 }

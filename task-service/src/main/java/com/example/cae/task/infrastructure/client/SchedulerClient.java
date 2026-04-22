@@ -67,10 +67,8 @@ public class SchedulerClient {
 		String url = schedulerServiceBaseUrl + "/api/nodes/" + nodeId;
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get node name");
-		if (result == null || !(result.getData() instanceof java.util.Map<?, ?> map)) {
-			return null;
-		}
-		return String.valueOf(map.get("nodeName"));
+		Map<String, Object> map = requireMapData(result, "get node name");
+		return toString(map.get("nodeName"));
 	}
 
 	public QueueNodeSnapshot getQueueNodeSnapshot(Long solverId) {
@@ -91,9 +89,7 @@ public class SchedulerClient {
 				.toUriString();
 		Result<Object> availableResult = restTemplate.getForObject(availableUrl, Result.class);
 		ensureSuccess(availableResult, "fetch dispatchable node count");
-		if (availableResult == null || !(availableResult.getData() instanceof List<?> records)) {
-			return 0;
-		}
+		List<?> records = requireListData(availableResult, "fetch dispatchable node count");
 		return (int) records.stream().filter(Map.class::isInstance).count();
 	}
 
@@ -109,9 +105,7 @@ public class SchedulerClient {
 				.toUriString();
 		Result<Object> result = restTemplate.getForObject(onlineUrl, Result.class);
 		ensureSuccess(result, "fetch online enabled capable node count");
-		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
-			return 0;
-		}
+		Map<String, Object> pageMap = requireMapData(result, "fetch online enabled capable node count");
 		return toInteger(pageMap.get("total")) == null ? 0 : toInteger(pageMap.get("total"));
 	}
 
@@ -125,12 +119,10 @@ public class SchedulerClient {
 				.toUriString();
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get online node summary");
-		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
-			return NodeSummary.empty();
-		}
+		Map<String, Object> pageMap = requireMapData(result, "get online node summary");
 		Object recordsObj = pageMap.get("records");
 		if (!(recordsObj instanceof List<?> records)) {
-			return NodeSummary.empty();
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get online node summary response records is invalid");
 		}
 		int onlineCount = 0;
 		BigDecimal totalLoad = BigDecimal.ZERO;
@@ -168,13 +160,11 @@ public class SchedulerClient {
 		String url = schedulerServiceBaseUrl + "/internal/tasks/" + taskId + "/schedules";
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "list task schedule records");
-		if (result == null || !(result.getData() instanceof List<?> rows)) {
-			return List.of();
-		}
+		List<?> rows = requireListData(result, "list task schedule records");
 		List<ScheduleRecordItem> records = new ArrayList<>();
 		for (Object row : rows) {
 			if (!(row instanceof Map<?, ?> map)) {
-				continue;
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "list task schedule records response row is invalid");
 			}
 			ScheduleRecordItem item = new ScheduleRecordItem();
 			item.setScheduleId(toLong(map.get("scheduleId")));
@@ -219,6 +209,21 @@ public class SchedulerClient {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> requireMapData(Result<?> result, String action) {
+		if (!(result.getData() instanceof Map<?, ?> map)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is invalid");
+		}
+		return (Map<String, Object>) map;
+	}
+
+	private List<?> requireListData(Result<?> result, String action) {
+		if (!(result.getData() instanceof List<?> rows)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is invalid");
+		}
+		return rows;
+	}
+
 	private Integer toInteger(Object value) {
 		if (value == null) {
 			return null;
@@ -250,7 +255,7 @@ public class SchedulerClient {
 		try {
 			return LocalDateTime.parse(String.valueOf(value));
 		} catch (Exception ex) {
-			return null;
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "response datetime is invalid: " + value);
 		}
 	}
 

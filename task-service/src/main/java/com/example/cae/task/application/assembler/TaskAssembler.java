@@ -1,11 +1,14 @@
 package com.example.cae.task.application.assembler;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.constant.TaskConstants;
-import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.common.enums.TaskStatusEnum;
+import com.example.cae.common.exception.BizException;
+import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.infrastructure.persistence.entity.TaskPO;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
+import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
@@ -75,6 +78,19 @@ public class TaskAssembler {
 
 	public TaskListItemResponse toListItemResponse(Task task) {
 		TaskListItemResponse response = new TaskListItemResponse();
+		populateListItem(task, response);
+		return response;
+	}
+
+	public AdminTaskListItemResponse toAdminListItemResponse(Task task) {
+		AdminTaskListItemResponse response = new AdminTaskListItemResponse();
+		populateListItem(task, response);
+		response.setUserId(task.getUserId());
+		response.setFailType(task.getFailType());
+		return response;
+	}
+
+	private void populateListItem(Task task, TaskListItemResponse response) {
 		response.setTaskId(task.getId());
 		response.setTaskNo(task.getTaskNo());
 		response.setTaskName(task.getTaskName());
@@ -89,7 +105,6 @@ public class TaskAssembler {
 		response.setSubmitTime(task.getSubmitTime());
 		response.setStartTime(task.getStartTime());
 		response.setEndTime(task.getEndTime());
-		return response;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -103,9 +118,9 @@ public class TaskAssembler {
 				return (Map<String, Object>) map;
 			}
 		} catch (Exception ignored) {
-			// keep query responses resilient even if stored params are malformed.
+			throw new BizException(ErrorCodeConstants.CONFLICT, "stored task paramsJson is invalid");
 		}
-		return Map.of();
+		throw new BizException(ErrorCodeConstants.CONFLICT, "stored task paramsJson is invalid");
 	}
 
 	private boolean canRetry(Task task) {

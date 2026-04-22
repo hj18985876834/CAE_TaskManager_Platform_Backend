@@ -5,6 +5,7 @@ import com.example.cae.task.application.service.TaskLogAppService;
 import com.example.cae.task.application.service.TaskQueryAppService;
 import com.example.cae.task.application.service.TaskResultAppService;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
+import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
@@ -34,7 +35,7 @@ public class TaskQueryFacade {
 		return taskQueryAppService.pageMyTasks(request, userId);
 	}
 
-	public PageResult<TaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
+	public PageResult<AdminTaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
 		return taskQueryAppService.pageAdminTasks(request);
 	}
 

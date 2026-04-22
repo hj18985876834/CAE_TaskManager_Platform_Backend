@@ -230,38 +230,38 @@ public class TaskDispatchManager {
 	}
 
 	private void enrichExecutionMeta(Task task, TaskDTO dto) {
-		try {
-			SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
-			if (solverMeta != null) {
-				if (solverMeta.getSolverCode() != null && !solverMeta.getSolverCode().isBlank()) {
-					dto.setSolverCode(solverMeta.getSolverCode());
-				}
-				if (solverMeta.getExecMode() != null && !solverMeta.getExecMode().isBlank()) {
-					dto.setSolverExecMode(solverMeta.getExecMode());
-				}
-				if (solverMeta.getExecPath() != null && !solverMeta.getExecPath().isBlank()) {
-					dto.setSolverExecPath(solverMeta.getExecPath());
-				}
-			}
-		} catch (Exception ignored) {
-			// keep queued API resilient even if solver-service is temporarily unavailable.
+		SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
+		if (solverMeta == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					"queued task is missing solver meta, taskId=" + task.getId() + ", solverId=" + task.getSolverId());
+		}
+		if (solverMeta.getSolverCode() == null || solverMeta.getSolverCode().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					"queued task solverCode is empty, taskId=" + task.getId() + ", solverId=" + task.getSolverId());
+		}
+		dto.setSolverCode(solverMeta.getSolverCode());
+		if (solverMeta.getExecMode() != null && !solverMeta.getExecMode().isBlank()) {
+			dto.setSolverExecMode(solverMeta.getExecMode());
+		}
+		if (solverMeta.getExecPath() != null && !solverMeta.getExecPath().isBlank()) {
+			dto.setSolverExecPath(solverMeta.getExecPath());
 		}
 
-		try {
-			SolverClient.ProfileExecutionMeta meta = solverClient.getProfileExecutionMeta(task.getProfileId());
-			if (meta != null) {
-				if (meta.getCommandTemplate() != null && !meta.getCommandTemplate().isBlank()) {
-					dto.setCommandTemplate(meta.getCommandTemplate());
-				}
-				if (meta.getParserName() != null && !meta.getParserName().isBlank()) {
-					dto.setParserName(meta.getParserName());
-				}
-				if (meta.getTimeoutSeconds() != null && meta.getTimeoutSeconds() > 0) {
-					dto.setTimeoutSeconds(meta.getTimeoutSeconds());
-				}
-			}
-		} catch (Exception ignored) {
-			// keep queued API resilient even if solver-service is temporarily unavailable.
+		SolverClient.ProfileExecutionMeta meta = solverClient.getProfileExecutionMeta(task.getProfileId());
+		if (meta == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					"queued task is missing profile execution meta, taskId=" + task.getId() + ", profileId=" + task.getProfileId());
+		}
+		if (meta.getCommandTemplate() == null || meta.getCommandTemplate().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					"queued task commandTemplate is empty, taskId=" + task.getId() + ", profileId=" + task.getProfileId());
+		}
+		dto.setCommandTemplate(meta.getCommandTemplate());
+		if (meta.getParserName() != null && !meta.getParserName().isBlank()) {
+			dto.setParserName(meta.getParserName());
+		}
+		if (meta.getTimeoutSeconds() != null && meta.getTimeoutSeconds() > 0) {
+			dto.setTimeoutSeconds(meta.getTimeoutSeconds());
 		}
 	}
 
@@ -295,10 +295,11 @@ public class TaskDispatchManager {
 			if (parsed instanceof Map<?, ?> map) {
 				return (Map<String, Object>) map;
 			}
-		} catch (Exception ignored) {
-			// keep dispatch payload resilient when params are malformed.
+		} catch (Exception ex) {
+			throw new BizException(ErrorCodeConstants.CONFLICT,
+					"queued task paramsJson is invalid: " + ex.getMessage());
 		}
-		return Map.of();
+		throw new BizException(ErrorCodeConstants.CONFLICT, "queued task paramsJson is invalid");
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {
