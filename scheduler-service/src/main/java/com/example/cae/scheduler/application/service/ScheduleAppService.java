@@ -8,6 +8,7 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.application.assembler.ScheduleAssembler;
+import com.example.cae.scheduler.domain.enums.ScheduleStatusEnum;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.model.ScheduleRecord;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -177,11 +179,15 @@ public class ScheduleAppService {
 		if (request == null || request.getTaskId() == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid schedule record request");
 		}
+		String strategyName = request.getStrategyName();
+		if (strategyName == null || strategyName.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "strategyName is required");
+		}
 		ScheduleRecord record = ScheduleAssembler.newRecord(
 				request.getTaskId(),
 				request.getNodeId(),
-				request.getStrategyName() == null || request.getStrategyName().isBlank() ? "FCFS_MIN_LOAD" : request.getStrategyName(),
-				request.getScheduleStatus() == null || request.getScheduleStatus().isBlank() ? "UNKNOWN" : request.getScheduleStatus(),
+				strategyName,
+				normalizeScheduleStatus(request.getScheduleStatus()),
 				request.getScheduleMessage()
 		);
 		scheduleRecordRepository.save(record);
@@ -214,9 +220,12 @@ public class ScheduleAppService {
 				}
 			}
 			if (response.getNodeId() != null) {
-				computeNodeRepository.findById(response.getNodeId())
-						.map(ComputeNode::getNodeName)
-						.ifPresent(response::setNodeName);
+				ComputeNode node = computeNodeRepository.findById(response.getNodeId())
+						.orElseThrow(() -> new BizException(
+								ErrorCodeConstants.NODE_NOT_FOUND,
+								"schedule record node not found: " + response.getNodeId()
+						));
+				response.setNodeName(node.getNodeName());
 			}
 		}
 	}
@@ -231,5 +240,16 @@ public class ScheduleAppService {
 			return Map.of();
 		}
 		return taskClient.getTaskBasics(taskIds);
+	}
+
+	private String normalizeScheduleStatus(String scheduleStatus) {
+		if (scheduleStatus == null || scheduleStatus.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "scheduleStatus is required");
+		}
+		try {
+			return ScheduleStatusEnum.valueOf(scheduleStatus.trim().toUpperCase(Locale.ROOT)).name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid scheduleStatus: " + scheduleStatus);
+		}
 	}
 }

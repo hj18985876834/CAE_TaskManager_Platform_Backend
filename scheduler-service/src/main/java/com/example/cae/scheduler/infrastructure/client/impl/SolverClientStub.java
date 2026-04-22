@@ -25,16 +25,18 @@ public class SolverClientStub implements SolverClient {
 		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get solver meta");
-		if (result == null || !(result.getData() instanceof Map<?, ?> rawMap)) {
-			return null;
-		}
-		@SuppressWarnings("unchecked")
-		Map<String, Object> map = (Map<String, Object>) rawMap;
+		Map<String, Object> map = requireMapData(result, "get solver meta");
 		SolverMeta meta = new SolverMeta();
 		meta.setSolverId(toLong(map.get("solverId")));
 		meta.setSolverCode(toString(map.get("solverCode")));
 		meta.setSolverName(toString(map.get("solverName")));
 		meta.setEnabled(toInteger(map.get("enabled")));
+		if (meta.getSolverId() == null
+				|| meta.getSolverCode() == null || meta.getSolverCode().isBlank()
+				|| meta.getSolverName() == null || meta.getSolverName().isBlank()
+				|| meta.getEnabled() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get solver meta response data is invalid");
+		}
 		return meta;
 	}
 
@@ -43,17 +45,20 @@ public class SolverClientStub implements SolverClient {
 		String url = solverServiceBaseUrl + "/internal/profiles/" + profileId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get profile meta");
-		if (result == null || !(result.getData() instanceof Map<?, ?> rawMap)) {
-			return null;
-		}
-		@SuppressWarnings("unchecked")
-		Map<String, Object> map = (Map<String, Object>) rawMap;
+		Map<String, Object> map = requireMapData(result, "get profile meta");
 		ProfileMeta meta = new ProfileMeta();
 		meta.setProfileId(toLong(map.get("profileId")));
 		meta.setSolverId(toLong(map.get("solverId")));
 		meta.setProfileCode(toString(map.get("profileCode")));
 		meta.setProfileName(toString(map.get("profileName")));
 		meta.setEnabled(toInteger(map.get("enabled")));
+		if (meta.getProfileId() == null
+				|| meta.getSolverId() == null
+				|| meta.getProfileCode() == null || meta.getProfileCode().isBlank()
+				|| meta.getProfileName() == null || meta.getProfileName().isBlank()
+				|| meta.getEnabled() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get profile meta response data is invalid");
+		}
 		return meta;
 	}
 
@@ -88,5 +93,13 @@ public class SolverClientStub implements SolverClient {
 		if (result.getCode() != null && result.getCode() != 0) {
 			throw new BizException(result.getCode(), result.getMessage(), result.getData());
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> requireMapData(Result<?> result, String action) {
+		if (result == null || !(result.getData() instanceof Map<?, ?> rawMap)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is invalid");
+		}
+		return (Map<String, Object>) rawMap;
 	}
 }

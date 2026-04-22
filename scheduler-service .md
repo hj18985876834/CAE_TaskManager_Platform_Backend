@@ -801,7 +801,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/application/service/
 
 ##### `confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage)`
 
-写入一条成功调度记录，策略名目前固定写 `FCFS_LEAST_LOAD`。
+写入一条成功调度记录，策略名目前固定写 `FCFS_MIN_LOAD`。
 
 ##### `recordScheduleFailure(Long taskId, Long nodeId, String scheduleMessage)`
 
@@ -852,7 +852,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/domain/enums/
 - `SUCCESS`
 - `FAILED`
 
-当前这个枚举已经存在，但应用层写记录时仍主要直接写字符串常量，如 `"SUCCESS"`、`"FAILED"`、`"UNKNOWN"`，说明枚举还没有在整个模块里统一用起来。
+当前这个枚举已经存在，最新实现已经收口为只接受正式状态值 `SUCCESS / FAILED`；`/internal/schedules` 不再对空 `scheduleStatus` 静默写入 `"UNKNOWN"`。
 
 ### 11.3 领域模型目录
 

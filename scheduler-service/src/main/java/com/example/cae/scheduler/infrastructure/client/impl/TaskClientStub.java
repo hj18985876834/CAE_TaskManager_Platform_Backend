@@ -47,10 +47,13 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<List<TaskDTO>> body = response.getBody();
 		ensureSuccess(body, "list queued tasks");
-		if (body == null || body.getData() == null) {
-			return List.of();
+		List<TaskDTO> data = requireData(body, "list queued tasks");
+		for (TaskDTO item : data) {
+			if (item == null || item.getTaskId() == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "list queued tasks response contains invalid task item");
+			}
 		}
-		return body.getData();
+		return data;
 	}
 
 	@Override
@@ -72,13 +75,11 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<List<TaskBasicDTO>> body = response.getBody();
 		ensureSuccess(body, "get task basics");
-		if (body == null || body.getData() == null) {
-			return Map.of();
-		}
+		List<TaskBasicDTO> data = requireData(body, "get task basics");
 		Map<Long, TaskBasicDTO> taskBasics = new HashMap<>();
-		for (TaskBasicDTO item : body.getData()) {
-			if (item == null || item.getTaskId() == null) {
-				continue;
+		for (TaskBasicDTO item : data) {
+			if (item == null || item.getTaskId() == null || item.getTaskNo() == null || item.getTaskNo().isBlank()) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get task basics response contains invalid task basic item");
 			}
 			taskBasics.put(item.getTaskId(), item);
 		}
@@ -99,22 +100,13 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<TaskScheduleClaimDTO> result = httpResponse.getBody();
 		ensureSuccess(result, "mark task scheduled");
-		if (result == null || result.getData() == null) {
-			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
-			response.setClaimed(Boolean.FALSE);
-			response.setTaskId(taskId);
-			response.setNodeId(nodeId);
-			return response;
-		}
-		TaskScheduleClaimDTO responseData = result.getData();
-		if (responseData.getTaskId() == null) {
-			responseData.setTaskId(taskId);
-		}
-		if (responseData.getNodeId() == null) {
-			responseData.setNodeId(nodeId);
-		}
-		if (responseData.getClaimed() == null) {
-			responseData.setClaimed(Boolean.FALSE);
+		TaskScheduleClaimDTO responseData = requireData(result, "mark task scheduled");
+		if (responseData.getClaimed() == null
+				|| responseData.getTaskId() == null
+				|| responseData.getNodeId() == null
+				|| responseData.getStatus() == null
+				|| responseData.getStatus().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark task scheduled response data is invalid");
 		}
 		return responseData;
 	}
@@ -133,18 +125,12 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<TaskDispatchAckDTO> result = httpResponse.getBody();
 		ensureSuccess(result, "mark task dispatched");
-		if (result == null || result.getData() == null) {
-			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
-			response.setTaskId(taskId);
-			response.setNodeId(nodeId);
-			return response;
-		}
-		TaskDispatchAckDTO responseData = result.getData();
-		if (responseData.getTaskId() == null) {
-			responseData.setTaskId(taskId);
-		}
-		if (responseData.getNodeId() == null) {
-			responseData.setNodeId(nodeId);
+		TaskDispatchAckDTO responseData = requireData(result, "mark task dispatched");
+		if (responseData.getTaskId() == null
+				|| responseData.getNodeId() == null
+				|| responseData.getStatus() == null
+				|| responseData.getStatus().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark task dispatched response data is invalid");
 		}
 		return responseData;
 	}
@@ -166,12 +152,11 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<TaskStatusAckDTO> result = response.getBody();
 		ensureSuccess(result, "mark task dispatch failed");
-		TaskStatusAckDTO responseData = result == null ? null : result.getData();
-		if (responseData == null) {
-			responseData = new TaskStatusAckDTO();
-		}
-		if (responseData.getTaskId() == null) {
-			responseData.setTaskId(taskId);
+		TaskStatusAckDTO responseData = requireData(result, "mark task dispatch failed");
+		if (responseData.getTaskId() == null
+				|| responseData.getStatus() == null
+				|| responseData.getStatus().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark task dispatch failed response data is invalid");
 		}
 		return responseData;
 	}
@@ -191,10 +176,7 @@ public class TaskClientStub implements TaskClient {
 		);
 		Result<Integer> result = response.getBody();
 		ensureSuccess(result, "mark node offline tasks failed");
-		if (result == null || result.getData() == null) {
-			return 0;
-		}
-		return result.getData();
+		return requireData(result, "mark node offline tasks failed");
 	}
 
 	private void ensureSuccess(Result<?> result, String action) {
@@ -204,5 +186,12 @@ public class TaskClientStub implements TaskClient {
 		if (result.getCode() != null && result.getCode() != 0) {
 			throw new BizException(result.getCode(), result.getMessage(), result.getData());
 		}
+	}
+
+	private <T> T requireData(Result<T> result, String action) {
+		if (result == null || result.getData() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is empty");
+		}
+		return result.getData();
 	}
 }
