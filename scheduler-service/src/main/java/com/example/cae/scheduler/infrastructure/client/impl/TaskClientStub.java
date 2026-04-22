@@ -112,12 +112,16 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markNodeOfflineTasksFailed(Long nodeId, String reason) {
+	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		String url = taskServiceBaseUrl + "/internal/tasks/node-offline/fail";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		request.put("reason", reason);
-		restTemplate.postForEntity(url, request, Result.class);
+		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		if (result == null || result.getData() == null) {
+			return 0;
+		}
+		return toInteger(result.getData(), 0);
 	}
 
 	private Boolean toBoolean(Object value) {
@@ -139,6 +143,20 @@ public class TaskClientStub implements TaskClient {
 		}
 		try {
 			return Long.parseLong(String.valueOf(value));
+		} catch (NumberFormatException ex) {
+			return defaultValue;
+		}
+	}
+
+	private Integer toInteger(Object value, Integer defaultValue) {
+		if (value == null) {
+			return defaultValue;
+		}
+		if (value instanceof Number number) {
+			return number.intValue();
+		}
+		try {
+			return Integer.parseInt(String.valueOf(value));
 		} catch (NumberFormatException ex) {
 			return defaultValue;
 		}

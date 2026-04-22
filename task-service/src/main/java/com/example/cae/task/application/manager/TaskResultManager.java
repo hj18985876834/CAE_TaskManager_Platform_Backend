@@ -1,6 +1,7 @@
 package com.example.cae.task.application.manager;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
@@ -81,35 +82,36 @@ public class TaskResultManager {
 	}
 
 	@Transactional
-	public void finishTask(Long taskId, String finalStatus) {
+	public TaskStatusAckDTO finishTask(Long taskId, String finalStatus) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = normalizeAllowedFinalStatus(finalStatus);
 		if (shouldIgnoreTerminalReport(task, target)) {
-			return;
+			return buildTaskStatusAck(task);
 		}
 		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for terminal report: " + task.getStatus());
 		}
 		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+		return buildTaskStatusAck(task);
 	}
 
 	@Transactional
-	public void failTask(Long taskId, String failType, String failMessage) {
+	public TaskStatusAckDTO failTask(Long taskId, String failType, String failMessage) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
-		String targetStatus = TaskStatusEnum.TIMEOUT.name().equalsIgnoreCase(failType)
-				? TaskStatusEnum.TIMEOUT.name()
-				: TaskStatusEnum.FAILED.name();
+		String normalizedFailType = normalizeAllowedFailType(failType);
+		String targetStatus = TaskStatusEnum.FAILED.name();
 		if (shouldIgnoreTerminalReport(task, targetStatus)) {
-			return;
+			return buildTaskStatusAck(task);
 		}
 		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for fail report: " + task.getStatus());
 		}
-		task.setFailType(failType);
+		task.setFailType(normalizedFailType);
 		task.setFailMessage(failMessage);
 		taskStatusDomainService.transfer(task, targetStatus, failMessage, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+		return buildTaskStatusAck(task);
 	}
 
 	private boolean shouldIgnoreTerminalReport(Task task, String targetStatus) {
@@ -130,6 +132,20 @@ public class TaskResultManager {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported finalStatus: " + target);
 		}
 		return target;
+	}
+
+	private String normalizeAllowedFailType(String failType) {
+		String normalized = failType == null || failType.isBlank()
+				? null
+				: failType.trim().toUpperCase();
+		if (normalized == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "failType is required");
+		}
+		if (TaskStatusEnum.TIMEOUT.name().equals(normalized)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST,
+					"failType TIMEOUT is not supported by mark-failed, use mark-finished with finalStatus=TIMEOUT");
+		}
+		return normalized;
 	}
 
 	private void ensureLogReportAllowed(Long taskId) {
@@ -166,5 +182,12 @@ public class TaskResultManager {
 	private Task loadTask(Long taskId) {
 		return taskRepository.findById(taskId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+	}
+
+	private TaskStatusAckDTO buildTaskStatusAck(Task task) {
+		TaskStatusAckDTO response = new TaskStatusAckDTO();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setStatus(task == null ? null : task.getStatus());
+		return response;
 	}
 }

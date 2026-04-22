@@ -3,6 +3,7 @@ package com.example.cae.task.interfaces.internal;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
 import com.example.cae.task.interfaces.request.InternalTaskFailRequest;
@@ -47,9 +48,8 @@ public class InternalTaskDispatchController {
 	}
 
 	@PostMapping("/{taskId}/dispatch-failed")
-	public Result<Void> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
-		taskDispatchManager.markFailed(taskId, request.getNodeId(), request.getFailType(), request.getReason(), request.getRecoverable());
-		return Result.success();
+	public Result<TaskStatusAckDTO> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
+		return Result.success(taskDispatchManager.markFailed(taskId, request.getNodeId(), request.getFailType(), request.getReason(), request.getRecoverable()));
 	}
 
 	@PostMapping("/node-offline/fail")

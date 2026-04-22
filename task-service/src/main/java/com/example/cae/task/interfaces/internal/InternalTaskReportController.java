@@ -1,6 +1,7 @@
 package com.example.cae.task.interfaces.internal;
 
 import com.example.cae.common.constant.HeaderConstants;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskLifecycleManager;
 import com.example.cae.task.application.manager.TaskResultManager;
@@ -38,12 +39,11 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/status-report")
-	public Result<Void> reportStatus(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+	public Result<TaskStatusAckDTO> reportStatus(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 								 @Valid @RequestBody StatusReportRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
-		taskLifecycleManager.reportStatus(taskId, request);
-		return Result.success();
+		return Result.success(taskLifecycleManager.reportStatus(taskId, request));
 	}
 
 	@PostMapping("/{taskId}/log-report")
@@ -74,20 +74,18 @@ public class InternalTaskReportController {
 	}
 
 	@PostMapping("/{taskId}/mark-finished")
-	public Result<Void> markFinished(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+	public Result<TaskStatusAckDTO> markFinished(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 								 @Valid @RequestBody MarkFinishedRequest request,
 								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
-		taskResultManager.finishTask(taskId, request.getFinalStatus());
-		return Result.success();
+		return Result.success(taskResultManager.finishTask(taskId, request.getFinalStatus()));
 	}
 
 	@PostMapping("/{taskId}/mark-failed")
-	public Result<Void> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+	public Result<TaskStatusAckDTO> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 							   @Valid @RequestBody MarkFailedRequest request,
 							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
-		taskResultManager.failTask(taskId, request.getFailType(), request.getFailMessage());
-		return Result.success();
+		return Result.success(taskResultManager.failTask(taskId, request.getFailType(), request.getFailMessage()));
 	}
 }

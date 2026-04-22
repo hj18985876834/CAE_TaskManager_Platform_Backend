@@ -4,6 +4,7 @@ import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskFileDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.OperatorTypeEnum;
@@ -110,7 +111,7 @@ public class TaskDispatchManager {
 	}
 
 	@Transactional
-	public void markFailed(Long taskId, Long nodeId, String failType, String reason, Boolean recoverable) {
+	public TaskStatusAckDTO markFailed(Long taskId, Long nodeId, String failType, String reason, Boolean recoverable) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
@@ -119,13 +120,13 @@ public class TaskDispatchManager {
 			if (Set.of(TaskStatusEnum.RUNNING.name(), TaskStatusEnum.SUCCESS.name(),
 					TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name()).contains(task.getStatus())) {
 				ensureTaskBoundToNode(task, nodeId);
-				return;
+				return buildTaskStatusAck(task);
 			}
 			if (Boolean.TRUE.equals(recoverable) && TaskStatusEnum.QUEUED.name().equals(task.getStatus())) {
-				return;
+				return buildTaskStatusAck(task);
 			}
 			if (TaskStatusEnum.FAILED.name().equals(task.getStatus())) {
-				return;
+				return buildTaskStatusAck(task);
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
 		}
@@ -138,6 +139,7 @@ public class TaskDispatchManager {
 				OperatorTypeEnum.SYSTEM.name(),
 				null);
 		taskRepository.update(task);
+		return buildTaskStatusAck(task);
 	}
 
 	private void ensureTaskBoundToNode(Task task, Long nodeId) {
@@ -166,6 +168,13 @@ public class TaskDispatchManager {
 		return result;
 	}
 
+	private TaskStatusAckDTO buildTaskStatusAck(Task task) {
+		TaskStatusAckDTO response = new TaskStatusAckDTO();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setStatus(task == null ? null : task.getStatus());
+		return response;
+	}
+
 	@Transactional
 	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		if (nodeId == null) {
@@ -175,9 +184,13 @@ public class TaskDispatchManager {
 				? "node offline, task terminated by scheduler"
 				: reason;
 		List<Task> affectedTasks = taskRepository.listByNodeIdAndStatuses(nodeId, List.copyOf(NODE_OFFLINE_AFFECTED_STATUSES));
+		int changedCount = 0;
 		for (Task task : affectedTasks) {
 			Task lockedTask = taskRepository.findByIdForUpdate(task.getId()).orElse(null);
 			if (lockedTask == null || !NODE_OFFLINE_AFFECTED_STATUSES.contains(lockedTask.getStatus())) {
+				continue;
+			}
+			if (!nodeId.equals(lockedTask.getNodeId())) {
 				continue;
 			}
 			if (TaskStatusEnum.RUNNING.name().equals(lockedTask.getStatus())) {
@@ -185,15 +198,17 @@ public class TaskDispatchManager {
 				lockedTask.setFailMessage(effectiveReason);
 				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 				taskRepository.update(lockedTask);
+				changedCount++;
 				continue;
 			}
 			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
 				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 				taskRepository.update(lockedTask);
 				releaseReservationQuietly(nodeId, lockedTask.getId());
+				changedCount++;
 			}
 		}
-		return affectedTasks.size();
+		return changedCount;
 	}
 
 	private TaskDTO toTaskDTO(Task task) {

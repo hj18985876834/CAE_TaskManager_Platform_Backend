@@ -1,6 +1,7 @@
 package com.example.cae.task.application.manager;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.enums.OperatorTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
@@ -254,7 +255,7 @@ public class TaskLifecycleManager {
 	}
 
 	@Transactional
-	public void reportStatus(Long taskId, StatusReportRequest request) {
+	public TaskStatusAckDTO reportStatus(Long taskId, StatusReportRequest request) {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (request == null || request.getNodeId() == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status report request is required");
@@ -271,7 +272,7 @@ public class TaskLifecycleManager {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "status-report only supports RUNNING");
 		}
 		if (isIdempotentRunningReport(task, request, targetStatus)) {
-			return;
+			return buildTaskStatusAck(task);
 		}
 		if (request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
@@ -282,6 +283,7 @@ public class TaskLifecycleManager {
 		taskStatusDomainService.transfer(task, TaskStatusEnum.RUNNING.name(), reason, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
 		releaseReservationQuietly(task.getNodeId(), task.getId());
+		return buildTaskStatusAck(task);
 	}
 
 	private String pickStatus(StatusReportRequest request) {
@@ -448,6 +450,13 @@ public class TaskLifecycleManager {
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
+	}
+
+	private TaskStatusAckDTO buildTaskStatusAck(Task task) {
+		TaskStatusAckDTO response = new TaskStatusAckDTO();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setStatus(task == null ? null : task.getStatus());
+		return response;
 	}
 
 	private void validateTaskParams(Long profileId, Map<String, Object> params, Long taskId, String status) {
