@@ -124,13 +124,6 @@ class NodeAppServiceTest {
 	}
 
 	@Test
-	void updateRunningCountShouldRemainCompatibilityNoOp() {
-		nodeAppService.updateRunningCount(1L, 1);
-
-		verify(computeNodeRepository, never()).update(org.mockito.ArgumentMatchers.any());
-	}
-
-	@Test
 	void registerNodeFromAgentShouldPreserveAdminCapabilitySwitch() {
 		ComputeNode node = buildNode();
 		NodeSolverCapability existingCapability = buildCapability();

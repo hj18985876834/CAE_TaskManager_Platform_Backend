@@ -68,11 +68,6 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		validateResult(result, "heartbeat");
 	}
 
-	@Override
-	public void updateRunningCount(Integer delta) {
-		// runningCount is now sourced from heartbeat reports instead of manual +/- operations.
-	}
-
 	private void validateResult(Result<?> result, String action) {
 		if (result == null) {
 			throw new IllegalStateException(action + " response is empty");

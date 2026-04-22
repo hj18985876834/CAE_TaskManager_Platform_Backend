@@ -250,14 +250,6 @@ public class NodeAppService {
 		return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
 	}
 
-	/**
-	 * @deprecated runningCount should be updated by heartbeat reports instead of manual +/- operations.
-	 */
-	@Deprecated
-	public void updateRunningCount(Long nodeId, Integer delta) {
-		// Keep the legacy endpoint compatible while moving scheduling capacity management to reservedCount.
-	}
-
 	public String getNodeToken(Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");

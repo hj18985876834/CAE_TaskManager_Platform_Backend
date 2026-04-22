@@ -5,7 +5,6 @@ import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
-import com.example.cae.scheduler.interfaces.request.UpdateRunningCountRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -44,20 +43,16 @@ public class InternalSchedulerController {
 		return Result.success();
 	}
 
-	@PostMapping("/nodes/{nodeId}/running-count")
-	public Result<Void> updateRunningCount(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @Valid @RequestBody UpdateRunningCountRequest request) {
-		nodeAppService.updateRunningCount(nodeId, request.getDelta());
-		return Result.success();
-	}
-
 	@PostMapping("/nodes/{nodeId}/cancel-task")
-	public Result<Void> cancelTask(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @Valid @RequestBody NodeTaskCancelRequest request) {
+	public Result<Void> cancelTask(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId,
+								   @Valid @RequestBody NodeTaskCancelRequest request) {
 		scheduleAppService.cancelTaskOnNode(nodeId, request.getTaskId(), request.getReason());
 		return Result.success();
 	}
 
 	@GetMapping("/nodes/{nodeId}/token/verify")
-	public Result<Boolean> verifyNodeToken(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId, @RequestParam @NotBlank(message = "nodeToken不能为空") String nodeToken) {
+	public Result<Boolean> verifyNodeToken(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId,
+										   @RequestParam @NotBlank(message = "nodeToken不能为空") String nodeToken) {
 		return Result.success(nodeAppService.validateNodeToken(nodeId, nodeToken));
 	}
 }

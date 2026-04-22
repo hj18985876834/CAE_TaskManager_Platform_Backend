@@ -1,6 +1,7 @@
 package com.example.cae.scheduler.application.scheduler;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.enums.FailTypeEnum;
@@ -41,10 +42,10 @@ public class TaskScheduleJob {
 					taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
 					continue;
 				}
-				markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				dispatchAccepted = true;
-				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, "task dispatched");
+				TaskDispatchAckDTO dispatchAck = markTaskDispatchedQuietly(task.getTaskId(), nodeId);
+				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
 			} catch (Exception ex) {
 				if (nodeId != null && !dispatchAccepted) {
 					taskScheduleManager.releaseNodeReservation(nodeId, task == null ? null : task.getTaskId());
@@ -63,8 +64,18 @@ public class TaskScheduleJob {
 		}
 	}
 
-	private void markTaskDispatchedQuietly(Long taskId, Long nodeId) {
-		taskClient.markTaskDispatched(taskId, nodeId);
+	private TaskDispatchAckDTO markTaskDispatchedQuietly(Long taskId, Long nodeId) {
+		return taskClient.markTaskDispatched(taskId, nodeId);
+	}
+
+	private String buildDispatchSuccessMessage(TaskDispatchAckDTO dispatchAck) {
+		if (dispatchAck == null || dispatchAck.getStatus() == null || dispatchAck.getStatus().isBlank()) {
+			return "task dispatched";
+		}
+		if ("RUNNING".equalsIgnoreCase(dispatchAck.getStatus())) {
+			return "task dispatched, already running";
+		}
+		return "task dispatched";
 	}
 
 	private boolean isRecoverableDispatchError(Exception ex) {

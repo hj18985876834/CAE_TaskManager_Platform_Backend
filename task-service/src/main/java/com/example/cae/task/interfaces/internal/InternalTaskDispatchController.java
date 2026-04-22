@@ -1,6 +1,7 @@
 package com.example.cae.task.interfaces.internal;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
@@ -8,6 +9,7 @@ import com.example.cae.task.interfaces.request.InternalTaskFailRequest;
 import com.example.cae.task.interfaces.request.NodeOfflineTasksRequest;
 import com.example.cae.task.interfaces.request.TaskNodeMarkRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,24 +35,19 @@ public class InternalTaskDispatchController {
 	}
 
 	@PostMapping("/{taskId}/mark-scheduled")
-	public Result<TaskScheduleClaimDTO> markScheduled(@PathVariable("taskId") Long taskId,
-								 @RequestBody(required = false) TaskNodeMarkRequest request,
-							 @RequestParam(value = "nodeId", required = false) Long nodeId) {
-		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
-		return Result.success(taskDispatchManager.markScheduled(taskId, effectiveNodeId));
+	public Result<TaskScheduleClaimDTO> markScheduled(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+								 @Valid @RequestBody TaskNodeMarkRequest request) {
+		return Result.success(taskDispatchManager.markScheduled(taskId, request.getNodeId()));
 	}
 
 	@PostMapping("/{taskId}/mark-dispatched")
-	public Result<Void> markDispatched(@PathVariable("taskId") Long taskId,
-								  @RequestBody(required = false) TaskNodeMarkRequest request,
-							  @RequestParam(value = "nodeId", required = false) Long nodeId) {
-		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;
-		taskDispatchManager.markDispatched(taskId, effectiveNodeId);
-		return Result.success();
+	public Result<TaskDispatchAckDTO> markDispatched(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+								  @Valid @RequestBody TaskNodeMarkRequest request) {
+		return Result.success(taskDispatchManager.markDispatched(taskId, request.getNodeId()));
 	}
 
 	@PostMapping("/{taskId}/dispatch-failed")
-	public Result<Void> markFailed(@PathVariable("taskId") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
+	public Result<Void> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
 		taskDispatchManager.markFailed(taskId, request.getNodeId(), request.getFailType(), request.getReason(), request.getRecoverable());
 		return Result.success();
 	}

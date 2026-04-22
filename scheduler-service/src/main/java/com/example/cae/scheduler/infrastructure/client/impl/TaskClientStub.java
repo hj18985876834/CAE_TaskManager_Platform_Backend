@@ -1,6 +1,7 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
@@ -74,11 +75,29 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	public void markTaskDispatched(Long taskId, Long nodeId) {
+	public TaskDispatchAckDTO markTaskDispatched(Long taskId, Long nodeId) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-dispatched";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
-		restTemplate.postForEntity(url, request, Result.class);
+		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		if (result == null || result.getData() == null) {
+			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
+			response.setTaskId(taskId);
+			response.setNodeId(nodeId);
+			return response;
+		}
+		Object data = result.getData();
+		if (data instanceof java.util.Map<?, ?> map) {
+			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
+			response.setTaskId(toLong(map.get("taskId"), taskId));
+			response.setNodeId(toLong(map.get("nodeId"), nodeId));
+			response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
+			return response;
+		}
+		TaskDispatchAckDTO response = new TaskDispatchAckDTO();
+		response.setTaskId(taskId);
+		response.setNodeId(nodeId);
+		return response;
 	}
 
 	@Override

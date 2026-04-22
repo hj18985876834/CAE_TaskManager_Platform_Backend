@@ -1,6 +1,7 @@
 package com.example.cae.task.application.manager;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskFileDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.dto.TaskDTO;
@@ -88,7 +89,7 @@ public class TaskDispatchManager {
 	}
 
 	@Transactional
-	public void markDispatched(Long taskId, Long nodeId) {
+	public TaskDispatchAckDTO markDispatched(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
@@ -98,13 +99,14 @@ public class TaskDispatchManager {
 					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
 					.contains(task.getStatus())) {
 				ensureTaskBoundToNode(task, nodeId);
-				return;
+				return buildDispatchAck(task, nodeId);
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch confirm: " + task.getStatus());
 		}
 		ensureTaskBoundToNode(task, nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
+		return buildDispatchAck(task, nodeId);
 	}
 
 	@Transactional
@@ -145,6 +147,14 @@ public class TaskDispatchManager {
 		if (!task.getNodeId().equals(nodeId)) {
 			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "nodeId does not match task bound node");
 		}
+	}
+
+	private TaskDispatchAckDTO buildDispatchAck(Task task, Long nodeId) {
+		TaskDispatchAckDTO response = new TaskDispatchAckDTO();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setNodeId(nodeId);
+		response.setStatus(task == null ? null : task.getStatus());
+		return response;
 	}
 
 	private TaskScheduleClaimDTO buildScheduleClaimResult(Boolean claimed, Task task, Long requestedNodeId) {
