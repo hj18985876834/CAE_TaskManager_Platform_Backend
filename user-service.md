@@ -358,7 +358,6 @@ user-service/src/main/java/com/example/cae/user/interfaces/controller/
 - `POST /api/users`
 - `GET /api/users/{id}`
 - `PUT /api/users/{id}`
-- `PUT /api/users/{id}/status`
 - `POST /api/users/{id}/status`
 - `POST /api/users/{id}/reset-password`
 
@@ -1450,7 +1449,7 @@ UserController.createUser
 
 ### 16.4 当前代码中的几个实现细节，文档里建议明确说明
 
-- `UserController` 同时支持 `PUT /api/users/{id}/status` 和 `POST /api/users/{id}/status`。
+- `UserController` 已收口为只保留正式接口 `POST /api/users/{id}/status`。
 - `AuthController.logout` 当前没有调用应用层。
 - `UserStatusEnum` 已定义，但主流程仍直接使用 `0/1`。
 - `User.roleCode` 字段存在，但仓储层未填充。
@@ -1531,4 +1530,3 @@ UserController.createUser
 因此，在论文或模块说明中，最合适的表述应该是：
 
 > `user-service` 已完成平台用户登录、当前用户查询、用户管理和内部用户信息服务等基础能力，采用标准分层架构实现用户主数据管理与认证流程编排，并与网关服务协作形成统一访问闭环；当前实现重点满足原型平台演示与联调需要，在 token 安全性、权限粒度和配置扩展性方面仍保留进一步增强空间。
-

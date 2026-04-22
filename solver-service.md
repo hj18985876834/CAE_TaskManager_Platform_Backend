@@ -335,7 +335,6 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/controller/
 - `GET /api/solvers/{solverId}`
 - `POST /api/solvers`
 - `PUT /api/solvers/{solverId}`
-- `PUT /api/solvers/{solverId}/status`
 - `POST /api/solvers/{solverId}/status`
 - `GET /api/solvers/{solverId}/profiles`
 - `GET /api/solvers/{solverId}/task-options`
@@ -368,7 +367,6 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/controller/
 - `GET /api/profiles/{profileId}`
 - `POST /api/profiles`
 - `PUT /api/profiles/{profileId}`
-- `PUT /api/profiles/{profileId}/status`
 - `POST /api/profiles/{profileId}/status`
 - `GET /api/profiles/{profileId}/upload-spec`
 - `GET /api/profiles/{profileId}/file-rules`
@@ -1656,4 +1654,3 @@ InternalProfileController.getProfileDetail
 因此，在论文或设计文档里比较准确的表述应该是：
 
 > `solver-service` 已实现平台求解器定义、任务模板、模板文件规则及上传规范生成等核心能力，作为平台中的规则与元数据中心，为前端任务创建和 task-service 模板校验提供统一配置来源；当前实现重点满足原型平台的可配置性与可扩展性需求，在执行模式约束、动态配置能力和部分工具类接入深度方面仍保留后续增强空间。
-

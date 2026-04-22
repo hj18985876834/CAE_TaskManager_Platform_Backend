@@ -983,14 +983,14 @@ node-agent/src/main/java/com/example/cae/nodeagent/infrastructure/client/
 
 - `POST /api/node-agent/register`
 - `POST /api/node-agent/heartbeat`
-- `POST /internal/nodes/{nodeId}/running-count`
+- `POST /internal/tasks/{taskId}/dispatch-failed`
 
 其中有几个非常关键的实现细节：
 
 - 注册时会把 `solverIds` 转成 `solvers[{solverId, solverVersion}]`
 - 注册成功后会把返回的 `nodeId` 和 `nodeToken` 回写到 `NodeAgentConfig`
 - 心跳请求会通过请求头携带 `X_NODE_TOKEN`
-- 调整运行数时，如果 `delta == 0` 或 `nodeId == null` 会直接跳过
+- 执行前失败不会再直接回写 task-service，而是先回调 scheduler-service，由调度服务统一驱动任务状态回写与预占释放
 
 #### `impl/TaskReportClientImpl.java`
 
@@ -1249,7 +1249,7 @@ node-agent/src/main/java/com/example/cae/nodeagent/support/
 
 - `POST /api/node-agent/register`
 - `POST /api/node-agent/heartbeat`
-- `POST /internal/nodes/{nodeId}/running-count`
+- `POST /internal/tasks/{taskId}/dispatch-failed`
 
 对应代码链路：
 

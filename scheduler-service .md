@@ -322,21 +322,19 @@ scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/controller/
 scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/internal/
 ```
 
-#### `NodeRegisterController.java`
+#### 旧式节点接入接口
 
-旧式内部节点注册接口：
+旧式内部节点注册/心跳接口已经移除：
 
 - `POST /internal/scheduler/nodes/register`
-
-它接收的是 `NodeRegisterRequest`，只上报 `solverIds`，不带版本信息。当前主链路已经更多走 `NodeAgentController`，但这个接口仍保留，适合兼容更简单的内部调用方式。
-
-#### `NodeHeartbeatController.java`
-
-旧式内部节点心跳接口：
-
 - `POST /internal/scheduler/nodes/heartbeat`
 
-和 `NodeAgentController` 相比，它不要求节点 token，更像是内部受信任调用接口。
+当前节点接入统一由 `NodeAgentController` 承担，正式入口是：
+
+- `POST /api/node-agent/register`
+- `POST /api/node-agent/heartbeat`
+
+这样可以保证节点注册、节点 token、求解器能力版本上报都走同一套合同。
 
 #### `InternalSchedulerController.java`
 
@@ -344,9 +342,11 @@ scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/internal/
 
 - `GET /internal/nodes/available`：按求解器查询可用节点
 - `POST /internal/schedules`：写入调度记录
-- `POST /internal/nodes/{nodeId}/running-count`：调整节点运行任务数
+- `POST /internal/nodes/{nodeId}/reserve`：预占节点容量
+- `POST /internal/nodes/{nodeId}/release-reservation`：释放节点预占
 - `POST /internal/nodes/{nodeId}/cancel-task`：向节点发起取消任务
 - `GET /internal/nodes/{nodeId}/token/verify`：校验节点 token
+- `POST /internal/tasks/{taskId}/dispatch-failed`：接收 node-agent 的执行前失败回调，并统一驱动任务状态回写与预占释放
 
 其中最关键的是最后一个接口。`task-service` 在接收 `node-agent` 状态回传时，会调用这里确认“当前回传者是否真的是绑定该任务的节点”。
 

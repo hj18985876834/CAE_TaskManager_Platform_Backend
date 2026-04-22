@@ -1,5 +1,7 @@
 package com.example.cae.task.infrastructure.client;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.config.TaskRemoteServiceProperties;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -32,7 +34,8 @@ public class SchedulerClient {
 		Map<String, Object> body = new java.util.HashMap<>();
 		body.put("taskId", taskId);
 		body.put("reason", reason);
-		restTemplate.postForEntity(url, body, Result.class);
+		Result<?> result = restTemplate.postForObject(url, body, Result.class);
+		ensureSuccess(result, "cancel task on node");
 	}
 
 	@SuppressWarnings("unchecked")
@@ -204,6 +207,15 @@ public class SchedulerClient {
 			return bool;
 		}
 		return Boolean.parseBoolean(String.valueOf(data));
+	}
+
+	private void ensureSuccess(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
+		}
 	}
 
 	private Integer toInteger(Object value) {

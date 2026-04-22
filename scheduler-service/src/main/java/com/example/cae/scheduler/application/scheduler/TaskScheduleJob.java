@@ -9,6 +9,8 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
@@ -17,6 +19,7 @@ import java.util.List;
 
 @Component
 public class TaskScheduleJob {
+	private static final Logger log = LoggerFactory.getLogger(TaskScheduleJob.class);
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -47,27 +50,58 @@ public class TaskScheduleJob {
 				TaskDispatchAckDTO dispatchAck = markTaskDispatchedQuietly(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
 			} catch (Exception ex) {
-				if (nodeId != null && !taskMarkedScheduled) {
-					taskScheduleManager.releaseNodeReservation(nodeId, task == null ? null : task.getTaskId());
-				}
-				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
-					taskScheduleManager.handleDispatchFailure(
-							task.getTaskId(),
-							nodeId,
-							FailTypeEnum.DISPATCH_ERROR.name(),
-							ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
-							isRecoverableDispatchError(ex)
-					);
-				}
-				if (!(taskMarkedScheduled && !dispatchAccepted)) {
-					taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
-				}
+				handleScheduleException(task, nodeId, taskMarkedScheduled, dispatchAccepted, ex);
 			}
 		}
 	}
 
+	private void handleScheduleException(TaskDTO task,
+										 Long nodeId,
+										 boolean taskMarkedScheduled,
+										 boolean dispatchAccepted,
+										 Exception ex) {
+		if (nodeId != null && !taskMarkedScheduled) {
+			releaseReservationQuietly(nodeId, task == null ? null : task.getTaskId());
+		}
+		if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
+			handleDispatchFailureQuietly(task.getTaskId(), nodeId, ex);
+			return;
+		}
+		recordScheduleFailureQuietly(task == null ? null : task.getTaskId(), nodeId, ex);
+	}
+
 	private TaskDispatchAckDTO markTaskDispatchedQuietly(Long taskId, Long nodeId) {
 		return taskClient.markTaskDispatched(taskId, nodeId);
+	}
+
+	private void releaseReservationQuietly(Long nodeId, Long taskId) {
+		try {
+			taskScheduleManager.releaseNodeReservation(nodeId, taskId);
+		} catch (Exception releaseEx) {
+			recordScheduleFailureQuietly(taskId, nodeId, releaseEx);
+		}
+	}
+
+	private void handleDispatchFailureQuietly(Long taskId, Long nodeId, Exception ex) {
+		try {
+			taskScheduleManager.handleDispatchFailure(
+					taskId,
+					nodeId,
+					FailTypeEnum.DISPATCH_ERROR.name(),
+					ex == null || ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
+					isRecoverableDispatchError(ex)
+			);
+		} catch (Exception callbackEx) {
+			recordScheduleFailureQuietly(taskId, nodeId, callbackEx);
+		}
+	}
+
+	private void recordScheduleFailureQuietly(Long taskId, Long nodeId, Exception ex) {
+		try {
+			taskScheduleManager.recordScheduleFailure(taskId, nodeId, ex == null ? null : ex.getMessage());
+		} catch (Exception recordEx) {
+			log.warn("failed to record schedule failure, taskId={}, nodeId={}", taskId, nodeId, recordEx);
+		}
 	}
 
 	private String buildDispatchSuccessMessage(TaskDispatchAckDTO dispatchAck) {
