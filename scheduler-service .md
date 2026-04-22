@@ -296,9 +296,10 @@ scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/controller/
 调度记录查询接口，对外暴露：
 
 - `GET /api/schedules`：分页查询调度记录
-- `GET /api/tasks/{taskId}/schedules`：查看某个任务的全部调度记录
 
-这是“调度监控页面”的主要数据入口。
+其中单任务调度记录查询 `/api/tasks/{taskId}/schedules` 已收口到 `task-service`，由任务服务先完成任务归属/管理员权限校验，再通过内部链路访问调度记录。
+
+这里保留的 `ScheduleController` 只负责全局调度记录分页查询，是“调度监控页面”的主要数据入口。
 
 #### `NodeAgentController.java`
 

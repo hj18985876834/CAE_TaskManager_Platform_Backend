@@ -10,9 +10,9 @@ public class InternalScheduleRecordRequest {
 	private Long taskId;
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
-	@Size(max = 64, message = "strategyName长度不能超过64")
+	@Size(max = 50, message = "strategyName长度不能超过50")
 	private String strategyName;
-	@Size(max = 32, message = "scheduleStatus长度不能超过32")
+	@Size(max = 30, message = "scheduleStatus长度不能超过30")
 	private String scheduleStatus;
 	@Size(max = 255, message = "scheduleMessage长度不能超过255")
 	private String scheduleMessage;

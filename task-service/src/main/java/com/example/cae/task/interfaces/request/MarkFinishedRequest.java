@@ -13,7 +13,7 @@ public class MarkFinishedRequest {
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
 	@NotBlank(message = "finalStatus不能为空")
-	@Size(max = 32, message = "finalStatus长度不能超过32")
+	@Size(max = 30, message = "finalStatus长度不能超过30")
 	private String finalStatus;
 
 	public Long getNodeId() {

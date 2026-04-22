@@ -4,7 +4,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 public class UpdateUserRequest {
-	@Size(max = 64, message = "realName长度不能超过64")
+	@Size(max = 50, message = "realName长度不能超过50")
 	private String realName;
 	@Positive(message = "roleId必须大于0")
 	private Long roleId;

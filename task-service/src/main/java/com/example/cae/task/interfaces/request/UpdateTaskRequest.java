@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Map;
 
 public class UpdateTaskRequest {
-	@Size(max = 128, message = "taskName长度不能超过128")
+	@Size(max = 100, message = "taskName长度不能超过100")
 	private String taskName;
 	@Min(value = 0, message = "priority不能小于0")
 	private Integer priority;

@@ -21,7 +21,7 @@ public class GatewayRouteConfig {
                         .uri(gatewayRouteProperties.getUserServiceUri()))
                 .route("solver-service", r -> r.path("/api/solvers/**", "/api/profiles/**", "/api/file-rules/**")
                         .uri(gatewayRouteProperties.getSolverServiceUri()))
-                .route("scheduler-service", r -> r.path("/api/node-agent/**", "/api/scheduler/nodes/**", "/api/scheduler/records/**", "/api/nodes/**", "/api/schedules/**")
+                .route("scheduler-service", r -> r.path("/api/node-agent/**", "/api/nodes/**", "/api/schedules/**")
                         .uri(gatewayRouteProperties.getSchedulerServiceUri()))
                 .route("task-service", r -> r.path("/api/tasks/**", "/api/admin/tasks/**", "/api/admin/dashboard/**")
                         .uri(gatewayRouteProperties.getTaskServiceUri()))

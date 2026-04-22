@@ -21,7 +21,7 @@ public class CreateProfileRequest {
 	@Size(max = 100, message = "profileName长度不能超过100")
 	private String profileName;
 	@NotBlank(message = "uploadMode不能为空")
-	@Size(max = 32, message = "uploadMode长度不能超过32")
+	@Size(max = 30, message = "uploadMode长度不能超过30")
 	private String uploadMode;
 	@NotBlank(message = "commandTemplate不能为空")
 	@Size(max = 255, message = "commandTemplate长度不能超过255")

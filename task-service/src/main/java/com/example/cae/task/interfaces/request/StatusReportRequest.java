@@ -9,15 +9,15 @@ public class StatusReportRequest {
 	@NotNull(message = "nodeId不能为空")
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
-	@Size(max = 32, message = "fromStatus长度不能超过32")
+	@Size(max = 30, message = "fromStatus长度不能超过30")
 	private String fromStatus;
-	@Size(max = 32, message = "toStatus长度不能超过32")
+	@Size(max = 30, message = "toStatus长度不能超过30")
 	private String toStatus;
 	@Size(max = 255, message = "changeReason长度不能超过255")
 	private String changeReason;
-	@Size(max = 32, message = "operatorType长度不能超过32")
+	@Size(max = 30, message = "operatorType长度不能超过30")
 	private String operatorType;
-	@Size(max = 32, message = "status长度不能超过32")
+	@Size(max = 30, message = "status长度不能超过30")
 	private String status;
 	@Size(max = 255, message = "reason长度不能超过255")
 	private String reason;

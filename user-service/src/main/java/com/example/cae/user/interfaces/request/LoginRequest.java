@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 
 public class LoginRequest {
 	@NotBlank(message = "username不能为空")
-	@Size(max = 64, message = "username长度不能超过64")
+	@Size(max = 50, message = "username长度不能超过50")
 	private String username;
 	@NotBlank(message = "password不能为空")
 	@Size(max = 64, message = "password长度不能超过64")

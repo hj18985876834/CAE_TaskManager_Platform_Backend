@@ -79,13 +79,16 @@ Current scheduler public paths are:
 
 - /api/nodes
 - /api/schedules
+
+Task-owned schedule timeline path is exposed by task-service:
+
 - /api/tasks/{taskId}/schedules
 
 Gateway route config should at least forward:
 
 - /api/nodes/**
 - /api/schedules/**
-- /api/tasks/*/schedules
+- /api/tasks/**
 
 Result:
 

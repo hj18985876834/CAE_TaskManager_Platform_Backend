@@ -11,7 +11,7 @@ public class ResultFileReportRequest {
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
 	@NotBlank(message = "fileType不能为空")
-	@Size(max = 32, message = "fileType长度不能超过32")
+	@Size(max = 30, message = "fileType长度不能超过30")
 	private String fileType;
 	@NotBlank(message = "fileName不能为空")
 	@Size(max = 255, message = "fileName长度不能超过255")

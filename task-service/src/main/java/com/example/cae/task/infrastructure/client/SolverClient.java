@@ -1,6 +1,8 @@
 package com.example.cae.task.infrastructure.client;
 
 import com.example.cae.common.dto.FileRuleDTO;
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.config.TaskRemoteServiceProperties;
 import org.springframework.stereotype.Component;
@@ -94,6 +96,7 @@ public class SolverClient {
 	public Object getUploadSpec(Long profileId) {
 		String url = solverServiceBaseUrl + "/api/profiles/" + profileId + "/upload-spec";
 		Result<?> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get upload spec");
 		return result == null ? null : result.getData();
 	}
 
@@ -136,6 +139,7 @@ public class SolverClient {
 	public SolverMeta getSolverMeta(Long solverId) {
 		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get solver meta");
 		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
 			return null;
 		}
@@ -164,10 +168,20 @@ public class SolverClient {
 	private Map<String, Object> getInternalProfileMap(Long profileId) {
 		String url = solverServiceBaseUrl + "/internal/profiles/" + profileId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get internal profile");
 		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
 			return null;
 		}
 		return (Map<String, Object>) map;
+	}
+
+	private void ensureSuccess(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
+		}
 	}
 
 	private String toString(Object value) {

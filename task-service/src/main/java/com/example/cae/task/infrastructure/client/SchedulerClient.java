@@ -47,12 +47,7 @@ public class SchedulerClient {
 		Map<String, Object> body = new java.util.HashMap<>();
 		body.put("taskId", taskId);
 		Result<Object> result = restTemplate.postForObject(url, body, Result.class);
-		if (result == null) {
-			return null;
-		}
-		if (result.getCode() != null && result.getCode() != 0) {
-			throw new com.example.cae.common.exception.BizException(result.getCode(), result.getMessage(), result.getData());
-		}
+		ensureSuccess(result, "release node reservation");
 		if (!(result.getData() instanceof Map<?, ?> dataMap)) {
 			return null;
 		}
@@ -71,6 +66,7 @@ public class SchedulerClient {
 		}
 		String url = schedulerServiceBaseUrl + "/api/nodes/" + nodeId;
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get node name");
 		if (result == null || !(result.getData() instanceof java.util.Map<?, ?> map)) {
 			return null;
 		}
@@ -94,6 +90,7 @@ public class SchedulerClient {
 				.queryParam("solverId", solverId)
 				.toUriString();
 		Result<Object> availableResult = restTemplate.getForObject(availableUrl, Result.class);
+		ensureSuccess(availableResult, "fetch dispatchable node count");
 		if (availableResult == null || !(availableResult.getData() instanceof List<?> records)) {
 			return 0;
 		}
@@ -111,6 +108,7 @@ public class SchedulerClient {
 				.queryParam("pageSize", 1)
 				.toUriString();
 		Result<Object> result = restTemplate.getForObject(onlineUrl, Result.class);
+		ensureSuccess(result, "fetch online enabled capable node count");
 		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
 			return 0;
 		}
@@ -126,6 +124,7 @@ public class SchedulerClient {
 				.queryParam("pageSize", 1000)
 				.toUriString();
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get online node summary");
 		if (result == null || !(result.getData() instanceof Map<?, ?> pageMap)) {
 			return NodeSummary.empty();
 		}
@@ -168,6 +167,7 @@ public class SchedulerClient {
 		}
 		String url = schedulerServiceBaseUrl + "/internal/tasks/" + taskId + "/schedules";
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "list task schedule records");
 		if (result == null || !(result.getData() instanceof List<?> rows)) {
 			return List.of();
 		}
@@ -199,6 +199,7 @@ public class SchedulerClient {
 				.buildAndExpand(nodeId)
 				.toUriString();
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "verify node token");
 		if (result == null || result.getData() == null) {
 			return false;
 		}

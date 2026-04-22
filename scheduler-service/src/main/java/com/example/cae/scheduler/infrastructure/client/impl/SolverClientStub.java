@@ -1,5 +1,7 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
@@ -22,6 +24,7 @@ public class SolverClientStub implements SolverClient {
 	public SolverMeta getSolverMeta(Long solverId) {
 		String url = solverServiceBaseUrl + "/internal/solvers/" + solverId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get solver meta");
 		if (result == null || !(result.getData() instanceof Map<?, ?> rawMap)) {
 			return null;
 		}
@@ -39,6 +42,7 @@ public class SolverClientStub implements SolverClient {
 	public ProfileMeta getProfileMeta(Long profileId) {
 		String url = solverServiceBaseUrl + "/internal/profiles/" + profileId;
 		Result<?> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get profile meta");
 		if (result == null || !(result.getData() instanceof Map<?, ?> rawMap)) {
 			return null;
 		}
@@ -75,5 +79,14 @@ public class SolverClientStub implements SolverClient {
 			return number.intValue();
 		}
 		return Integer.parseInt(String.valueOf(value));
+	}
+
+	private void ensureSuccess(Result<?> result, String action) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
+		}
 	}
 }

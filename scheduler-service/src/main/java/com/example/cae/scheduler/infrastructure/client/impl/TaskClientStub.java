@@ -12,6 +12,7 @@ import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -85,12 +86,18 @@ public class TaskClientStub implements TaskClient {
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
 	public TaskScheduleClaimDTO markTaskScheduled(Long taskId, Long nodeId) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-scheduled";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
-		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ResponseEntity<Result<TaskScheduleClaimDTO>> httpResponse = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<TaskScheduleClaimDTO>>() {
+				}
+		);
+		Result<TaskScheduleClaimDTO> result = httpResponse.getBody();
 		ensureSuccess(result, "mark task scheduled");
 		if (result == null || result.getData() == null) {
 			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
@@ -99,20 +106,17 @@ public class TaskClientStub implements TaskClient {
 			response.setNodeId(nodeId);
 			return response;
 		}
-		Object data = result.getData();
-		if (data instanceof java.util.Map<?, ?> map) {
-			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
-			response.setClaimed(toBoolean(map.get("claimed")));
-			response.setTaskId(toLong(map.get("taskId"), taskId));
-			response.setNodeId(toLong(map.get("nodeId"), nodeId));
-			response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
-			return response;
+		TaskScheduleClaimDTO responseData = result.getData();
+		if (responseData.getTaskId() == null) {
+			responseData.setTaskId(taskId);
 		}
-		TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
-		response.setClaimed(Boolean.parseBoolean(String.valueOf(data)));
-		response.setTaskId(taskId);
-		response.setNodeId(nodeId);
-		return response;
+		if (responseData.getNodeId() == null) {
+			responseData.setNodeId(nodeId);
+		}
+		if (responseData.getClaimed() == null) {
+			responseData.setClaimed(Boolean.FALSE);
+		}
+		return responseData;
 	}
 
 	@Override
@@ -120,7 +124,14 @@ public class TaskClientStub implements TaskClient {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-dispatched";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
-		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ResponseEntity<Result<TaskDispatchAckDTO>> httpResponse = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<TaskDispatchAckDTO>>() {
+				}
+		);
+		Result<TaskDispatchAckDTO> result = httpResponse.getBody();
 		ensureSuccess(result, "mark task dispatched");
 		if (result == null || result.getData() == null) {
 			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
@@ -128,18 +139,14 @@ public class TaskClientStub implements TaskClient {
 			response.setNodeId(nodeId);
 			return response;
 		}
-		Object data = result.getData();
-		if (data instanceof java.util.Map<?, ?> map) {
-			TaskDispatchAckDTO response = new TaskDispatchAckDTO();
-			response.setTaskId(toLong(map.get("taskId"), taskId));
-			response.setNodeId(toLong(map.get("nodeId"), nodeId));
-			response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
-			return response;
+		TaskDispatchAckDTO responseData = result.getData();
+		if (responseData.getTaskId() == null) {
+			responseData.setTaskId(taskId);
 		}
-		TaskDispatchAckDTO response = new TaskDispatchAckDTO();
-		response.setTaskId(taskId);
-		response.setNodeId(nodeId);
-		return response;
+		if (responseData.getNodeId() == null) {
+			responseData.setNodeId(nodeId);
+		}
+		return responseData;
 	}
 
 	@Override
@@ -150,16 +157,23 @@ public class TaskClientStub implements TaskClient {
 		request.put("failType", failType);
 		request.put("reason", reason);
 		request.put("recoverable", recoverable);
-		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ResponseEntity<Result<TaskStatusAckDTO>> response = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<TaskStatusAckDTO>>() {
+				}
+		);
+		Result<TaskStatusAckDTO> result = response.getBody();
 		ensureSuccess(result, "mark task dispatch failed");
-		TaskStatusAckDTO response = new TaskStatusAckDTO();
-		response.setTaskId(taskId);
-		if (result == null || !(result.getData() instanceof Map<?, ?> map)) {
-			return response;
+		TaskStatusAckDTO responseData = result == null ? null : result.getData();
+		if (responseData == null) {
+			responseData = new TaskStatusAckDTO();
 		}
-		response.setTaskId(toLong(map.get("taskId"), taskId));
-		response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
-		return response;
+		if (responseData.getTaskId() == null) {
+			responseData.setTaskId(taskId);
+		}
+		return responseData;
 	}
 
 	@Override
@@ -168,50 +182,19 @@ public class TaskClientStub implements TaskClient {
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		request.put("reason", reason);
-		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
+		ResponseEntity<Result<Integer>> response = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<Integer>>() {
+				}
+		);
+		Result<Integer> result = response.getBody();
 		ensureSuccess(result, "mark node offline tasks failed");
 		if (result == null || result.getData() == null) {
 			return 0;
 		}
-		return toInteger(result.getData(), 0);
-	}
-
-	private Boolean toBoolean(Object value) {
-		if (value == null) {
-			return Boolean.FALSE;
-		}
-		if (value instanceof Boolean bool) {
-			return bool;
-		}
-		return Boolean.parseBoolean(String.valueOf(value));
-	}
-
-	private Long toLong(Object value, Long defaultValue) {
-		if (value == null) {
-			return defaultValue;
-		}
-		if (value instanceof Number number) {
-			return number.longValue();
-		}
-		try {
-			return Long.parseLong(String.valueOf(value));
-		} catch (NumberFormatException ex) {
-			return defaultValue;
-		}
-	}
-
-	private Integer toInteger(Object value, Integer defaultValue) {
-		if (value == null) {
-			return defaultValue;
-		}
-		if (value instanceof Number number) {
-			return number.intValue();
-		}
-		try {
-			return Integer.parseInt(String.valueOf(value));
-		} catch (NumberFormatException ex) {
-			return defaultValue;
-		}
+		return result.getData();
 	}
 
 	private void ensureSuccess(Result<?> result, String action) {

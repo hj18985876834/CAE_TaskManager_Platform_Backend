@@ -7,13 +7,13 @@ import jakarta.validation.constraints.Size;
 
 public class CreateSolverRequest {
 	@NotBlank(message = "solverCode不能为空")
-	@Size(max = 64, message = "solverCode长度不能超过64")
+	@Size(max = 50, message = "solverCode长度不能超过50")
 	private String solverCode;
 	@NotBlank(message = "solverName不能为空")
-	@Size(max = 128, message = "solverName长度不能超过128")
+	@Size(max = 100, message = "solverName长度不能超过100")
 	private String solverName;
 	@NotBlank(message = "version不能为空")
-	@Size(max = 64, message = "version长度不能超过64")
+	@Size(max = 50, message = "version长度不能超过50")
 	private String version;
 	@NotBlank(message = "execMode不能为空")
 	private String execMode;
@@ -92,4 +92,3 @@ public class CreateSolverRequest {
 		this.remark = remark;
 	}
 }
-

@@ -11,13 +11,13 @@ import java.util.List;
 
 public class NodeAgentRegisterRequest {
 	@NotBlank(message = "nodeCode不能为空")
-	@Size(max = 64, message = "nodeCode长度不能超过64")
+	@Size(max = 50, message = "nodeCode长度不能超过50")
 	private String nodeCode;
 	@NotBlank(message = "nodeName不能为空")
-	@Size(max = 128, message = "nodeName长度不能超过128")
+	@Size(max = 100, message = "nodeName长度不能超过100")
 	private String nodeName;
 	@NotBlank(message = "host不能为空")
-	@Size(max = 128, message = "host长度不能超过128")
+	@Size(max = 100, message = "host长度不能超过100")
 	private String host;
 	@NotNull(message = "port不能为空")
 	@Positive(message = "port必须大于0")
@@ -82,7 +82,7 @@ public class NodeAgentRegisterRequest {
 		@Positive(message = "solverId必须大于0")
 		private Long solverId;
 		@NotBlank(message = "solverVersion不能为空")
-		@Size(max = 64, message = "solverVersion长度不能超过64")
+		@Size(max = 50, message = "solverVersion长度不能超过50")
 		private String solverVersion;
 
 		public Long getSolverId() {

@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class CreateTaskRequest {
 	@NotBlank(message = "taskName不能为空")
-	@Size(max = 128, message = "taskName长度不能超过128")
+	@Size(max = 100, message = "taskName长度不能超过100")
 	private String taskName;
 	@NotNull(message = "solverId不能为空")
 	@Positive(message = "solverId必须大于0")
@@ -20,7 +20,7 @@ public class CreateTaskRequest {
 	@Positive(message = "profileId必须大于0")
 	private Long profileId;
 	@NotBlank(message = "taskType不能为空")
-	@Size(max = 64, message = "taskType长度不能超过64")
+	@Size(max = 50, message = "taskType长度不能超过50")
 	private String taskType;
 	@Min(value = 0, message = "priority不能小于0")
 	private Integer priority;

@@ -223,10 +223,7 @@ gateway-service/src/main/java/com/example/cae/gateway/config/
   - `/api/profiles/**`
   - `/api/file-rules/**`
 - `scheduler-service`
-  - `/api/tasks/*/schedules`
   - `/api/node-agent/**`
-  - `/api/scheduler/nodes/**`
-  - `/api/scheduler/records/**`
   - `/api/nodes/**`
   - `/api/schedules/**`
 - `task-service`
@@ -236,10 +233,10 @@ gateway-service/src/main/java/com/example/cae/gateway/config/
 
 这里有一个很关键的实现细节：
 
-- `/api/tasks/*/schedules` 被单独提前路由到 `scheduler-service`
-- 而 `/api/tasks/**` 的其余请求走 `task-service`
+- `/api/tasks/**` 统一走 `task-service`
+- 单任务调度记录查询 `/api/tasks/{taskId}/schedules` 也由 `task-service` 承担权限校验后再访问调度记录
 
-这说明网关已经显式处理了“同一前缀下不同职责服务”的路由拆分问题。
+这说明网关不再把任务归属敏感接口直接路由到 `scheduler-service`，避免绕过任务归属或管理员权限边界。
 
 #### `CorsConfig.java`
 
@@ -554,10 +551,7 @@ Token 提取工具。
 
 路径包括：
 
-- `/api/tasks/*/schedules`
 - `/api/node-agent/**`
-- `/api/scheduler/nodes/**`
-- `/api/scheduler/records/**`
 - `/api/nodes/**`
 - `/api/schedules/**`
 
