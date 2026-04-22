@@ -41,7 +41,7 @@ public class ProfileController {
 	}
 
 	@GetMapping("/{profileId}")
-	public Result<ProfileDetailResponse> getProfileDetail(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId) {
+	public Result<ProfileDetailResponse> getProfileDetail(@PathVariable("profileId") @Positive(message = "profileId must be greater than 0") Long profileId) {
 		return Result.success(profileFacade.getProfileDetail(profileId));
 	}
 
@@ -51,31 +51,26 @@ public class ProfileController {
 	}
 
 	@PutMapping("/{profileId}")
-	public Result<Void> updateProfile(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId, @Valid @RequestBody UpdateProfileRequest request) {
+	public Result<Void> updateProfile(@PathVariable("profileId") @Positive(message = "profileId must be greater than 0") Long profileId,
+									  @Valid @RequestBody UpdateProfileRequest request) {
 		profileFacade.updateProfile(profileId, request);
 		return Result.success();
 	}
 
-	@PutMapping("/{profileId}/status")
-	public Result<Void> updateProfileStatus(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId, @Valid @RequestBody UpdateProfileStatusRequest request) {
-		profileFacade.updateProfileStatus(profileId, request);
-		return Result.success();
-	}
-
 	@PostMapping("/{profileId}/status")
-	public Result<Void> updateProfileStatusPost(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId, @Valid @RequestBody UpdateProfileStatusRequest request) {
+	public Result<Void> updateProfileStatusPost(@PathVariable("profileId") @Positive(message = "profileId must be greater than 0") Long profileId,
+												@Valid @RequestBody UpdateProfileStatusRequest request) {
 		profileFacade.updateProfileStatus(profileId, request);
 		return Result.success();
 	}
 
 	@GetMapping("/{profileId}/upload-spec")
-	public Result<UploadSpecResponse> getUploadSpec(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId) {
+	public Result<UploadSpecResponse> getUploadSpec(@PathVariable("profileId") @Positive(message = "profileId must be greater than 0") Long profileId) {
 		return Result.success(profileFacade.buildUploadSpec(profileId));
 	}
 
 	@GetMapping("/{profileId}/file-rules")
-	public Result<List<FileRuleResponse>> getFileRules(@PathVariable("profileId") @Positive(message = "profileId必须大于0") Long profileId) {
+	public Result<List<FileRuleResponse>> getFileRules(@PathVariable("profileId") @Positive(message = "profileId must be greater than 0") Long profileId) {
 		return Result.success(profileFacade.getFileRules(profileId));
 	}
 }
-

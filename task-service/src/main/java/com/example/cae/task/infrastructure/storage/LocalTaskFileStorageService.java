@@ -1,5 +1,6 @@
 package com.example.cae.task.infrastructure.storage;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.enums.FileRoleEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.TaskFile;
@@ -28,7 +29,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 	@Override
 	public TaskFile saveInputFile(Long taskId, MultipartFile file, String fileKey, String fileRole) {
 		if (file == null || file.isEmpty()) {
-			throw new BizException(400, "file is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "file is required");
 		}
 		String normalizedFileRole = normalizeFileRole(fileRole);
 		String fileName = file.getOriginalFilename() == null ? "unknown.bin" : file.getOriginalFilename();
@@ -38,7 +39,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		try {
 			path = Path.of(dir, fileName);
 		} catch (InvalidPathException ex) {
-			throw new BizException(400, "invalid file name");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid file name");
 		}
 		try {
 			Files.createDirectories(path.getParent());
@@ -119,7 +120,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		try {
 			return FileRoleEnum.valueOf(fileRole.trim().toUpperCase()).name();
 		} catch (IllegalArgumentException ex) {
-			throw new BizException(400, "unsupported fileRole: " + fileRole);
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported fileRole: " + fileRole);
 		}
 	}
 

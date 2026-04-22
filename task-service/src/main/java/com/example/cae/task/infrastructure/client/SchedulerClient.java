@@ -138,12 +138,14 @@ public class SchedulerClient {
 				continue;
 			}
 			onlineCount++;
+			Integer enabled = toInteger(nodeMap.get("enabled"));
+			if (enabled == null || enabled != 1) {
+				continue;
+			}
 			Integer runningCount = toInteger(nodeMap.get("runningCount"));
-			Integer reservedCount = toInteger(nodeMap.get("reservedCount"));
 			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
 			if (runningCount != null && maxConcurrency != null && maxConcurrency > 0) {
-				int effectiveLoad = runningCount + (reservedCount == null ? 0 : reservedCount);
-				totalLoad = totalLoad.add(BigDecimal.valueOf(effectiveLoad)
+				totalLoad = totalLoad.add(BigDecimal.valueOf(runningCount)
 						.divide(BigDecimal.valueOf(maxConcurrency), 4, RoundingMode.HALF_UP));
 				loadSamples++;
 			}
@@ -161,7 +163,7 @@ public class SchedulerClient {
 		if (taskId == null) {
 			return List.of();
 		}
-		String url = schedulerServiceBaseUrl + "/api/tasks/" + taskId + "/schedules";
+		String url = schedulerServiceBaseUrl + "/internal/tasks/" + taskId + "/schedules";
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
 		if (result == null || !(result.getData() instanceof List<?> rows)) {
 			return List.of();
@@ -174,6 +176,7 @@ public class SchedulerClient {
 			ScheduleRecordItem item = new ScheduleRecordItem();
 			item.setScheduleId(toLong(map.get("scheduleId")));
 			item.setTaskId(toLong(map.get("taskId")));
+			item.setTaskNo(toString(map.get("taskNo")));
 			item.setNodeId(toLong(map.get("nodeId")));
 			item.setNodeName(toString(map.get("nodeName")));
 			item.setStrategyName(toString(map.get("strategyName")));
@@ -297,6 +300,7 @@ public class SchedulerClient {
 	public static class ScheduleRecordItem {
 		private Long scheduleId;
 		private Long taskId;
+		private String taskNo;
 		private Long nodeId;
 		private String nodeName;
 		private String strategyName;
@@ -318,6 +322,14 @@ public class SchedulerClient {
 
 		public void setTaskId(Long taskId) {
 			this.taskId = taskId;
+		}
+
+		public String getTaskNo() {
+			return taskNo;
+		}
+
+		public void setTaskNo(String taskNo) {
+			this.taskNo = taskNo;
 		}
 
 		public Long getNodeId() {

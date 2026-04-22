@@ -23,6 +23,8 @@ public interface TaskRepository {
 
 	List<Task> listByStatus(String status);
 
+	List<Task> listByIds(List<Long> taskIds);
+
 	List<Task> listByNodeIdAndStatuses(Long nodeId, List<String> statuses);
 
 	long countAll();

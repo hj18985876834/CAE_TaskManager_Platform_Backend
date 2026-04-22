@@ -56,8 +56,11 @@ public class TaskReportManager {
 	}
 
 	public void reportFail(ExecutionContext context, Exception ex) {
-		String failType = ex instanceof ProcessTimeoutException ? FailTypeEnum.TIMEOUT.name() : FailTypeEnum.RUNTIME_ERROR.name();
-		taskReportAppService.markFailed(context.getTaskId(), failType, ex.getMessage());
+		if (ex instanceof ProcessTimeoutException) {
+			taskReportAppService.markTimeout(context.getTaskId());
+			return;
+		}
+		taskReportAppService.markFailed(context.getTaskId(), FailTypeEnum.RUNTIME_ERROR.name(), ex.getMessage());
 	}
 
 	public void reportPreRunFailure(ExecutionContext context, Exception ex) {
@@ -65,6 +68,7 @@ public class TaskReportManager {
 				? "node-agent prepare task failed"
 				: ex.getMessage();
 		taskReportAppService.dispatchFailed(context.getTaskId(), FailTypeEnum.EXECUTOR_START_ERROR.name(), message, false);
+		releaseReservationQuietly(context.getTaskId());
 	}
 
 	public void reportCanceled(ExecutionContext context, String reason) {
@@ -76,5 +80,13 @@ public class TaskReportManager {
 	public void completeTask(Long taskId) {
 		logSeqMap.remove(taskId);
 		taskRuntimeRegistry.finish(taskId);
+	}
+
+	private void releaseReservationQuietly(Long taskId) {
+		try {
+			taskReportAppService.releaseReservation(taskId);
+		} catch (Exception ex) {
+			log.warn("failed to release reservation after pre-run failure, taskId={}", taskId, ex);
+		}
 	}
 }

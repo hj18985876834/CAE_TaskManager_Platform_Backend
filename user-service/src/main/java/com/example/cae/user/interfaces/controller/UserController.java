@@ -1,7 +1,7 @@
 package com.example.cae.user.interfaces.controller;
 
-import com.example.cae.common.response.Result;
 import com.example.cae.common.response.PageResult;
+import com.example.cae.common.response.Result;
 import com.example.cae.user.application.facade.UserFacade;
 import com.example.cae.user.interfaces.request.CreateUserRequest;
 import com.example.cae.user.interfaces.request.ResetPasswordRequest;
@@ -43,30 +43,27 @@ public class UserController {
 	}
 
 	@GetMapping("/{id}")
-	public Result<UserDetailResponse> getById(@PathVariable("id") @Positive(message = "id必须大于0") Long id) {
+	public Result<UserDetailResponse> getById(@PathVariable("id") @Positive(message = "id must be greater than 0") Long id) {
 		return Result.success(userFacade.getById(id));
 	}
 
 	@PutMapping("/{id}")
-	public Result<Void> updateUser(@PathVariable("id") @Positive(message = "id必须大于0") Long id, @Valid @RequestBody UpdateUserRequest request) {
+	public Result<Void> updateUser(@PathVariable("id") @Positive(message = "id must be greater than 0") Long id,
+								   @Valid @RequestBody UpdateUserRequest request) {
 		userFacade.updateUser(id, request);
 		return Result.success();
 	}
 
-	@PutMapping("/{id}/status")
-	public Result<Void> updateStatus(@PathVariable("id") @Positive(message = "id必须大于0") Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
-		userFacade.updateStatus(id, request);
-		return Result.success();
-	}
-
 	@PostMapping("/{id}/status")
-	public Result<Void> updateStatusPost(@PathVariable("id") @Positive(message = "id必须大于0") Long id, @Valid @RequestBody UpdateUserStatusRequest request) {
+	public Result<Void> updateStatusPost(@PathVariable("id") @Positive(message = "id must be greater than 0") Long id,
+										 @Valid @RequestBody UpdateUserStatusRequest request) {
 		userFacade.updateStatus(id, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{id}/reset-password")
-	public Result<Void> resetPassword(@PathVariable("id") @Positive(message = "id必须大于0") Long id, @Valid @RequestBody ResetPasswordRequest request) {
+	public Result<Void> resetPassword(@PathVariable("id") @Positive(message = "id must be greater than 0") Long id,
+									  @Valid @RequestBody ResetPasswordRequest request) {
 		userFacade.resetPassword(id, request);
 		return Result.success();
 	}

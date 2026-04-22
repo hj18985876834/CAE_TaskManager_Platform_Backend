@@ -1,8 +1,9 @@
 package com.example.cae.nodeagent.application.manager;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.nodeagent.application.assembler.ExecutionContextAssembler;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
-import com.example.cae.common.exception.BizException;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
 import com.example.cae.nodeagent.interfaces.request.DispatchTaskRequest;
@@ -36,13 +37,13 @@ public class TaskDispatchManager {
 
 	public void acceptTask(DispatchTaskRequest request) {
 		if (request == null || request.getTaskId() == null) {
-			throw new BizException(400, "taskId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
 		if (taskRuntimeRegistry.runningCount() >= maxConcurrency()) {
-			throw new BizException(409, "node is busy");
+			throw new BizException(ErrorCodeConstants.CONFLICT, "node is busy");
 		}
 		if (!taskRuntimeRegistry.register(request.getTaskId())) {
-			throw new BizException(409, "task already running");
+			throw new BizException(ErrorCodeConstants.CONFLICT, "task already running");
 		}
 		ExecutionContext context = executionContextAssembler.fromDispatchRequest(request);
 		try {
@@ -56,7 +57,7 @@ public class TaskDispatchManager {
 
 	public boolean cancelTask(CancelTaskRequest request) {
 		if (request == null || request.getTaskId() == null) {
-			throw new BizException(400, "taskId is required");
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
 		return taskRuntimeRegistry.cancel(request.getTaskId(), request.getReason());
 	}

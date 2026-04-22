@@ -70,6 +70,14 @@ public class TaskRepositoryImpl implements TaskRepository {
 	}
 
 	@Override
+	public List<Task> listByIds(List<Long> taskIds) {
+		if (taskIds == null || taskIds.isEmpty()) {
+			return List.of();
+		}
+		return taskMapper.selectByIds(taskIds).stream().map(taskAssembler::fromPO).toList();
+	}
+
+	@Override
 	public List<Task> listByNodeIdAndStatuses(Long nodeId, List<String> statuses) {
 		return taskMapper.selectByNodeIdAndStatuses(nodeId, statuses).stream().map(taskAssembler::fromPO).toList();
 	}

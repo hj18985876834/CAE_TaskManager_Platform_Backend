@@ -1,5 +1,6 @@
 package com.example.cae.task.application.service;
 
+import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.enums.TaskStatusEnum;
@@ -101,6 +102,29 @@ public class TaskQueryAppService {
 		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskFileResponse).toList();
 	}
 
+	public List<TaskScheduleRecordResponse> getTaskScheduleRecords(Long taskId, Long userId, String roleCode) {
+		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		try {
+			return schedulerClient.listTaskScheduleRecords(taskId).stream()
+					.map(item -> toTaskScheduleRecordResponse(item, task.getTaskNo()))
+					.toList();
+		} catch (Exception ignored) {
+			return List.of();
+		}
+	}
+
+	public List<TaskBasicDTO> listTaskBasics(List<Long> taskIds) {
+		return taskRepository.listByIds(taskIds).stream()
+				.map(task -> {
+					TaskBasicDTO dto = new TaskBasicDTO();
+					dto.setTaskId(task.getId());
+					dto.setTaskNo(task.getTaskNo());
+					return dto;
+				})
+				.toList();
+	}
+
 	public TaskDashboardSummaryResponse getDashboardSummary() {
 		long totalTaskCount = taskRepository.countAll();
 		long runningTaskCount = taskRepository.countByStatus(TaskStatusEnum.RUNNING.name());
@@ -195,7 +219,7 @@ public class TaskQueryAppService {
 				.toList());
 		try {
 			response.setScheduleRecords(schedulerClient.listTaskScheduleRecords(response.getTaskId()).stream()
-					.map(this::toTaskScheduleRecordResponse)
+					.map(item -> toTaskScheduleRecordResponse(item, response.getTaskNo()))
 					.toList());
 		} catch (Exception ignored) {
 			response.setScheduleRecords(List.of());
@@ -203,10 +227,11 @@ public class TaskQueryAppService {
 		return response;
 	}
 
-	private TaskScheduleRecordResponse toTaskScheduleRecordResponse(SchedulerClient.ScheduleRecordItem item) {
+	private TaskScheduleRecordResponse toTaskScheduleRecordResponse(SchedulerClient.ScheduleRecordItem item, String fallbackTaskNo) {
 		TaskScheduleRecordResponse response = new TaskScheduleRecordResponse();
 		response.setScheduleId(item.getScheduleId());
 		response.setTaskId(item.getTaskId());
+		response.setTaskNo(item.getTaskNo() == null || item.getTaskNo().isBlank() ? fallbackTaskNo : item.getTaskNo());
 		response.setNodeId(item.getNodeId());
 		response.setNodeName(item.getNodeName());
 		response.setStrategyName(item.getStrategyName());

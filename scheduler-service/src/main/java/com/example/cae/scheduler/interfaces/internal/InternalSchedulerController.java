@@ -6,6 +6,7 @@ import com.example.cae.scheduler.application.service.ScheduleAppService;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
+import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -41,6 +42,11 @@ public class InternalSchedulerController {
 	public Result<Void> createScheduleRecord(@Valid @RequestBody InternalScheduleRecordRequest request) {
 		scheduleAppService.recordSchedule(request);
 		return Result.success();
+	}
+
+	@GetMapping("/tasks/{taskId}/schedules")
+	public Result<List<ScheduleRecordResponse>> listTaskSchedules(@PathVariable("taskId") @Positive(message = "taskId蹇呴』澶т簬0") Long taskId) {
+		return Result.success(scheduleAppService.listByTaskId(taskId));
 	}
 
 	@PostMapping("/nodes/{nodeId}/cancel-task")

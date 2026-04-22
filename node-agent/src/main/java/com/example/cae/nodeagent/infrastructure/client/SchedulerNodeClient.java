@@ -6,4 +6,6 @@ public interface SchedulerNodeClient {
 	void register(NodeInfo nodeInfo);
 
 	void heartbeat(NodeInfo nodeInfo);
+
+	void releaseReservation(Long taskId);
 }

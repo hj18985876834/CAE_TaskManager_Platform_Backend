@@ -11,6 +11,7 @@ import com.example.cae.solver.domain.repository.FileRuleRepository;
 import com.example.cae.solver.domain.repository.ProfileRepository;
 import com.example.cae.solver.domain.repository.SolverRepository;
 import com.example.cae.solver.domain.service.ProfileRuleDomainService;
+import com.example.cae.solver.infrastructure.support.ProfileTemplateContractValidator;
 import com.example.cae.solver.interfaces.request.CreateProfileRequest;
 import com.example.cae.solver.interfaces.request.ProfilePageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateProfileRequest;
@@ -29,12 +30,18 @@ public class ProfileAppService {
 	private final ProfileRepository profileRepository;
 	private final FileRuleRepository fileRuleRepository;
 	private final ProfileRuleDomainService profileRuleDomainService;
+	private final ProfileTemplateContractValidator profileTemplateContractValidator;
 
-	public ProfileAppService(SolverRepository solverRepository, ProfileRepository profileRepository, FileRuleRepository fileRuleRepository, ProfileRuleDomainService profileRuleDomainService) {
+	public ProfileAppService(SolverRepository solverRepository,
+							 ProfileRepository profileRepository,
+							 FileRuleRepository fileRuleRepository,
+							 ProfileRuleDomainService profileRuleDomainService,
+							 ProfileTemplateContractValidator profileTemplateContractValidator) {
 		this.solverRepository = solverRepository;
 		this.profileRepository = profileRepository;
 		this.fileRuleRepository = fileRuleRepository;
 		this.profileRuleDomainService = profileRuleDomainService;
+		this.profileTemplateContractValidator = profileTemplateContractValidator;
 	}
 
 	public PageResult<ProfileListItemResponse> pageProfiles(ProfilePageQueryRequest request) {
@@ -59,8 +66,11 @@ public class ProfileAppService {
 		if (!solver.isEnabled()) {
 			throw new BizException(ErrorCodeConstants.SOLVER_DISABLED, "solver is disabled");
 		}
+		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate());
 		profileRuleDomainService.checkProfileCodeUnique(request.getSolverId(), request.getProfileCode());
 		SolverTaskProfile profile = ProfileAssembler.toProfile(request);
+		profile.setUploadMode(profileTemplateContractValidator.normalizeUploadMode(request.getUploadMode()));
+		profile.setCommandTemplate(profileTemplateContractValidator.normalizeCommandTemplate(request.getCommandTemplate()));
 		if (request.getEnabled() != null && request.getEnabled() == 0) {
 			profile.disable();
 		} else {
@@ -72,10 +82,11 @@ public class ProfileAppService {
 
 	public void updateProfile(Long profileId, UpdateProfileRequest request) {
 		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
+		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate());
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
-		profile.setUploadMode(request.getUploadMode());
-		profile.setCommandTemplate(request.getCommandTemplate());
+		profile.setUploadMode(profileTemplateContractValidator.normalizeUploadMode(request.getUploadMode()));
+		profile.setCommandTemplate(profileTemplateContractValidator.normalizeCommandTemplate(request.getCommandTemplate()));
 		if (request.getParamsSchema() != null && !request.getParamsSchema().isBlank()) {
 			profile.setParamsSchemaJson(request.getParamsSchema());
 		} else {

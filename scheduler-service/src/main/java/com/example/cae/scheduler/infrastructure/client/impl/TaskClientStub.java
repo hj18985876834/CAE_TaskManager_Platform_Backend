@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
+import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
@@ -11,8 +12,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class TaskClientStub implements TaskClient {
@@ -42,6 +46,37 @@ public class TaskClientStub implements TaskClient {
 			return List.of();
 		}
 		return body.getData();
+	}
+
+	@Override
+	public Map<Long, TaskBasicDTO> getTaskBasics(List<Long> taskIds) {
+		if (taskIds == null || taskIds.isEmpty()) {
+			return Map.of();
+		}
+		UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(taskServiceBaseUrl + "/internal/tasks/basics");
+		taskIds.stream()
+				.filter(taskId -> taskId != null)
+				.distinct()
+				.forEach(taskId -> builder.queryParam("taskIds", taskId));
+		ResponseEntity<Result<List<TaskBasicDTO>>> response = restTemplate.exchange(
+				builder.toUriString(),
+				HttpMethod.GET,
+				null,
+				new ParameterizedTypeReference<Result<List<TaskBasicDTO>>>() {
+				}
+		);
+		Result<List<TaskBasicDTO>> body = response.getBody();
+		if (body == null || body.getData() == null) {
+			return Map.of();
+		}
+		Map<Long, TaskBasicDTO> taskBasics = new HashMap<>();
+		for (TaskBasicDTO item : body.getData()) {
+			if (item == null || item.getTaskId() == null) {
+				continue;
+			}
+			taskBasics.put(item.getTaskId(), item);
+		}
+		return taskBasics;
 	}
 
 	@Override

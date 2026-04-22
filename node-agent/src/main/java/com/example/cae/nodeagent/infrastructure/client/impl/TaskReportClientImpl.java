@@ -75,10 +75,15 @@ public class TaskReportClientImpl implements TaskReportClient {
 
 	@Override
 	public void markFinished(Long taskId) {
+		markFinished(taskId, "SUCCESS");
+	}
+
+	@Override
+	public void markFinished(Long taskId, String finalStatus) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/mark-finished";
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
-		body.put("finalStatus", "SUCCESS");
+		body.put("finalStatus", finalStatus);
 		restTemplate.postForEntity(url, withToken(body), Object.class);
 	}
 

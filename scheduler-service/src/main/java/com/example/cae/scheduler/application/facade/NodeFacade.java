@@ -11,6 +11,7 @@ import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverStatusResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -51,8 +52,8 @@ public class NodeFacade {
 		nodeManageManager.updateNodeStatus(nodeId, request);
 	}
 
-	public void updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
-		nodeManageManager.updateNodeSolverStatus(nodeId, solverId, request);
+	public NodeSolverStatusResponse updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
+		return nodeManageManager.updateNodeSolverStatus(nodeId, solverId, request);
 	}
 
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {

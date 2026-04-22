@@ -7,6 +7,7 @@ import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskScheduleRecordResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
@@ -30,22 +31,36 @@ public class TaskQueryController {
 	}
 
 	@GetMapping
-	public Result<PageResult<TaskListItemResponse>> pageMyTasks(@Valid TaskListQueryRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
+	public Result<PageResult<TaskListItemResponse>> pageMyTasks(@Valid TaskListQueryRequest request,
+																@RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskQueryAppService.pageMyTasks(request, userId));
 	}
 
 	@GetMapping("/{taskId}")
-	public Result<TaskDetailResponse> getTaskDetail(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<TaskDetailResponse> getTaskDetail(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+													@RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId,
+													@RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskDetail(taskId, userId, roleCode));
 	}
 
 	@GetMapping("/{taskId}/status-history")
-	public Result<List<TaskStatusHistoryResponse>> getTaskStatusHistory(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<List<TaskStatusHistoryResponse>> getTaskStatusHistory(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+																	  @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId,
+																	  @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskStatusHistory(taskId, userId, roleCode));
 	}
 
 	@GetMapping("/{taskId}/files")
-	public Result<List<TaskFileResponse>> getTaskFiles(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+	public Result<List<TaskFileResponse>> getTaskFiles(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+													   @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId,
+													   @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskFiles(taskId, userId, roleCode));
+	}
+
+	@GetMapping("/{taskId}/schedules")
+	public Result<List<TaskScheduleRecordResponse>> getTaskScheduleRecords(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+																		  @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId,
+																		  @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
+		return Result.success(taskQueryAppService.getTaskScheduleRecords(taskId, userId, roleCode));
 	}
 }

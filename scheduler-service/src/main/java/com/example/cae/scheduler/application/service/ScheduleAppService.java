@@ -1,59 +1,63 @@
 package com.example.cae.scheduler.application.service;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
+import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.application.assembler.ScheduleAssembler;
 import com.example.cae.scheduler.domain.model.ComputeNode;
-import com.example.cae.scheduler.domain.model.NodeReservation;
 import com.example.cae.scheduler.domain.model.ScheduleRecord;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
-import com.example.cae.scheduler.domain.repository.NodeReservationRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
+import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.SchedulePageQueryRequest;
+import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ScheduleAppService {
 	private final ComputeNodeRepository computeNodeRepository;
-	private final NodeReservationRepository nodeReservationRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
 	private final ScheduleDomainService scheduleDomainService;
 	private final ScheduleStrategy scheduleStrategy;
 	private final NodeAgentClient nodeAgentClient;
 	private final SolverClient solverClient;
-	private final NodeAppService nodeAppService;
+	private final TaskClient taskClient;
+	private final NodeCapacityManager nodeCapacityManager;
 
 	public ScheduleAppService(ComputeNodeRepository computeNodeRepository,
-							NodeReservationRepository nodeReservationRepository,
 							NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
 							ScheduleRecordRepository scheduleRecordRepository,
 							ScheduleDomainService scheduleDomainService,
 							ScheduleStrategy scheduleStrategy,
 							NodeAgentClient nodeAgentClient,
 							SolverClient solverClient,
-							NodeAppService nodeAppService) {
+							TaskClient taskClient,
+							NodeCapacityManager nodeCapacityManager) {
 		this.computeNodeRepository = computeNodeRepository;
-		this.nodeReservationRepository = nodeReservationRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.scheduleRecordRepository = scheduleRecordRepository;
 		this.scheduleDomainService = scheduleDomainService;
 		this.scheduleStrategy = scheduleStrategy;
 		this.nodeAgentClient = nodeAgentClient;
 		this.solverClient = solverClient;
-		this.nodeAppService = nodeAppService;
+		this.taskClient = taskClient;
+		this.nodeCapacityManager = nodeCapacityManager;
 	}
 
 	@Transactional
@@ -75,27 +79,8 @@ public class ScheduleAppService {
 			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 		}
 
-		ComputeNode lockedNode = computeNodeRepository.findByIdForUpdate(selected.getId())
-				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
-		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(lockedNode.getId(), task.getTaskId()).orElse(null);
-		if (reservation != null && reservation.isReserved()) {
-			return lockedNode.getId();
-		}
-		if (!lockedNode.reserveSlot()) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
-		}
-		computeNodeRepository.update(lockedNode);
-		if (reservation == null) {
-			NodeReservation newReservation = new NodeReservation();
-			newReservation.setNodeId(lockedNode.getId());
-			newReservation.setTaskId(task.getTaskId());
-			newReservation.markReserved();
-			nodeReservationRepository.save(newReservation);
-		} else {
-			reservation.markReserved();
-			nodeReservationRepository.update(reservation);
-		}
-		return lockedNode.getId();
+		NodeReservationActionResponse reservation = nodeCapacityManager.reserve(selected.getId(), task.getTaskId());
+		return reservation.getNodeId();
 	}
 
 	private void validateSolverAndProfile(TaskDTO task) {
@@ -149,7 +134,7 @@ public class ScheduleAppService {
 		if (nodeId == null || taskId == null) {
 			return;
 		}
-		nodeAppService.releaseReservation(nodeId, taskId);
+		nodeCapacityManager.release(nodeId, taskId);
 	}
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
@@ -167,8 +152,8 @@ public class ScheduleAppService {
 		PageResult<ScheduleRecord> page = scheduleRecordRepository.page(request, offset, pageSize);
 		List<ScheduleRecordResponse> records = page.getRecords().stream()
 				.map(ScheduleAssembler::toResponse)
-				.map(this::enrichScheduleRecordResponse)
 				.toList();
+		enrichScheduleRecordResponses(records);
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
 	}
 
@@ -190,19 +175,49 @@ public class ScheduleAppService {
 		if (taskId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
-		return scheduleRecordRepository.listByTaskId(taskId).stream()
+		List<ScheduleRecordResponse> records = scheduleRecordRepository.listByTaskId(taskId).stream()
 				.map(ScheduleAssembler::toResponse)
-				.map(this::enrichScheduleRecordResponse)
 				.toList();
+		enrichScheduleRecordResponses(records);
+		return records;
 	}
 
-	private ScheduleRecordResponse enrichScheduleRecordResponse(ScheduleRecordResponse response) {
-		if (response == null || response.getNodeId() == null) {
-			return response;
+	private void enrichScheduleRecordResponses(List<ScheduleRecordResponse> records) {
+		if (records == null || records.isEmpty()) {
+			return;
 		}
-		computeNodeRepository.findById(response.getNodeId())
-				.map(ComputeNode::getNodeName)
-				.ifPresent(response::setNodeName);
-		return response;
+		Map<Long, TaskBasicDTO> taskBasics = fetchTaskBasics(records);
+		for (ScheduleRecordResponse response : records) {
+			if (response == null) {
+				continue;
+			}
+			if (response.getTaskId() != null) {
+				TaskBasicDTO taskBasic = taskBasics.get(response.getTaskId());
+				if (taskBasic != null) {
+					response.setTaskNo(taskBasic.getTaskNo());
+				}
+			}
+			if (response.getNodeId() != null) {
+				computeNodeRepository.findById(response.getNodeId())
+						.map(ComputeNode::getNodeName)
+						.ifPresent(response::setNodeName);
+			}
+		}
+	}
+
+	private Map<Long, TaskBasicDTO> fetchTaskBasics(List<ScheduleRecordResponse> records) {
+		List<Long> taskIds = records.stream()
+				.filter(response -> response != null && response.getTaskId() != null)
+				.map(ScheduleRecordResponse::getTaskId)
+				.distinct()
+				.collect(Collectors.toList());
+		if (taskIds.isEmpty()) {
+			return Map.of();
+		}
+		try {
+			return taskClient.getTaskBasics(taskIds);
+		} catch (Exception ignored) {
+			return Map.of();
+		}
 	}
 }

@@ -68,6 +68,21 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		validateResult(result, "heartbeat");
 	}
 
+	@Override
+	public void releaseReservation(Long taskId) {
+		if (taskId == null) {
+			return;
+		}
+		String url = nodeAgentConfig.getSchedulerBaseUrl()
+				+ "/internal/nodes/" + nodeAgentConfig.getNodeId() + "/release-reservation";
+		Map<String, Object> body = new HashMap<>();
+		body.put("taskId", taskId);
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
+		Result<?> result = restTemplate.postForObject(url, new HttpEntity<>(body, headers), Result.class);
+		validateResult(result, "release reservation");
+	}
+
 	private void validateResult(Result<?> result, String action) {
 		if (result == null) {
 			throw new IllegalStateException(action + " response is empty");

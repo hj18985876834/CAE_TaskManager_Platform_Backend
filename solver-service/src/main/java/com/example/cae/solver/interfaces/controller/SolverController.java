@@ -41,7 +41,7 @@ public class SolverController {
 	}
 
 	@GetMapping("/{solverId}")
-	public Result<SolverDetailResponse> getSolverDetail(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId) {
+	public Result<SolverDetailResponse> getSolverDetail(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
 		return Result.success(solverFacade.getSolverDetail(solverId));
 	}
 
@@ -51,31 +51,26 @@ public class SolverController {
 	}
 
 	@PutMapping("/{solverId}")
-	public Result<Void> updateSolver(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId, @Valid @RequestBody UpdateSolverRequest request) {
+	public Result<Void> updateSolver(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId,
+									 @Valid @RequestBody UpdateSolverRequest request) {
 		solverFacade.updateSolver(solverId, request);
 		return Result.success();
 	}
 
-	@PutMapping("/{solverId}/status")
-	public Result<Void> updateSolverStatus(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId, @Valid @RequestBody UpdateSolverStatusRequest request) {
-		solverFacade.updateSolverStatus(solverId, request);
-		return Result.success();
-	}
-
 	@PostMapping("/{solverId}/status")
-	public Result<Void> updateSolverStatusPost(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId, @Valid @RequestBody UpdateSolverStatusRequest request) {
+	public Result<Void> updateSolverStatusPost(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId,
+											   @Valid @RequestBody UpdateSolverStatusRequest request) {
 		solverFacade.updateSolverStatus(solverId, request);
 		return Result.success();
 	}
 
 	@GetMapping("/{solverId}/profiles")
-	public Result<List<ProfileListItemResponse>> getSolverProfiles(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId) {
+	public Result<List<ProfileListItemResponse>> getSolverProfiles(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
 		return Result.success(solverFacade.getSolverProfiles(solverId));
 	}
 
 	@GetMapping("/{solverId}/task-options")
-	public Result<List<SolverTaskOptionResponse>> getSolverTaskOptions(@PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId) {
+	public Result<List<SolverTaskOptionResponse>> getSolverTaskOptions(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
 		return Result.success(solverFacade.getSolverTaskOptions(solverId));
 	}
 }
-

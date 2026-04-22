@@ -9,6 +9,7 @@ import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverStatusResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -37,27 +38,26 @@ public class NodeController {
 	}
 
 	@GetMapping("/{nodeId}")
-	public Result<NodeDetailResponse> getNodeDetail(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId) {
+	public Result<NodeDetailResponse> getNodeDetail(@PathVariable("nodeId") @Positive(message = "nodeId must be greater than 0") Long nodeId) {
 		return Result.success(nodeFacade.getNodeDetail(nodeId));
 	}
 
 	@PostMapping("/{nodeId}/status")
-	public Result<Void> updateNodeStatus(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId,
-										 @Valid @RequestBody UpdateNodeStatusRequest request) {
+	public Result<Void> updateNodeStatus(@PathVariable("nodeId") @Positive(message = "nodeId must be greater than 0") Long nodeId,
+									 @Valid @RequestBody UpdateNodeStatusRequest request) {
 		nodeFacade.updateNodeStatus(nodeId, request);
 		return Result.success();
 	}
 
 	@PostMapping("/{nodeId}/solvers/{solverId}/status")
-	public Result<Void> updateNodeSolverStatus(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId,
-											   @PathVariable("solverId") @Positive(message = "solverId必须大于0") Long solverId,
-											   @Valid @RequestBody UpdateNodeSolverStatusRequest request) {
-		nodeFacade.updateNodeSolverStatus(nodeId, solverId, request);
-		return Result.success();
+	public Result<NodeSolverStatusResponse> updateNodeSolverStatus(@PathVariable("nodeId") @Positive(message = "nodeId must be greater than 0") Long nodeId,
+										  @PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId,
+										  @Valid @RequestBody UpdateNodeSolverStatusRequest request) {
+		return Result.success(nodeFacade.updateNodeSolverStatus(nodeId, solverId, request));
 	}
 
 	@GetMapping("/{nodeId}/solvers")
-	public Result<List<NodeSolverResponse>> listNodeSolvers(@PathVariable("nodeId") @Positive(message = "nodeId必须大于0") Long nodeId) {
+	public Result<List<NodeSolverResponse>> listNodeSolvers(@PathVariable("nodeId") @Positive(message = "nodeId must be greater than 0") Long nodeId) {
 		return Result.success(nodeFacade.listNodeSolvers(nodeId));
 	}
 }

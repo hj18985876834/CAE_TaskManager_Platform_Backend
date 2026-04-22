@@ -3,12 +3,11 @@ package com.example.cae.scheduler.application.service;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.PageResult;
+import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.application.assembler.NodeAssembler;
 import com.example.cae.scheduler.domain.model.ComputeNode;
-import com.example.cae.scheduler.domain.model.NodeReservation;
 import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
-import com.example.cae.scheduler.domain.repository.NodeReservationRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.service.NodeDomainService;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
@@ -23,6 +22,7 @@ import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
+import com.example.cae.scheduler.interfaces.response.NodeSolverStatusResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,21 +43,21 @@ import java.util.stream.Collectors;
 @Service
 public class NodeAppService {
 	private final ComputeNodeRepository computeNodeRepository;
-	private final NodeReservationRepository nodeReservationRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final NodeDomainService nodeDomainService;
 	private final SolverClient solverClient;
+	private final NodeCapacityManager nodeCapacityManager;
 
 	public NodeAppService(ComputeNodeRepository computeNodeRepository,
-						  NodeReservationRepository nodeReservationRepository,
 						  NodeSolverCapabilityRepository nodeSolverCapabilityRepository,
 						  NodeDomainService nodeDomainService,
-						  SolverClient solverClient) {
+						  SolverClient solverClient,
+						  NodeCapacityManager nodeCapacityManager) {
 		this.computeNodeRepository = computeNodeRepository;
-		this.nodeReservationRepository = nodeReservationRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
 		this.nodeDomainService = nodeDomainService;
 		this.solverClient = solverClient;
+		this.nodeCapacityManager = nodeCapacityManager;
 	}
 
 	public Long registerNode(NodeRegisterRequest request) {
@@ -152,7 +152,7 @@ public class NodeAppService {
 		computeNodeRepository.update(node);
 	}
 
-	public void updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
+	public NodeSolverStatusResponse updateNodeSolverStatus(Long nodeId, Long solverId, UpdateNodeSolverStatusRequest request) {
 		if (nodeId == null || solverId == null || request == null || request.getEnabled() == null) {
 			throw new BizException(ErrorCodeConstants.INVALID_NODE_STATUS_REQUEST, "invalid node solver status request");
 		}
@@ -163,6 +163,11 @@ public class NodeAppService {
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NOT_FOUND, "node solver capability not found"));
 		capability.setEnabled(request.getEnabled());
 		nodeSolverCapabilityRepository.update(capability);
+		NodeSolverStatusResponse response = new NodeSolverStatusResponse();
+		response.setNodeId(nodeId);
+		response.setSolverId(solverId);
+		response.setEnabled(capability.getEnabled());
+		return response;
 	}
 
 	public List<NodeSolverResponse> listNodeSolvers(Long nodeId) {
@@ -207,47 +212,12 @@ public class NodeAppService {
 
 	@Transactional
 	public NodeReservationActionResponse reserveReservation(Long nodeId, Long taskId) {
-		validateReservationRequest(nodeId, taskId);
-		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
-				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
-		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
-		if (reservation != null && reservation.isReserved()) {
-			return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
-		}
-		if (!node.reserveSlot()) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
-		}
-		computeNodeRepository.update(node);
-		if (reservation == null) {
-			NodeReservation newReservation = new NodeReservation();
-			newReservation.setNodeId(nodeId);
-			newReservation.setTaskId(taskId);
-			newReservation.markReserved();
-			nodeReservationRepository.save(newReservation);
-			return buildReservationActionResponse(taskId, nodeId, newReservation.getStatus(), safeReservedCount(node));
-		}
-		reservation.markReserved();
-		nodeReservationRepository.update(reservation);
-		return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
+		return nodeCapacityManager.reserve(nodeId, taskId);
 	}
 
 	@Transactional
 	public NodeReservationActionResponse releaseReservation(Long nodeId, Long taskId) {
-		validateReservationRequest(nodeId, taskId);
-		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
-				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
-		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
-		if (reservation == null) {
-			throw new BizException(ErrorCodeConstants.CONFLICT, "node reservation does not exist");
-		}
-		if (!reservation.isReserved()) {
-			return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
-		}
-		node.releaseReservation();
-		computeNodeRepository.update(node);
-		reservation.markReleased();
-		nodeReservationRepository.update(reservation);
-		return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
+		return nodeCapacityManager.release(nodeId, taskId);
 	}
 
 	public String getNodeToken(Long nodeId) {
@@ -266,28 +236,6 @@ public class NodeAppService {
 		return computeNodeRepository.findById(nodeId)
 				.map(node -> nodeToken.equals(node.getNodeToken()))
 				.orElse(false);
-	}
-
-	private void validateReservationRequest(Long nodeId, Long taskId) {
-		if (nodeId == null || taskId == null) {
-			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId and taskId are required");
-		}
-	}
-
-	private NodeReservationActionResponse buildReservationActionResponse(Long taskId,
-																		 Long nodeId,
-																		 String reservationStatus,
-																		 Integer reservedCount) {
-		NodeReservationActionResponse response = new NodeReservationActionResponse();
-		response.setTaskId(taskId);
-		response.setNodeId(nodeId);
-		response.setReservationStatus(reservationStatus);
-		response.setReservedCount(reservedCount);
-		return response;
-	}
-
-	private Integer safeReservedCount(ComputeNode node) {
-		return node == null || node.getReservedCount() == null ? 0 : node.getReservedCount();
 	}
 
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {

@@ -12,6 +12,7 @@ import com.example.cae.task.interfaces.response.TaskLogPageResponse;
 import com.example.cae.task.interfaces.response.TaskLogResponse;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
 import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
+import com.example.cae.task.interfaces.response.TaskScheduleRecordResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
 import org.springframework.stereotype.Component;
 
@@ -47,6 +48,10 @@ public class TaskQueryFacade {
 
 	public List<TaskFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
 		return taskQueryAppService.getTaskFiles(taskId, userId, roleCode);
+	}
+
+	public List<TaskScheduleRecordResponse> getTaskScheduleRecords(Long taskId, Long userId, String roleCode) {
+		return taskQueryAppService.getTaskScheduleRecords(taskId, userId, roleCode);
 	}
 
 	public TaskLogPageResponse getLogs(Long taskId, Integer fromSeq, Integer pageSize, Long userId, String roleCode) {

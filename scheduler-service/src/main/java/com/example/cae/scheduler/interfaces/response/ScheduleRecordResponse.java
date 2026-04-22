@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public class ScheduleRecordResponse {
 	private Long scheduleId;
 	private Long taskId;
+	private String taskNo;
 	private Long nodeId;
 	private String nodeName;
 	private String strategyName;
@@ -26,6 +27,14 @@ public class ScheduleRecordResponse {
 
 	public void setTaskId(Long taskId) {
 		this.taskId = taskId;
+	}
+
+	public String getTaskNo() {
+		return taskNo;
+	}
+
+	public void setTaskNo(String taskNo) {
+		this.taskNo = taskNo;
 	}
 
 	public Long getNodeId() {
