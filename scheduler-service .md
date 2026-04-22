@@ -345,7 +345,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/interfaces/internal/
 - `POST /internal/schedules`：写入调度记录
 - `POST /internal/nodes/{nodeId}/reserve`：预占节点容量
 - `POST /internal/nodes/{nodeId}/release-reservation`：释放节点预占
-- `POST /internal/nodes/{nodeId}/cancel-task`：向节点发起取消任务
+- `POST /internal/nodes/{nodeId}/cancel-task`：运行中取消的二阶段扩展占位，首版会明确返回不支持
 - `GET /internal/nodes/{nodeId}/token/verify`：校验节点 token
 - `POST /internal/tasks/{taskId}/dispatch-failed`：接收 node-agent 的执行前失败回调，并统一驱动任务状态回写与预占释放
 
@@ -656,8 +656,8 @@ scheduler-service/src/main/java/com/example/cae/scheduler/application/scheduler/
 
 如果中间异常：
 
-- 若已占用节点，会释放 `runningCount`；
-- 若任务已经被标记为 `SCHEDULED`，会把任务写成 `FAILED`；
+- 若已创建预占，则会释放 `node_reservation` 并同步回收 `reservedCount`；
+- 若任务已经被标记为 `SCHEDULED / DISPATCHED` 且尚未真正运行，则走 `dispatch-failed` 回写，由 `recoverable` 规则决定回到 `QUEUED` 还是转 `FAILED`；
 - 无论如何都会记录一条调度失败记录。
 
 这说明当前实现已经有“占位释放”和“调度失败审计”，但还没有“自动重试调度”。
@@ -689,7 +689,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/application/service/
 - 节点启停
 - 节点求解器能力启停
 - 可用节点筛选
-- `runningCount` 调整
+- 节点容量预占与释放
 - 节点 token 获取与校验
 - 节点能力同步
 
@@ -758,9 +758,14 @@ scheduler-service/src/main/java/com/example/cae/scheduler/application/service/
 - 节点存在对应求解器能力
 - 该能力已启用
 
-##### `updateRunningCount(Long nodeId, Integer delta)`
+##### 节点容量计数说明
 
-按增量调整节点当前运行任务数，供节点代理在任务开始/结束时上报。
+当前实现不再提供旧版 `updateRunningCount(Long nodeId, Integer delta)` 接口。
+
+节点容量改为两套计数协同：
+
+- `reservedCount`：调度阶段的预占数，由 `node_reservation` 驱动
+- `runningCount`：节点心跳上报的真实运行数
 
 ##### `getNodeToken(Long nodeId)` / `validateNodeToken(Long nodeId, String nodeToken)`
 
@@ -791,7 +796,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/application/service/
 3. 根据 `solverId` 读取对应的节点能力；
 4. 通过 `ScheduleDomainService.filterAvailableNodes()` 筛出满足条件的节点；
 5. 调 `ScheduleStrategy.selectNode()` 选择最终节点；
-6. 先把节点的 `runningCount + 1` 作为并发占位；
+6. 先创建 `node_reservation` 并把节点 `reservedCount + 1` 作为调度预占；
 7. 返回选中的 `nodeId`。
 
 这里有两个很关键的实现细节：
@@ -1070,7 +1075,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/infrastructure/client/
 - 根据 `nodeId` 先查出节点主机地址；
 - 自动拼出节点代理基础地址；
 - 调 `POST /internal/dispatch-task` 下发任务；
-- 调 `POST /internal/cancel-task` 取消任务；
+- 运行中取消属于第二阶段扩展，首版不会真正调用节点取消执行；
 - 校验节点代理返回的 `accepted` 标志；
 - 若节点 host 为空或节点不存在，直接报错。
 
@@ -1345,7 +1350,7 @@ scheduler-service/src/main/java/com/example/cae/scheduler/support/
 4. `ScheduleAppService.scheduleTask(task)` 选节点
 5. `ScheduleDomainService` 过滤可用节点
 6. `FcfsLeastLoadStrategy` 选出最终节点
-7. 先把节点 `runningCount + 1`
+7. 先创建节点预占，增加 `reservedCount`
 8. 调 `task-service` 把任务标记为 `SCHEDULED`
 9. 调 `node-agent` 下发任务
 10. 再调 `task-service` 把任务标记为 `DISPATCHED`
@@ -1354,9 +1359,9 @@ scheduler-service/src/main/java/com/example/cae/scheduler/support/
 失败时：
 
 - 若只是“没有可用节点”，任务仍会保留在 `QUEUED` 队列中，等待下一轮轮询；
-- 若已经标成 `SCHEDULED` 但下发失败，则当前实现会把任务直接改为 `FAILED`；
+- 若已经标成 `SCHEDULED / DISPATCHED` 但在进入 `RUNNING` 前失败，则统一走 `dispatch-failed` 链路并按 `recoverable` 分流；
 - 失败调度会写 `schedule_record`；
-- 若已占用节点并发，则会回滚 `runningCount`。
+- 若已创建预占，则会回滚对应 `node_reservation / reservedCount`。
 
 ### 15.4 节点启停与能力启停链路
 
@@ -1450,10 +1455,10 @@ scheduler-service/src/main/java/com/example/cae/scheduler/support/
 当前实现中：
 
 - 无可用节点：任务继续留在 `QUEUED`
-- 已标 `SCHEDULED` 但下发失败：任务直接记为 `FAILED`
-- 节点离线：受影响任务直接记为 `FAILED`
+- 已标 `SCHEDULED / DISPATCHED` 但下发失败：统一走 `dispatch-failed`，按 `recoverable` 分流到 `QUEUED` 或 `FAILED`
+- 节点离线：`SCHEDULED / DISPATCHED` 回队，`RUNNING` 才记为 `FAILED(NODE_OFFLINE)`
 
-也就是说，当前没有自动回队和自动重调度机制。
+也就是说，当前已经具备“回队补偿 + 后续轮询再调度”的基础能力，而不是一律直接失败。
 
 #### 4. `schedule_record.node_id` 最好允许为空
 

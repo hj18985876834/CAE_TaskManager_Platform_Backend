@@ -633,9 +633,9 @@ node-agent/src/main/java/com/example/cae/nodeagent/application/manager/
 
 取消回传链路：
 
-- 当前只调用 `reportStatus(taskId, "CANCELED", message)`
-
-也就是说，当前取消是通过“状态上报”为主，而不是单独走 `markFailed` 或 `markFinished`。
+- 首版不再把取消写入正式任务状态
+- 当前实现只记录日志说明“运行中取消属于第二阶段扩展”
+- 因此 `reportCanceled(...)` 只作为保底收尾分支存在，不驱动 `CANCELED` 状态流转
 
 ##### `completeTask(Long taskId)`
 
@@ -643,13 +643,13 @@ node-agent/src/main/java/com/example/cae/nodeagent/application/manager/
 
 - 清理日志序号缓存
 - 从运行时注册表移除任务
-- 调调度服务把 `runningCount - 1`
 
 这里有一个很重要的实现细节：
 
 - `node-agent` 在任务接收时没有显式上报 `runningCount + 1`
-- 因为调度器在选中节点时已经预占了并发数
-- 节点侧真正负责的是完成后尽快回传 `-1`，以及在心跳中持续上报实时 `runningCount`
+- 调度容量由 `scheduler-service` 的 `reservedCount + runningCount` 模型统一管理
+- 节点侧不再提供旧版 `updateRunningCount(+/-1)` 这类接口
+- 节点侧只通过心跳持续上报真实 `runningCount`
 
 #### `TaskRuntimeRegistry.java`
 
@@ -736,7 +736,7 @@ node-agent/src/main/java/com/example/cae/nodeagent/application/service/
 - `reportResultFile`
 - `markFinished`
 - `markFailed`
-- `updateRunningCount`
+- `dispatchFailed`
 
 ---
 
@@ -1410,8 +1410,8 @@ node-agent/src/main/java/com/example/cae/nodeagent/support/
    - `reportResultFile()` 循环回传
    - `markFinished()`
 4. 执行失败后：`markFailed()`
-5. 执行取消后：`reportStatus(..., "CANCELED", ...)`
-6. 执行完成后：`updateRunningCount(-1)`
+5. 若命中取消分支：仅记录“首版不支持运行中取消正式流转”的说明日志
+6. 执行完成后：`completeTask()` 只负责清理本地运行态注册表
 
 每次回传都会带：
 
@@ -1422,19 +1422,15 @@ node-agent/src/main/java/com/example/cae/nodeagent/support/
 
 ### 15.7 取消任务链路
 
-取消链路如下：
+首版正式状态机不支持 `RUNNING -> CANCELED`，因此运行中取消链路当前明确作为“第二阶段扩展预留”，不会进入正式任务状态流转。
 
-1. `scheduler-service` 调 `POST /internal/cancel-task`
-2. `DispatchController.cancel()`
-3. `TaskDispatchManager.cancelTask(request)`
-4. `TaskRuntimeRegistry.cancel(taskId, reason)`
-5. 若任务正在运行：
-   - 标记 `cancelRequested = true`
-   - 保存取消原因
-   - 强制销毁底层进程
-   - 中断执行线程
-6. `TaskExecuteManager.execute()` 捕获取消态
-7. `TaskReportManager.reportCanceled(context, reason)`
+当前实现如下：
+
+1. `scheduler-service` 仍保留 `POST /internal/nodes/{nodeId}/cancel-task` 内部接口占位
+2. `node-agent` 仍保留 `POST /internal/cancel-task` 控制器占位
+3. 但两端当前都会直接返回“不支持首版运行中取消”的业务错误
+
+这样做的目的，是避免出现“进程被中断了，但任务主状态没有合法流转”的半成品行为。
 
 当前取消策略是“强制终止”，不是“优雅停止”。
 
@@ -1503,9 +1499,9 @@ node-agent/src/main/java/com/example/cae/nodeagent/support/
 
 当前并发数更新逻辑不是完全由节点侧单独决定，而是两边协同：
 
-- `scheduler-service` 在选中节点时先 `runningCount + 1`
+- `scheduler-service` 在选中节点时先创建 `node_reservation`，增加 `reservedCount`
 - `node-agent` 心跳持续上报真实 `runningCount`
-- 任务完成时 `node-agent` 再主动发 `updateRunningCount(-1)`
+- 任务进入 `RUNNING` 后由 `task-service` 回调 `scheduler-service` 释放预占
 
 这点在文档里最好明确，否则容易误以为节点接收任务时为什么没有显式 `+1`。
 
@@ -1526,7 +1522,9 @@ node-agent/src/main/java/com/example/cae/nodeagent/support/
 
 #### 4. 调度器下发到节点代理的接口当前没有额外鉴权
 
-当前 `scheduler-service -> node-agent` 的 `/internal/dispatch-task`、`/internal/cancel-task` 调用，没有像节点回传到 `task-service` 那样携带 `X_NODE_TOKEN`。
+当前 `scheduler-service -> node-agent` 的 `/internal/dispatch-task` 调用，没有像节点回传到 `task-service` 那样携带 `X_NODE_TOKEN`。
+
+`/internal/cancel-task` 虽然仍保留为第二阶段扩展占位，但首版会直接返回“不支持运行中取消”。
 
 所以当前安全模型更接近：
 

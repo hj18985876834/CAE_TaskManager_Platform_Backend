@@ -4,6 +4,9 @@ import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.config.TaskRemoteServiceProperties;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -38,7 +41,6 @@ public class SchedulerClient {
 		ensureSuccess(result, "cancel task on node");
 	}
 
-	@SuppressWarnings("unchecked")
 	public NodeReservationActionResult releaseNodeReservation(Long nodeId, Long taskId) {
 		if (nodeId == null || taskId == null) {
 			return null;
@@ -46,16 +48,26 @@ public class SchedulerClient {
 		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/release-reservation";
 		Map<String, Object> body = new java.util.HashMap<>();
 		body.put("taskId", taskId);
-		Result<Object> result = restTemplate.postForObject(url, body, Result.class);
+		Result<NodeReservationActionResult> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(body),
+				new ParameterizedTypeReference<Result<NodeReservationActionResult>>() {
+				}
+		).getBody();
 		ensureSuccess(result, "release node reservation");
-		if (!(result.getData() instanceof Map<?, ?> dataMap)) {
-			return null;
+		NodeReservationActionResult actionResult = result == null ? null : result.getData();
+		if (actionResult == null
+				|| actionResult.getTaskId() == null
+				|| actionResult.getNodeId() == null
+				|| actionResult.getReservationStatus() == null
+				|| actionResult.getReservationStatus().isBlank()
+				|| actionResult.getReservedCount() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "release node reservation response data is invalid");
 		}
-		NodeReservationActionResult actionResult = new NodeReservationActionResult();
-		actionResult.setTaskId(toLong(dataMap.get("taskId")));
-		actionResult.setNodeId(toLong(dataMap.get("nodeId")));
-		actionResult.setReservationStatus(toString(dataMap.get("reservationStatus")));
-		actionResult.setReservedCount(toInteger(dataMap.get("reservedCount")));
+		if (!taskId.equals(actionResult.getTaskId()) || !nodeId.equals(actionResult.getNodeId())) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "release node reservation response identity mismatch");
+		}
 		return actionResult;
 	}
 

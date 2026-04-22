@@ -16,7 +16,6 @@ import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepositor
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
-import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
@@ -40,7 +39,6 @@ public class ScheduleAppService {
 	private final ScheduleRecordRepository scheduleRecordRepository;
 	private final ScheduleDomainService scheduleDomainService;
 	private final ScheduleStrategy scheduleStrategy;
-	private final NodeAgentClient nodeAgentClient;
 	private final SolverClient solverClient;
 	private final TaskClient taskClient;
 	private final NodeCapacityManager nodeCapacityManager;
@@ -50,7 +48,6 @@ public class ScheduleAppService {
 							ScheduleRecordRepository scheduleRecordRepository,
 							ScheduleDomainService scheduleDomainService,
 							ScheduleStrategy scheduleStrategy,
-							NodeAgentClient nodeAgentClient,
 							SolverClient solverClient,
 							TaskClient taskClient,
 							NodeCapacityManager nodeCapacityManager) {
@@ -59,7 +56,6 @@ public class ScheduleAppService {
 		this.scheduleRecordRepository = scheduleRecordRepository;
 		this.scheduleDomainService = scheduleDomainService;
 		this.scheduleStrategy = scheduleStrategy;
-		this.nodeAgentClient = nodeAgentClient;
 		this.solverClient = solverClient;
 		this.taskClient = taskClient;
 		this.nodeCapacityManager = nodeCapacityManager;
@@ -159,7 +155,8 @@ public class ScheduleAppService {
 		if (nodeId == null || taskId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId and taskId are required");
 		}
-		nodeAgentClient.cancelTask(nodeId, taskId, reason);
+		throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED,
+				"runtime cancel is not supported in first-version status contract");
 	}
 
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {

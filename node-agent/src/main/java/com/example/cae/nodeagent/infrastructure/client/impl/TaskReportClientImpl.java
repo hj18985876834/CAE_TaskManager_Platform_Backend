@@ -2,6 +2,7 @@ package com.example.cae.nodeagent.infrastructure.client.impl;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.constant.HeaderConstants;
+import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
@@ -10,6 +11,8 @@ import com.example.cae.nodeagent.infrastructure.client.TaskReportClient;
 import com.example.cae.nodeagent.infrastructure.storage.PathMappingSupport;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -35,11 +38,11 @@ public class TaskReportClientImpl implements TaskReportClient {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/status-report";
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
-		body.put("fromStatus", null);
+		body.put("fromStatus", "DISPATCHED");
 		body.put("toStatus", "RUNNING");
 		body.put("changeReason", reason);
 		body.put("operatorType", "NODE");
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report running");
+		validateStatusAck(postForStatusAck(url, body, "report running"), taskId, "RUNNING", "report running");
 	}
 
 	@Override
@@ -49,7 +52,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("seqNo", seqNo);
 		body.put("logContent", content);
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report log");
+		validateVoidResult(postForVoidResult(url, body), "report log");
 	}
 
 	@Override
@@ -61,7 +64,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("durationSeconds", result.getDurationSeconds());
 		body.put("summaryText", result.getSummaryText());
 		body.put("metrics", result.getMetrics());
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report result summary");
+		validateVoidResult(postForVoidResult(url, body), "report result summary");
 	}
 
 	@Override
@@ -73,7 +76,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("fileName", file == null ? null : file.getName());
 		body.put("storagePath", file == null ? null : pathMappingSupport.toWindowsPath(file.getAbsolutePath()));
 		body.put("fileSize", file == null ? null : file.length());
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "report result file");
+		validateVoidResult(postForVoidResult(url, body), "report result file");
 	}
 
 	@Override
@@ -87,7 +90,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("finalStatus", finalStatus);
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "mark finished");
+		validateStatusAck(postForStatusAck(url, body, "mark finished"), taskId, finalStatus, "mark finished");
 	}
 
 	@Override
@@ -100,7 +103,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("failType", failType);
 		body.put("failMessage", failMessage);
-		validateResult(restTemplate.postForObject(url, withToken(body), Result.class), "mark failed");
+		validateStatusAck(postForStatusAck(url, body, "mark failed"), taskId, "FAILED", "mark failed");
 	}
 
 	private String taskBaseUrl() {
@@ -135,12 +138,47 @@ public class TaskReportClientImpl implements TaskReportClient {
 		return new HttpEntity<>(body, headers);
 	}
 
-	private void validateResult(Result<?> result, String action) {
+	private Result<TaskStatusAckDTO> postForStatusAck(String url, Object body, String action) {
+		return restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				withToken(body),
+				new ParameterizedTypeReference<Result<TaskStatusAckDTO>>() {
+				}
+		).getBody();
+	}
+
+	private Result<Void> postForVoidResult(String url, Object body) {
+		return restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				withToken(body),
+				new ParameterizedTypeReference<Result<Void>>() {
+				}
+		).getBody();
+	}
+
+	private void validateVoidResult(Result<?> result, String action) {
 		if (result == null) {
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
 		}
 		if (result.getCode() != null && result.getCode() != 0) {
 			throw new BizException(result.getCode(), result.getMessage(), result.getData());
+		}
+	}
+
+	private void validateStatusAck(Result<TaskStatusAckDTO> result, Long taskId, String expectedStatus, String action) {
+		validateVoidResult(result, action);
+		TaskStatusAckDTO ack = result.getData();
+		if (ack == null || ack.getTaskId() == null || ack.getStatus() == null || ack.getStatus().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is invalid");
+		}
+		if (!ack.getTaskId().equals(taskId)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response taskId mismatch");
+		}
+		if (expectedStatus != null && !expectedStatus.equalsIgnoreCase(ack.getStatus())) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					action + " response status mismatch: " + ack.getStatus());
 		}
 	}
 }

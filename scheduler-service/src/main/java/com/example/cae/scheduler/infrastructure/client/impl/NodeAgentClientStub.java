@@ -8,6 +8,9 @@ import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -51,15 +54,21 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("inputFiles", task.getInputFiles() == null ? java.util.List.of() : task.getInputFiles());
 		request.put("params", task.getParams() == null ? java.util.Map.of() : task.getParams());
 
-		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		Result<NodeAgentActionAck> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<NodeAgentActionAck>>() {
+				}
+		).getBody();
 		validateResult(result, "dispatch task");
-		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
+		NodeAgentActionAck ack = result == null ? null : result.getData();
+		if (ack == null || ack.getAccepted() == null) {
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent dispatch response is empty");
 		}
-		Object accepted = dataMap.get("accepted");
-		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
-			Object message = dataMap.get("message");
-			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected task" : String.valueOf(message));
+		if (!Boolean.TRUE.equals(ack.getAccepted())) {
+			String message = ack.getMessage();
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected task" : message);
 		}
 	}
 
@@ -74,15 +83,21 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		request.put("taskId", taskId);
 		request.put("reason", reason);
 
-		Result<?> result = restTemplate.postForObject(url, request, Result.class);
+		Result<NodeAgentActionAck> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(request),
+				new ParameterizedTypeReference<Result<NodeAgentActionAck>>() {
+				}
+		).getBody();
 		validateResult(result, "cancel task");
-		if (result == null || !(result.getData() instanceof Map<?, ?> dataMap)) {
+		NodeAgentActionAck ack = result == null ? null : result.getData();
+		if (ack == null || ack.getAccepted() == null) {
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent cancel response is empty");
 		}
-		Object accepted = dataMap.get("accepted");
-		if (!(accepted instanceof Boolean acceptedFlag) || !acceptedFlag) {
-			Object message = dataMap.get("message");
-			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected cancel" : String.valueOf(message));
+		if (!Boolean.TRUE.equals(ack.getAccepted())) {
+			String message = ack.getMessage();
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected cancel" : message);
 		}
 	}
 
@@ -133,6 +148,27 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		}
 		if (result.getCode() != null && result.getCode() != 0) {
 			throw new BizException(result.getCode(), result.getMessage() == null ? "node-agent " + action + " failed" : result.getMessage());
+		}
+	}
+
+	private static class NodeAgentActionAck {
+		private Boolean accepted;
+		private String message;
+
+		public Boolean getAccepted() {
+			return accepted;
+		}
+
+		public void setAccepted(Boolean accepted) {
+			this.accepted = accepted;
+		}
+
+		public String getMessage() {
+			return message;
+		}
+
+		public void setMessage(String message) {
+			this.message = message;
 		}
 	}
 }

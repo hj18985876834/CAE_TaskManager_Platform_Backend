@@ -1,12 +1,17 @@
 package com.example.cae.nodeagent.infrastructure.client.impl;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.constant.HeaderConstants;
+import com.example.cae.common.dto.TaskStatusAckDTO;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
 import com.example.cae.nodeagent.domain.model.NodeInfo;
 import com.example.cae.nodeagent.infrastructure.client.SchedulerNodeClient;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -24,7 +29,6 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 	}
 
 	@Override
-	@SuppressWarnings("unchecked")
 	public void register(NodeInfo nodeInfo) {
 		String url = nodeAgentConfig.getSchedulerBaseUrl() + "/api/node-agent/register";
 		Map<String, Object> body = new HashMap<>();
@@ -34,23 +38,20 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		body.put("port", nodeInfo.getPort());
 		body.put("maxConcurrency", nodeInfo.getMaxConcurrency());
 		body.put("solvers", toSolverItems(nodeInfo.getSolverIds()));
-		Result<Object> result = restTemplate.postForObject(url, body, Result.class);
+		Result<NodeRegisterAck> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(body),
+				new ParameterizedTypeReference<Result<NodeRegisterAck>>() {
+				}
+		).getBody();
 		validateResult(result, "register node");
-		if (!(result.getData() instanceof Map<?, ?> dataMap)) {
-			throw new IllegalStateException("register node response data is empty");
+		NodeRegisterAck ack = result.getData();
+		if (ack == null || ack.getNodeId() == null || ack.getNodeToken() == null || ack.getNodeToken().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "register node response data is invalid");
 		}
-		Object nodeId = dataMap.get("nodeId");
-		Object nodeToken = dataMap.get("nodeToken");
-		if (nodeId != null) {
-			try {
-				nodeAgentConfig.setNodeId(Long.parseLong(String.valueOf(nodeId)));
-			} catch (NumberFormatException ignored) {
-				// keep configured id if parsing fails
-			}
-		}
-		if (nodeToken != null) {
-			nodeAgentConfig.setNodeToken(String.valueOf(nodeToken));
-		}
+		nodeAgentConfig.setNodeId(ack.getNodeId());
+		nodeAgentConfig.setNodeToken(ack.getNodeToken());
 	}
 
 	@Override
@@ -82,16 +83,29 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		body.put("recoverable", recoverable);
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HeaderConstants.X_NODE_TOKEN, nodeAgentConfig.getNodeToken());
-		Result<?> result = restTemplate.postForObject(url, new HttpEntity<>(body, headers), Result.class);
+		Result<TaskStatusAckDTO> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(body, headers),
+				new ParameterizedTypeReference<Result<TaskStatusAckDTO>>() {
+				}
+		).getBody();
 		validateResult(result, "dispatch failed");
+		TaskStatusAckDTO ack = result.getData();
+		if (ack == null || ack.getTaskId() == null || ack.getStatus() == null || ack.getStatus().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "dispatch failed response data is invalid");
+		}
+		if (!ack.getTaskId().equals(taskId)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "dispatch failed response taskId mismatch");
+		}
 	}
 
 	private void validateResult(Result<?> result, String action) {
 		if (result == null) {
-			throw new IllegalStateException(action + " response is empty");
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response is empty");
 		}
 		if (result.getCode() != null && result.getCode() != 0) {
-			throw new IllegalStateException(action + " failed: " + result.getMessage());
+			throw new BizException(result.getCode(), result.getMessage(), result.getData());
 		}
 	}
 
@@ -116,5 +130,26 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 			return "v1";
 		}
 		return version;
+	}
+
+	private static class NodeRegisterAck {
+		private Long nodeId;
+		private String nodeToken;
+
+		public Long getNodeId() {
+			return nodeId;
+		}
+
+		public void setNodeId(Long nodeId) {
+			this.nodeId = nodeId;
+		}
+
+		public String getNodeToken() {
+			return nodeToken;
+		}
+
+		public void setNodeToken(String nodeToken) {
+			this.nodeToken = nodeToken;
+		}
 	}
 }

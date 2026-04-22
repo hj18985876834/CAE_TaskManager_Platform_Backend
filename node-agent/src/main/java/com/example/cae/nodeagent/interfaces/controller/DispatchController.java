@@ -1,5 +1,7 @@
 package com.example.cae.nodeagent.interfaces.controller;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.nodeagent.application.manager.TaskDispatchManager;
 import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
@@ -31,10 +33,7 @@ public class DispatchController {
 
 	@PostMapping("/cancel-task")
 	public Result<CancelTaskResponse> cancel(@RequestBody CancelTaskRequest request) {
-		CancelTaskResponse response = new CancelTaskResponse();
-		boolean accepted = taskDispatchManager.cancelTask(request);
-		response.setAccepted(accepted);
-		response.setMessage(accepted ? "cancel signal sent" : "task not running");
-		return Result.success(response);
+		throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED,
+				"runtime cancel is not supported in first-version status contract");
 	}
 }
