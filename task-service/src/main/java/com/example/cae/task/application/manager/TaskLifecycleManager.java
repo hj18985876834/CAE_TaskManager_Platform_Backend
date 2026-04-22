@@ -21,6 +21,7 @@ import com.example.cae.task.domain.service.TaskValidationDomainService;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.storage.TaskFileStorageService;
+import com.example.cae.task.application.support.TaskParamSchemaValidator;
 import com.example.cae.task.infrastructure.support.TaskNoGenerator;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
@@ -55,6 +56,7 @@ public class TaskLifecycleManager {
 	private final TaskValidationDomainService taskValidationDomainService;
 	private final TaskValidationManager taskValidationManager;
 	private final TaskFileStorageService taskFileStorageService;
+	private final TaskParamSchemaValidator taskParamSchemaValidator;
 	private final TaskAssembler taskAssembler;
 	private final TaskNoGenerator taskNoGenerator;
 	private final SchedulerClient schedulerClient;
@@ -72,6 +74,7 @@ public class TaskLifecycleManager {
 								TaskValidationDomainService taskValidationDomainService,
 								TaskValidationManager taskValidationManager,
 								TaskFileStorageService taskFileStorageService,
+								TaskParamSchemaValidator taskParamSchemaValidator,
 								TaskAssembler taskAssembler,
 								TaskNoGenerator taskNoGenerator,
 								SchedulerClient schedulerClient,
@@ -88,6 +91,7 @@ public class TaskLifecycleManager {
 		this.taskValidationDomainService = taskValidationDomainService;
 		this.taskValidationManager = taskValidationManager;
 		this.taskFileStorageService = taskFileStorageService;
+		this.taskParamSchemaValidator = taskParamSchemaValidator;
 		this.taskAssembler = taskAssembler;
 		this.taskNoGenerator = taskNoGenerator;
 		this.schedulerClient = schedulerClient;
@@ -96,6 +100,8 @@ public class TaskLifecycleManager {
 	}
 
 	public TaskCreateResponse createTask(CreateTaskRequest request, Long userId) {
+		validateTaskDefinition(request.getSolverId(), request.getProfileId(), request.getTaskType());
+		validateTaskParams(request.getProfileId(), request.getParams(), null, TaskStatusEnum.CREATED.name());
 		Task task = taskAssembler.toTask(request, userId);
 		task.setTaskNo(taskNoGenerator.generateTaskNo());
 		task.setStatus(TaskStatusEnum.CREATED.name());
@@ -117,6 +123,7 @@ public class TaskLifecycleManager {
 			task.setPriority(request.getPriority());
 		}
 		if (request.getParams() != null) {
+			validateTaskParams(task.getProfileId(), request.getParams(), task.getId(), task.getStatus());
 			paramsChanged = !Objects.equals(parseParamsJson(task.getParamsJson()), request.getParams());
 			task.setParamsJson(JsonUtil.toJson(request.getParams()));
 		}
@@ -127,29 +134,20 @@ public class TaskLifecycleManager {
 		return taskAssembler.toUpdateResponse(task);
 	}
 
+	@Transactional
 	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskEditable(task);
 		UploadConstraint constraint = resolveUploadConstraint(task);
 		validateArchiveUpload(task, file, constraint);
-		TaskFile existingArchive = replaceExistingArchiveIfNeeded(task, constraint, userId);
+		replaceExistingArchiveIfNeeded(task, constraint, userId);
 		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, constraint.fileKey(), constraint.fileRole());
 		taskFile.setArchiveFlag(1);
-		if (existingArchive == null) {
+		try {
 			taskFileRepository.save(taskFile);
-		} else {
-			existingArchive.setFileRole(taskFile.getFileRole());
-			existingArchive.setFileKey(taskFile.getFileKey());
-			existingArchive.setOriginName(taskFile.getOriginName());
-			existingArchive.setStoragePath(taskFile.getStoragePath());
-			existingArchive.setUnpackDir(null);
-			existingArchive.setRelativePath(null);
-			existingArchive.setArchiveFlag(taskFile.getArchiveFlag());
-			existingArchive.setFileSize(taskFile.getFileSize());
-			existingArchive.setFileSuffix(taskFile.getFileSuffix());
-			existingArchive.setChecksum(taskFile.getChecksum());
-			taskFileRepository.update(existingArchive);
-			taskFile = existingArchive;
+		} catch (RuntimeException ex) {
+			deleteStoredFileQuietly(taskFile.getStoragePath());
+			throw ex;
 		}
 		return toTaskFileResponse(taskFile);
 	}
@@ -198,8 +196,10 @@ public class TaskLifecycleManager {
 
 	public void adjustPriority(Long taskId, Integer priority, Long adminUserId) {
 		Task task = loadTask(taskId);
-		if (task.isFinished()) {
-			throw new BizException(ErrorCodeConstants.TASK_PRIORITY_UPDATE_NOT_ALLOWED, "finished task priority cannot be adjusted");
+		if (!List.of(TaskStatusEnum.CREATED.name(), TaskStatusEnum.VALIDATED.name(), TaskStatusEnum.QUEUED.name())
+				.contains(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_PRIORITY_UPDATE_NOT_ALLOWED,
+					"priority can only be adjusted in CREATED, VALIDATED or QUEUED status");
 		}
 
 		Integer oldPriority = task.getPriority() == null ? 0 : task.getPriority();
@@ -265,16 +265,16 @@ public class TaskLifecycleManager {
 		if (!task.getNodeId().equals(request.getNodeId())) {
 			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "reported node does not match task bound node");
 		}
-		if (request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
-			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
-		}
 		String targetStatus = pickStatus(request);
 		String reason = pickReason(request);
 		if (!TaskStatusEnum.RUNNING.name().equalsIgnoreCase(targetStatus)) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "status-report only supports RUNNING");
 		}
-		if (TaskStatusEnum.RUNNING.name().equalsIgnoreCase(task.getStatus())) {
+		if (isIdempotentRunningReport(task, request, targetStatus)) {
 			return;
+		}
+		if (request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.TASK_STATUS_MISMATCH, "task status mismatch");
 		}
 		if (!TaskStatusEnum.DISPATCHED.name().equals(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for running report: " + task.getStatus());
@@ -307,9 +307,27 @@ public class TaskLifecycleManager {
 		return request.getReason();
 	}
 
+	private boolean isIdempotentRunningReport(Task task, StatusReportRequest request, String targetStatus) {
+		if (task == null || request == null || request.getNodeId() == null) {
+			return false;
+		}
+		if (!TaskStatusEnum.RUNNING.name().equalsIgnoreCase(targetStatus)) {
+			return false;
+		}
+		if (!TaskStatusEnum.RUNNING.name().equalsIgnoreCase(task.getStatus())) {
+			return false;
+		}
+		String fromStatus = request.getFromStatus();
+		if (fromStatus == null || fromStatus.isBlank()) {
+			return true;
+		}
+		return TaskStatusEnum.DISPATCHED.name().equalsIgnoreCase(fromStatus)
+				|| TaskStatusEnum.RUNNING.name().equalsIgnoreCase(fromStatus);
+	}
+
 	private TaskFileResponse toTaskFileResponse(TaskFile file) {
 		TaskFileResponse response = new TaskFileResponse();
-		response.setId(file.getId());
+		response.setFileId(file.getId());
 		response.setTaskId(file.getTaskId());
 		response.setFileRole(file.getFileRole());
 		response.setFileKey(file.getFileKey());
@@ -354,10 +372,8 @@ public class TaskLifecycleManager {
 	}
 
 	private TaskFile replaceExistingArchiveIfNeeded(Task task, UploadConstraint constraint, Long userId) {
-		TaskFile existingArchive = taskFileRepository.listByTaskId(task.getId()).stream()
-				.filter(existing -> constraint.fileRole().equalsIgnoreCase(existing.getFileRole())
-						&& constraint.fileKey().equalsIgnoreCase(existing.getFileKey()))
-				.findFirst()
+		TaskFile existingArchive = taskFileRepository
+				.findByTaskIdAndFileRoleAndFileKey(task.getId(), constraint.fileRole(), constraint.fileKey())
 				.orElse(null);
 		if (existingArchive == null) {
 			return null;
@@ -369,6 +385,17 @@ public class TaskLifecycleManager {
 			taskRepository.update(task);
 		}
 		return existingArchive;
+	}
+
+	private void deleteStoredFileQuietly(String storagePath) {
+		if (storagePath == null || storagePath.isBlank()) {
+			return;
+		}
+		try {
+			taskFileStorageService.deleteFile(storagePath);
+		} catch (RuntimeException ex) {
+			log.warn("failed to delete uploaded file after persistence error, path={}", storagePath, ex);
+		}
 	}
 
 	private void deleteOtherTaskFiles(Long taskId, Long keepId) {
@@ -421,6 +448,45 @@ public class TaskLifecycleManager {
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
+	}
+
+	private void validateTaskParams(Long profileId, Map<String, Object> params, Long taskId, String status) {
+		String schemaText = solverClient.getProfileParamsSchema(profileId);
+		List<com.example.cae.task.interfaces.response.TaskValidateResponse.ValidationIssue> issues =
+				taskParamSchemaValidator.validatePartial(schemaText, params);
+		if (issues.isEmpty()) {
+			return;
+		}
+		com.example.cae.task.interfaces.response.TaskValidateResponse response = new com.example.cae.task.interfaces.response.TaskValidateResponse();
+		response.setTaskId(taskId);
+		response.setValid(Boolean.FALSE);
+		response.setStatus(status);
+		response.setIssues(issues);
+		throw new BizException(ErrorCodeConstants.TASK_VALIDATION_FAILED, "task parameter validation failed", response);
+	}
+
+	private void validateTaskDefinition(Long solverId, Long profileId, String taskType) {
+		SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(solverId);
+		if (solverMeta == null) {
+			throw new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found");
+		}
+		if (!Integer.valueOf(1).equals(solverMeta.getEnabled())) {
+			throw new BizException(ErrorCodeConstants.SOLVER_DISABLED, "solver disabled");
+		}
+		SolverClient.ProfileMeta profileMeta = solverClient.getProfileMeta(profileId);
+		if (profileMeta == null) {
+			throw new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found");
+		}
+		if (!Integer.valueOf(1).equals(profileMeta.getEnabled())) {
+			throw new BizException(ErrorCodeConstants.PROFILE_DISABLED, "profile disabled");
+		}
+		if (!solverId.equals(profileMeta.getSolverId())) {
+			throw new BizException(ErrorCodeConstants.TASK_PROFILE_MISMATCH, "solver and profile do not match");
+		}
+		if (profileMeta.getTaskType() != null && !profileMeta.getTaskType().isBlank()
+				&& !profileMeta.getTaskType().equals(taskType)) {
+			throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
+		}
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {

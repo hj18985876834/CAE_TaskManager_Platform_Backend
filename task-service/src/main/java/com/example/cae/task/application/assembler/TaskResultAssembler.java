@@ -33,7 +33,7 @@ public class TaskResultAssembler {
 
 	public TaskResultFileResponse toFileResponse(TaskResultFile file) {
 		TaskResultFileResponse response = new TaskResultFileResponse();
-		response.setId(file.getId());
+		response.setFileId(file.getId());
 		response.setTaskId(file.getTaskId());
 		response.setFileType(file.getFileType());
 		response.setFileName(file.getFileName());

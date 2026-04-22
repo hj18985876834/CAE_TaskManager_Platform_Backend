@@ -260,6 +260,7 @@ CREATE TABLE task_file (
     checksum VARCHAR(100) DEFAULT NULL COMMENT '校验值',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
+    UNIQUE KEY uk_task_file_role_key (task_id, file_role, file_key),
     KEY idx_task_id (task_id),
     KEY idx_file_key (file_key),
     KEY idx_task_file_role (task_id, file_role)
@@ -295,6 +296,7 @@ CREATE TABLE task_result_file (
     file_size BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
+    UNIQUE KEY uk_task_file_type_name (task_id, file_type, file_name),
     KEY idx_task_id (task_id),
     KEY idx_file_type (file_type),
     KEY idx_task_file_type (task_id, file_type)

@@ -3,7 +3,7 @@ package com.example.cae.task.interfaces.response;
 import java.time.LocalDateTime;
 
 public class TaskResultFileResponse {
-	private Long id;
+	private Long fileId;
 	private Long taskId;
 	private String fileType;
 	private String fileName;
@@ -11,12 +11,12 @@ public class TaskResultFileResponse {
 	private Long fileSize;
 	private LocalDateTime createdAt;
 
-	public Long getId() {
-		return id;
+	public Long getFileId() {
+		return fileId;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
+	public void setFileId(Long fileId) {
+		this.fileId = fileId;
 	}
 
 	public Long getTaskId() {

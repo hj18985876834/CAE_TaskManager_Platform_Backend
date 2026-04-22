@@ -1,6 +1,7 @@
 package com.example.cae.task.interfaces.internal;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
 import com.example.cae.task.interfaces.request.InternalTaskFailRequest;
@@ -37,7 +38,7 @@ public class InternalTaskDispatchController {
 	}
 
 	@PostMapping("/{taskId}/mark-scheduled")
-	public Result<Boolean> markScheduled(@PathVariable("taskId") Long taskId,
+	public Result<TaskScheduleClaimDTO> markScheduled(@PathVariable("taskId") Long taskId,
 								 @RequestBody(required = false) TaskNodeMarkRequest request,
 							 @RequestParam(value = "nodeId", required = false) Long nodeId) {
 		Long effectiveNodeId = request != null && request.getNodeId() != null ? request.getNodeId() : nodeId;

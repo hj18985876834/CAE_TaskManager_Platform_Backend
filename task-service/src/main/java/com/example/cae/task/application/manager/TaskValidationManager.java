@@ -12,6 +12,7 @@ import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
+import com.example.cae.task.application.support.TaskParamSchemaValidator;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
@@ -60,6 +61,7 @@ public class TaskValidationManager {
     private final SolverClient solverClient;
     private final TaskStatusDomainService taskStatusDomainService;
     private final TaskValidationDomainService taskValidationDomainService;
+    private final TaskParamSchemaValidator taskParamSchemaValidator;
     private final TaskPathResolver taskPathResolver;
     private final TaskStoragePathSupport taskStoragePathSupport;
 
@@ -68,6 +70,7 @@ public class TaskValidationManager {
                                  SolverClient solverClient,
                                  TaskStatusDomainService taskStatusDomainService,
                                  TaskValidationDomainService taskValidationDomainService,
+                                 TaskParamSchemaValidator taskParamSchemaValidator,
                                  TaskPathResolver taskPathResolver,
                                  TaskStoragePathSupport taskStoragePathSupport) {
         this.taskRepository = taskRepository;
@@ -75,6 +78,7 @@ public class TaskValidationManager {
         this.solverClient = solverClient;
         this.taskStatusDomainService = taskStatusDomainService;
         this.taskValidationDomainService = taskValidationDomainService;
+        this.taskParamSchemaValidator = taskParamSchemaValidator;
         this.taskPathResolver = taskPathResolver;
         this.taskStoragePathSupport = taskStoragePathSupport;
     }
@@ -111,6 +115,7 @@ public class TaskValidationManager {
         List<TaskFile> files = taskFileRepository.listByTaskId(task.getId());
         Long profileSolverId = solverClient.getProfileSolverId(task.getProfileId());
         String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
+        String paramsSchema = solverClient.getProfileParamsSchema(task.getProfileId());
         SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
         String solverCode = solverMeta == null ? null : solverMeta.getSolverCode();
         List<FileRuleDTO> rules = solverClient.getFileRules(task.getProfileId());
@@ -129,9 +134,9 @@ public class TaskValidationManager {
                 throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
             }
             List<RuleDefinition> ruleDefinitions = buildRuleDefinitions(rules, issues);
-            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverMeta, taskParams, issues);
+            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverMeta, taskParams, paramsSchema, issues);
             if (!issues.isEmpty()) {
-                throw new BizException(ErrorCodeConstants.TASK_VALIDATION_FAILED, "task file validation failed", buildInvalidResponse(task, issues));
+                throw new BizException(ErrorCodeConstants.TASK_VALIDATION_FAILED, "task validation failed", buildInvalidResponse(task, issues));
             }
         } catch (BizException ex) {
             if (shouldAttachValidationData(ex)) {
@@ -147,6 +152,7 @@ public class TaskValidationManager {
                                                       List<RuleDefinition> ruleDefinitions,
                                                       SolverClient.SolverMeta solverMeta,
                                                       Map<String, Object> taskParams,
+                                                      String paramsSchema,
                                                       List<TaskValidateResponse.ValidationIssue> issues) {
         String archiveFileKey = resolveArchiveFileKey(ruleDefinitions);
         TaskFile archive = files.stream()
@@ -162,8 +168,13 @@ public class TaskValidationManager {
             issues.add(issue(archiveFileKey, archive.getOriginName(), "INVALID_ARCHIVE_SUFFIX", "Archive suffix is not allowed"));
             return null;
         }
+        Integer maxSizeMb = resolveArchiveMaxSizeMb(ruleDefinitions);
+        if (maxSizeMb != null && archive.getFileSize() != null && archive.getFileSize() > (long) maxSizeMb * 1024 * 1024) {
+            issues.add(issue(archiveFileKey, archive.getOriginName(), "ARCHIVE_TOO_LARGE", "Archive size exceeds schema limit"));
+            return null;
+        }
         if (!"zip".equals(suffix)) {
-            issues.add(issue(archiveFileKey, archive.getOriginName(), "UNSUPPORTED_ARCHIVE_FORMAT", "Only .zip archives are currently supported"));
+            issues.add(issue(archiveFileKey, archive.getOriginName(), "INVALID_ARCHIVE_SUFFIX", "Only .zip archives are currently supported"));
             return null;
         }
 
@@ -184,6 +195,14 @@ public class TaskValidationManager {
             }
             validateRule(ruleDefinition.rule(), extracted.entries(), ruleDefinition.ruleJson(), issues);
         }
+        Map<String, Object> effectiveParams = new LinkedHashMap<>();
+        if (taskParams != null && !taskParams.isEmpty()) {
+            effectiveParams.putAll(taskParams);
+        }
+        if (derivationOutcome.derivedParams() != null && !derivationOutcome.derivedParams().isEmpty()) {
+            effectiveParams.putAll(derivationOutcome.derivedParams());
+        }
+        issues.addAll(taskParamSchemaValidator.validateComplete(paramsSchema, effectiveParams));
         return new ValidationOutcome(derivationOutcome.derivedParams());
     }
 
@@ -221,6 +240,17 @@ public class TaskValidationManager {
                         .map(value -> value.toLowerCase(Locale.ROOT))
                         .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)))
                 .orElseGet(() -> new LinkedHashSet<>(List.of("zip")));
+    }
+
+    private Integer resolveArchiveMaxSizeMb(List<RuleDefinition> ruleDefinitions) {
+        return ruleDefinitions.stream()
+                .filter(ruleDefinition -> isArchiveRule(ruleDefinition.rule()))
+                .map(RuleDefinition::ruleJson)
+                .filter(Objects::nonNull)
+                .map(ruleJson -> firstInteger(ruleJson, "maxSizeMb"))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private Map<String, Object> buildValidationVariables(Task task,
@@ -306,7 +336,7 @@ public class TaskValidationManager {
                                 List<TaskValidateResponse.ValidationIssue> issues) {
         String paramName = trimToNull(deriveConfig.get("name"));
         if (paramName == null) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFIG_INVALID", "deriveParam.name is required"));
+            issues.add(templateRuleIssue(rule, rule.getPathPattern(), "deriveParam.name is required"));
             return;
         }
         Object derivedValue = resolveDerivedValue(rule, deriveConfig, caseDir, matchedEntries, issues);
@@ -315,7 +345,7 @@ public class TaskValidationManager {
         }
         Object existingValue = validationVariables.get(paramName);
         if (existingValue != null && !sameValue(existingValue, derivedValue)) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFLICT", "Derived parameter conflicts with task parameter: " + paramName));
+            issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "Derived parameter conflicts with task parameter: " + paramName));
             return;
         }
         validationVariables.put(paramName, derivedValue);
@@ -337,7 +367,7 @@ public class TaskValidationManager {
             case "relativePathRegex" -> deriveRegexValue(rule, deriveConfig, matchedEntries, ExtractedEntry::relativePath, issues);
             case "fileContentRegex" -> deriveFileContentValue(rule, deriveConfig, caseDir, matchedEntries, issues);
             default -> {
-                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_SOURCE_UNSUPPORTED", "Unsupported deriveParam.source: " + source));
+                issues.add(templateRuleIssue(rule, rule.getPathPattern(), "Unsupported deriveParam.source: " + source));
                 yield null;
             }
         };
@@ -348,7 +378,7 @@ public class TaskValidationManager {
                                       List<TaskValidateResponse.ValidationIssue> issues) {
         Object value = deriveConfig.get("value");
         if (value == null) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFIG_INVALID", "deriveParam.value is required for literal source"));
+            issues.add(templateRuleIssue(rule, rule.getPathPattern(), "deriveParam.value is required for literal source"));
             return null;
         }
         return normalizeDerivedValue(rule, deriveConfig, String.valueOf(value), issues);
@@ -364,13 +394,13 @@ public class TaskValidationManager {
                 .toList();
         if (fileEntries.isEmpty()) {
             if (isRequiredDeriveConfig(deriveConfig)) {
-                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_SOURCE_MISSING", "No file matched for parameter derivation"));
+                issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "No file matched for parameter derivation"));
             }
             return null;
         }
         String pattern = trimToNull(deriveConfig.get("pattern"));
         if (pattern == null) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFIG_INVALID", "deriveParam.pattern is required"));
+            issues.add(templateRuleIssue(rule, rule.getPathPattern(), "deriveParam.pattern is required"));
             return null;
         }
         Integer group = firstInteger(deriveConfig, "group");
@@ -387,12 +417,12 @@ public class TaskValidationManager {
                 }
                 return normalizeDerivedValue(rule, deriveConfig, matcher.group(groupIndex), issues);
             } catch (Exception ex) {
-                issues.add(issue(rule.getFileKey(), entry.relativePath(), "DERIVED_PARAM_PATTERN_INVALID", "deriveParam.pattern is invalid"));
+                issues.add(templateRuleIssue(rule, entry.relativePath(), "deriveParam.pattern is invalid"));
                 return null;
             }
         }
         if (isRequiredDeriveConfig(deriveConfig)) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_MATCH_FAILED", "Failed to derive parameter from matched files"));
+            issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "Failed to derive parameter from matched files"));
         }
         return null;
     }
@@ -407,13 +437,13 @@ public class TaskValidationManager {
                 .toList();
         if (fileEntries.isEmpty()) {
             if (isRequiredDeriveConfig(deriveConfig)) {
-                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_SOURCE_MISSING", "No file matched for parameter derivation"));
+                issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "No file matched for parameter derivation"));
             }
             return null;
         }
         String pattern = trimToNull(deriveConfig.get("pattern"));
         if (pattern == null) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFIG_INVALID", "deriveParam.pattern is required"));
+            issues.add(templateRuleIssue(rule, rule.getPathPattern(), "deriveParam.pattern is required"));
             return null;
         }
         Integer group = firstInteger(deriveConfig, "group");
@@ -424,7 +454,7 @@ public class TaskValidationManager {
             try {
                 content = Files.readString(filePath);
             } catch (IOException ex) {
-                issues.add(issue(rule.getFileKey(), entry.relativePath(), "DERIVED_PARAM_SOURCE_UNREADABLE", "Failed to read file for parameter derivation"));
+                issues.add(paramSchemaIssue(rule, entry.relativePath(), "Failed to read file for parameter derivation"));
                 return null;
             }
             content = applyPreprocess(content, rule, deriveConfig, entry, issues);
@@ -438,12 +468,12 @@ public class TaskValidationManager {
                 }
                 return normalizeDerivedValue(rule, deriveConfig, matcher.group(groupIndex), issues);
             } catch (Exception ex) {
-                issues.add(issue(rule.getFileKey(), entry.relativePath(), "DERIVED_PARAM_PATTERN_INVALID", "deriveParam.pattern is invalid"));
+                issues.add(templateRuleIssue(rule, entry.relativePath(), "deriveParam.pattern is invalid"));
                 return null;
             }
         }
         if (isRequiredDeriveConfig(deriveConfig)) {
-            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_MATCH_FAILED", "Failed to derive parameter from file content"));
+            issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "Failed to derive parameter from file content"));
         }
         return null;
     }
@@ -471,7 +501,7 @@ public class TaskValidationManager {
             try {
                 processed = processed.replaceAll(pattern, replacement);
             } catch (Exception ex) {
-                issues.add(issue(rule.getFileKey(), entry.relativePath(), "DERIVED_PARAM_PREPROCESS_INVALID", "deriveParam preprocess pattern is invalid"));
+                issues.add(templateRuleIssue(rule, entry.relativePath(), "deriveParam preprocess pattern is invalid"));
                 return null;
             }
         }
@@ -499,11 +529,11 @@ public class TaskValidationManager {
         if (sanitizeRegex != null) {
             try {
                 if (!Pattern.compile(sanitizeRegex).matcher(value).matches()) {
-                    issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_INVALID", "Derived parameter failed validation"));
+                    issues.add(paramSchemaIssue(rule, rule.getPathPattern(), "Derived parameter failed validation"));
                     return null;
                 }
             } catch (Exception ex) {
-                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "DERIVED_PARAM_CONFIG_INVALID", "deriveParam.sanitizeRegex is invalid"));
+                issues.add(templateRuleIssue(rule, rule.getPathPattern(), "deriveParam.sanitizeRegex is invalid"));
                 return null;
             }
         }
@@ -859,6 +889,14 @@ public class TaskValidationManager {
         issue.setErrorCode(errorCode);
         issue.setMessage(message);
         return issue;
+    }
+
+    private TaskValidateResponse.ValidationIssue templateRuleIssue(FileRuleDTO rule, String path, String message) {
+        return issue(rule.getFileKey(), path, "TEMPLATE_RULE_CONFLICT", message);
+    }
+
+    private TaskValidateResponse.ValidationIssue paramSchemaIssue(FileRuleDTO rule, String path, String message) {
+        return issue(rule.getFileKey(), path, "PARAM_SCHEMA_INVALID", message);
     }
 
     private String firstNonBlank(String first, String second) {

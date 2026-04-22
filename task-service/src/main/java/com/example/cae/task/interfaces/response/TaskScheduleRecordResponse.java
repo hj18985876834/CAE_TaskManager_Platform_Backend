@@ -3,7 +3,7 @@ package com.example.cae.task.interfaces.response;
 import java.time.LocalDateTime;
 
 public class TaskScheduleRecordResponse {
-	private Long id;
+	private Long scheduleId;
 	private Long taskId;
 	private Long nodeId;
 	private String nodeName;
@@ -12,12 +12,12 @@ public class TaskScheduleRecordResponse {
 	private String scheduleMessage;
 	private LocalDateTime createdAt;
 
-	public Long getId() {
-		return id;
+	public Long getScheduleId() {
+		return scheduleId;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
+	public void setScheduleId(Long scheduleId) {
+		this.scheduleId = scheduleId;
 	}
 
 	public Long getTaskId() {

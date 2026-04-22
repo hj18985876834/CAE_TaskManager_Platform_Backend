@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public class NodeDetailResponse {
-	private Long id;
 	private Long nodeId;
 	private String nodeCode;
 	private String nodeName;
@@ -22,14 +21,6 @@ public class NodeDetailResponse {
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
 	private List<NodeSolverResponse> solvers;
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
-	}
 
 	public Long getNodeId() {
 		return nodeId;

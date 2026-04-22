@@ -2,6 +2,7 @@ package com.example.cae.task.application.manager;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskFileDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.OperatorTypeEnum;
@@ -67,7 +68,7 @@ public class TaskDispatchManager {
 	}
 
 	@Transactional
-	public boolean markScheduled(Long taskId, Long nodeId) {
+	public TaskScheduleClaimDTO markScheduled(Long taskId, Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
@@ -76,14 +77,14 @@ public class TaskDispatchManager {
 			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name(), TaskStatusEnum.RUNNING.name(),
 					TaskStatusEnum.SUCCESS.name(), TaskStatusEnum.FAILED.name(), TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name())
 					.contains(task.getStatus())) {
-				return false;
+				return buildScheduleClaimResult(Boolean.FALSE, task, nodeId);
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for scheduling: " + task.getStatus());
 		}
 		task.bindNode(nodeId);
 		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
-		return true;
+		return buildScheduleClaimResult(Boolean.TRUE, task, nodeId);
 	}
 
 	@Transactional
@@ -130,7 +131,6 @@ public class TaskDispatchManager {
 				OperatorTypeEnum.SYSTEM.name(),
 				null);
 		taskRepository.update(task);
-		releaseReservationQuietly(nodeId, taskId);
 	}
 
 	private void ensureTaskBoundToNode(Task task, Long nodeId) {
@@ -140,6 +140,15 @@ public class TaskDispatchManager {
 		if (!task.getNodeId().equals(nodeId)) {
 			throw new BizException(ErrorCodeConstants.REPORTED_NODE_MISMATCH, "nodeId does not match task bound node");
 		}
+	}
+
+	private TaskScheduleClaimDTO buildScheduleClaimResult(Boolean claimed, Task task, Long requestedNodeId) {
+		TaskScheduleClaimDTO result = new TaskScheduleClaimDTO();
+		result.setClaimed(claimed);
+		result.setTaskId(task == null ? null : task.getId());
+		result.setNodeId(task != null && task.getNodeId() != null ? task.getNodeId() : requestedNodeId);
+		result.setStatus(task == null ? null : task.getStatus());
+		return result;
 	}
 
 	public String getTaskStatus(Long taskId) {
@@ -162,10 +171,18 @@ public class TaskDispatchManager {
 			if (lockedTask == null || !NODE_OFFLINE_AFFECTED_STATUSES.contains(lockedTask.getStatus())) {
 				continue;
 			}
-			lockedTask.setFailType(FailTypeEnum.NODE_OFFLINE.name());
-			lockedTask.setFailMessage(effectiveReason);
-			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
-			taskRepository.update(lockedTask);
+			if (TaskStatusEnum.RUNNING.name().equals(lockedTask.getStatus())) {
+				lockedTask.setFailType(FailTypeEnum.NODE_OFFLINE.name());
+				lockedTask.setFailMessage(effectiveReason);
+				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+				taskRepository.update(lockedTask);
+				continue;
+			}
+			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
+				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+				taskRepository.update(lockedTask);
+				releaseReservationQuietly(nodeId, lockedTask.getId());
+			}
 		}
 		return affectedTasks.size();
 	}

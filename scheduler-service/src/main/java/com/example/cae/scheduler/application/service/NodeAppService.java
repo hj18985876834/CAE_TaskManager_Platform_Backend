@@ -21,6 +21,7 @@ import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
+import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -178,7 +179,6 @@ public class NodeAppService {
 		computeNodeRepository.findByNodeCode(nodeCode).ifPresent(node -> {
 			node.markOffline();
 			node.setRunningCount(0);
-			node.setReservedCount(0);
 			node.setCpuUsage(BigDecimal.ZERO);
 			node.setMemoryUsage(BigDecimal.ZERO);
 			computeNodeRepository.update(node);
@@ -206,13 +206,13 @@ public class NodeAppService {
 	}
 
 	@Transactional
-	public void reserveReservation(Long nodeId, Long taskId) {
+	public NodeReservationActionResponse reserveReservation(Long nodeId, Long taskId) {
 		validateReservationRequest(nodeId, taskId);
 		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
 		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
 		if (reservation != null && reservation.isReserved()) {
-			return;
+			return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
 		}
 		if (!node.reserveSlot()) {
 			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
@@ -224,25 +224,30 @@ public class NodeAppService {
 			newReservation.setTaskId(taskId);
 			newReservation.markReserved();
 			nodeReservationRepository.save(newReservation);
-			return;
+			return buildReservationActionResponse(taskId, nodeId, newReservation.getStatus(), safeReservedCount(node));
 		}
 		reservation.markReserved();
 		nodeReservationRepository.update(reservation);
+		return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
 	}
 
 	@Transactional
-	public void releaseReservation(Long nodeId, Long taskId) {
+	public NodeReservationActionResponse releaseReservation(Long nodeId, Long taskId) {
 		validateReservationRequest(nodeId, taskId);
-		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
-		if (reservation == null || !reservation.isReserved()) {
-			return;
-		}
 		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
+		if (reservation == null) {
+			throw new BizException(ErrorCodeConstants.CONFLICT, "node reservation does not exist");
+		}
+		if (!reservation.isReserved()) {
+			return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
+		}
 		node.releaseReservation();
 		computeNodeRepository.update(node);
 		reservation.markReleased();
 		nodeReservationRepository.update(reservation);
+		return buildReservationActionResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
 	}
 
 	/**
@@ -277,6 +282,22 @@ public class NodeAppService {
 		}
 	}
 
+	private NodeReservationActionResponse buildReservationActionResponse(Long taskId,
+																		 Long nodeId,
+																		 String reservationStatus,
+																		 Integer reservedCount) {
+		NodeReservationActionResponse response = new NodeReservationActionResponse();
+		response.setTaskId(taskId);
+		response.setNodeId(nodeId);
+		response.setReservationStatus(reservationStatus);
+		response.setReservedCount(reservedCount);
+		return response;
+	}
+
+	private Integer safeReservedCount(ComputeNode node) {
+		return node == null || node.getReservedCount() == null ? 0 : node.getReservedCount();
+	}
+
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {
 		NodeDetailResponse response = NodeAssembler.toDetailResponse(node);
 		List<NodeSolverCapability> capabilities = nodeSolverCapabilityRepository.listByNodeId(node.getId());
@@ -300,7 +321,6 @@ public class NodeAppService {
 
 	private NodeListItemResponse toNodeListItem(ComputeNode node) {
 		NodeListItemResponse response = new NodeListItemResponse();
-		response.setId(node.getId());
 		response.setNodeId(node.getId());
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());

@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class NodeListItemResponse {
-	private Long id;
 	private Long nodeId;
 	private String nodeCode;
 	private String nodeName;
@@ -20,14 +19,6 @@ public class NodeListItemResponse {
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
-	}
 
 	public Long getNodeId() {
 		return nodeId;

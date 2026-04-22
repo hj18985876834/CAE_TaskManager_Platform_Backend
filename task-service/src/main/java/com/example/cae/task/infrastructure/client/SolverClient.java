@@ -24,6 +24,20 @@ public class SolverClient {
 		return getInternalProfileMap(profileId);
 	}
 
+	public ProfileMeta getProfileMeta(Long profileId) {
+		Map<String, Object> profileMap = getInternalProfileMap(profileId);
+		if (profileMap == null) {
+			return null;
+		}
+		ProfileMeta meta = new ProfileMeta();
+		meta.setProfileId(profileId);
+		meta.setSolverId(toLong(profileMap.get("solverId")));
+		meta.setTaskType(toString(profileMap.get("taskType")));
+		meta.setProfileName(toString(profileMap.get("profileName")));
+		meta.setEnabled(toInteger(profileMap.get("enabled")));
+		return meta;
+	}
+
 	public Long getProfileSolverId(Long profileId) {
 		Map<String, Object> profileMap = getInternalProfileMap(profileId);
 		return profileMap == null ? null : toLong(profileMap.get("solverId"));
@@ -37,6 +51,18 @@ public class SolverClient {
 	public String getProfileName(Long profileId) {
 		Map<String, Object> profileMap = getInternalProfileMap(profileId);
 		return profileMap == null ? null : toString(profileMap.get("profileName"));
+	}
+
+	public String getProfileParamsSchema(Long profileId) {
+		Map<String, Object> profileMap = getInternalProfileMap(profileId);
+		if (profileMap == null) {
+			return null;
+		}
+		String paramsSchema = toString(profileMap.get("paramsSchema"));
+		if (paramsSchema != null && !paramsSchema.isBlank()) {
+			return paramsSchema;
+		}
+		return toString(profileMap.get("paramsSchemaJson"));
 	}
 
 	public List<FileRuleDTO> getFileRules(Long profileId) {
@@ -118,6 +144,7 @@ public class SolverClient {
 		solverMeta.setSolverName(toString(map.get("solverName")));
 		solverMeta.setExecMode(toString(map.get("execMode")));
 		solverMeta.setExecPath(toString(map.get("execPath")));
+		solverMeta.setEnabled(toInteger(map.get("enabled")));
 		return solverMeta;
 	}
 
@@ -241,6 +268,7 @@ public class SolverClient {
 		private String solverName;
 		private String execMode;
 		private String execPath;
+		private Integer enabled;
 
 		public String getSolverCode() {
 			return solverCode;
@@ -272,6 +300,62 @@ public class SolverClient {
 
 		public void setExecPath(String execPath) {
 			this.execPath = execPath;
+		}
+
+		public Integer getEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(Integer enabled) {
+			this.enabled = enabled;
+		}
+	}
+
+	public static class ProfileMeta {
+		private Long profileId;
+		private Long solverId;
+		private String taskType;
+		private String profileName;
+		private Integer enabled;
+
+		public Long getProfileId() {
+			return profileId;
+		}
+
+		public void setProfileId(Long profileId) {
+			this.profileId = profileId;
+		}
+
+		public Long getSolverId() {
+			return solverId;
+		}
+
+		public void setSolverId(Long solverId) {
+			this.solverId = solverId;
+		}
+
+		public String getTaskType() {
+			return taskType;
+		}
+
+		public void setTaskType(String taskType) {
+			this.taskType = taskType;
+		}
+
+		public String getProfileName() {
+			return profileName;
+		}
+
+		public void setProfileName(String profileName) {
+			this.profileName = profileName;
+		}
+
+		public Integer getEnabled() {
+			return enabled;
+		}
+
+		public void setEnabled(Integer enabled) {
+			this.enabled = enabled;
 		}
 	}
 }

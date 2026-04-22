@@ -20,7 +20,7 @@ public class TaskLogRepositoryImpl implements TaskLogRepository {
 
 	@Override
 	public void save(TaskLogChunk chunk) {
-		taskLogChunkMapper.insert(taskLogAssembler.toPO(chunk));
+		taskLogChunkMapper.insertOrUpdate(taskLogAssembler.toPO(chunk));
 	}
 
 	@Override

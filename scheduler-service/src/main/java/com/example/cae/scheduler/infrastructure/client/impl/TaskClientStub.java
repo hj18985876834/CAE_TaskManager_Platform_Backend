@@ -1,6 +1,7 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.config.SchedulerRemoteServiceProperties;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
@@ -44,19 +45,32 @@ public class TaskClientStub implements TaskClient {
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public boolean markTaskScheduled(Long taskId, Long nodeId) {
+	public TaskScheduleClaimDTO markTaskScheduled(Long taskId, Long nodeId) {
 		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/mark-scheduled";
 		java.util.Map<String, Object> request = new java.util.HashMap<>();
 		request.put("nodeId", nodeId);
 		Result<Object> result = restTemplate.postForObject(url, request, Result.class);
 		if (result == null || result.getData() == null) {
-			return false;
+			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
+			response.setClaimed(Boolean.FALSE);
+			response.setTaskId(taskId);
+			response.setNodeId(nodeId);
+			return response;
 		}
 		Object data = result.getData();
-		if (data instanceof Boolean bool) {
-			return bool;
+		if (data instanceof java.util.Map<?, ?> map) {
+			TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
+			response.setClaimed(toBoolean(map.get("claimed")));
+			response.setTaskId(toLong(map.get("taskId"), taskId));
+			response.setNodeId(toLong(map.get("nodeId"), nodeId));
+			response.setStatus(map.get("status") == null ? null : String.valueOf(map.get("status")));
+			return response;
 		}
-		return Boolean.parseBoolean(String.valueOf(data));
+		TaskScheduleClaimDTO response = new TaskScheduleClaimDTO();
+		response.setClaimed(Boolean.parseBoolean(String.valueOf(data)));
+		response.setTaskId(taskId);
+		response.setNodeId(nodeId);
+		return response;
 	}
 
 	@Override
@@ -95,5 +109,29 @@ public class TaskClientStub implements TaskClient {
 			return null;
 		}
 		return String.valueOf(result.getData());
+	}
+
+	private Boolean toBoolean(Object value) {
+		if (value == null) {
+			return Boolean.FALSE;
+		}
+		if (value instanceof Boolean bool) {
+			return bool;
+		}
+		return Boolean.parseBoolean(String.valueOf(value));
+	}
+
+	private Long toLong(Object value, Long defaultValue) {
+		if (value == null) {
+			return defaultValue;
+		}
+		if (value instanceof Number number) {
+			return number.longValue();
+		}
+		try {
+			return Long.parseLong(String.valueOf(value));
+		} catch (NumberFormatException ex) {
+			return defaultValue;
+		}
 	}
 }

@@ -1,13 +1,14 @@
 package com.example.cae.scheduler.infrastructure.client;
 
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 
 import java.util.List;
 
 public interface TaskClient {
 	List<TaskDTO> listPendingTasks(Integer limit);
 
-	boolean markTaskScheduled(Long taskId, Long nodeId);
+	TaskScheduleClaimDTO markTaskScheduled(Long taskId, Long nodeId);
 
 	void markTaskDispatched(Long taskId, Long nodeId);
 

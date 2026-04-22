@@ -3,6 +3,7 @@ package com.example.cae.scheduler.interfaces.internal;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.interfaces.request.NodeReservationRequest;
+import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -23,16 +24,14 @@ public class InternalNodeReservationController {
 	}
 
 	@PostMapping("/{nodeId}/reserve")
-	public Result<Void> reserve(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
-								@Valid @RequestBody NodeReservationRequest request) {
-		nodeAppService.reserveReservation(nodeId, request.getTaskId());
-		return Result.success();
+	public Result<NodeReservationActionResponse> reserve(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
+														 @Valid @RequestBody NodeReservationRequest request) {
+		return Result.success(nodeAppService.reserveReservation(nodeId, request.getTaskId()));
 	}
 
 	@PostMapping("/{nodeId}/release-reservation")
-	public Result<Void> releaseReservation(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
-										   @Valid @RequestBody NodeReservationRequest request) {
-		nodeAppService.releaseReservation(nodeId, request.getTaskId());
-		return Result.success();
+	public Result<NodeReservationActionResponse> releaseReservation(@PathVariable @Positive(message = "nodeId must be greater than 0") Long nodeId,
+																	@Valid @RequestBody NodeReservationRequest request) {
+		return Result.success(nodeAppService.releaseReservation(nodeId, request.getTaskId()));
 	}
 }

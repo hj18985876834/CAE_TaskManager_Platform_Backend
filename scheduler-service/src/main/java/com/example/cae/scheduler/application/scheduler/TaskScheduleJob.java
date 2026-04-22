@@ -2,6 +2,7 @@ package com.example.cae.scheduler.application.scheduler;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
@@ -35,7 +36,8 @@ public class TaskScheduleJob {
 			boolean dispatchAccepted = false;
 			try {
 				nodeId = taskScheduleManager.schedule(task);
-				taskMarkedScheduled = taskClient.markTaskScheduled(task.getTaskId(), nodeId);
+				TaskScheduleClaimDTO scheduleClaim = taskClient.markTaskScheduled(task.getTaskId(), nodeId);
+				taskMarkedScheduled = scheduleClaim != null && Boolean.TRUE.equals(scheduleClaim.getClaimed());
 				if (!taskMarkedScheduled) {
 					taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
 					continue;

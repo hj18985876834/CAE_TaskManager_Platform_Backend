@@ -35,14 +35,30 @@ public class SchedulerClient {
 		restTemplate.postForEntity(url, body, Result.class);
 	}
 
-	public void releaseNodeReservation(Long nodeId, Long taskId) {
+	@SuppressWarnings("unchecked")
+	public NodeReservationActionResult releaseNodeReservation(Long nodeId, Long taskId) {
 		if (nodeId == null || taskId == null) {
-			return;
+			return null;
 		}
 		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/release-reservation";
 		Map<String, Object> body = new java.util.HashMap<>();
 		body.put("taskId", taskId);
-		restTemplate.postForEntity(url, body, Result.class);
+		Result<Object> result = restTemplate.postForObject(url, body, Result.class);
+		if (result == null) {
+			return null;
+		}
+		if (result.getCode() != null && result.getCode() != 0) {
+			throw new com.example.cae.common.exception.BizException(result.getCode(), result.getMessage(), result.getData());
+		}
+		if (!(result.getData() instanceof Map<?, ?> dataMap)) {
+			return null;
+		}
+		NodeReservationActionResult actionResult = new NodeReservationActionResult();
+		actionResult.setTaskId(toLong(dataMap.get("taskId")));
+		actionResult.setNodeId(toLong(dataMap.get("nodeId")));
+		actionResult.setReservationStatus(toString(dataMap.get("reservationStatus")));
+		actionResult.setReservedCount(toInteger(dataMap.get("reservedCount")));
+		return actionResult;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -156,7 +172,7 @@ public class SchedulerClient {
 				continue;
 			}
 			ScheduleRecordItem item = new ScheduleRecordItem();
-			item.setId(toLong(map.get("id")));
+			item.setScheduleId(toLong(map.get("scheduleId")));
 			item.setTaskId(toLong(map.get("taskId")));
 			item.setNodeId(toLong(map.get("nodeId")));
 			item.setNodeName(toString(map.get("nodeName")));
@@ -279,7 +295,7 @@ public class SchedulerClient {
 	}
 
 	public static class ScheduleRecordItem {
-		private Long id;
+		private Long scheduleId;
 		private Long taskId;
 		private Long nodeId;
 		private String nodeName;
@@ -288,12 +304,12 @@ public class SchedulerClient {
 		private String scheduleMessage;
 		private LocalDateTime createdAt;
 
-		public Long getId() {
-			return id;
+		public Long getScheduleId() {
+			return scheduleId;
 		}
 
-		public void setId(Long id) {
-			this.id = id;
+		public void setScheduleId(Long scheduleId) {
+			this.scheduleId = scheduleId;
 		}
 
 		public Long getTaskId() {
@@ -350,6 +366,45 @@ public class SchedulerClient {
 
 		public void setCreatedAt(LocalDateTime createdAt) {
 			this.createdAt = createdAt;
+		}
+	}
+
+	public static class NodeReservationActionResult {
+		private Long taskId;
+		private Long nodeId;
+		private String reservationStatus;
+		private Integer reservedCount;
+
+		public Long getTaskId() {
+			return taskId;
+		}
+
+		public void setTaskId(Long taskId) {
+			this.taskId = taskId;
+		}
+
+		public Long getNodeId() {
+			return nodeId;
+		}
+
+		public void setNodeId(Long nodeId) {
+			this.nodeId = nodeId;
+		}
+
+		public String getReservationStatus() {
+			return reservationStatus;
+		}
+
+		public void setReservationStatus(String reservationStatus) {
+			this.reservationStatus = reservationStatus;
+		}
+
+		public Integer getReservedCount() {
+			return reservedCount;
+		}
+
+		public void setReservedCount(Integer reservedCount) {
+			this.reservedCount = reservedCount;
 		}
 	}
 }

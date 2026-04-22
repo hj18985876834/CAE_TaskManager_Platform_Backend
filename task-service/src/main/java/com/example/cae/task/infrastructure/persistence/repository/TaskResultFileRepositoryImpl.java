@@ -25,7 +25,7 @@ public class TaskResultFileRepositoryImpl implements TaskResultFileRepository {
 		po.setFileName(file.getFileName());
 		po.setStoragePath(file.getStoragePath());
 		po.setFileSize(file.getFileSize());
-		taskResultFileMapper.insert(po);
+		taskResultFileMapper.insertOrUpdate(po);
 	}
 
 	@Override

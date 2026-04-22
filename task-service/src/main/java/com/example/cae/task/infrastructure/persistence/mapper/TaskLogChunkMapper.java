@@ -11,8 +11,9 @@ import java.util.List;
 
 @Mapper
 public interface TaskLogChunkMapper {
-	@Insert("INSERT INTO task_log_chunk(task_id, seq_no, log_content) VALUES(#{taskId}, #{seqNo}, #{logContent})")
-	int insert(TaskLogChunkPO po);
+	@Insert("INSERT INTO task_log_chunk(task_id, seq_no, log_content) VALUES(#{taskId}, #{seqNo}, #{logContent}) " +
+			"ON DUPLICATE KEY UPDATE log_content = VALUES(log_content)")
+	int insertOrUpdate(TaskLogChunkPO po);
 
 	@Select("SELECT id, task_id AS taskId, seq_no AS seqNo, log_content AS logContent, created_at AS createdAt FROM task_log_chunk WHERE task_id = #{taskId} AND seq_no >= #{fromSeq} ORDER BY seq_no ASC LIMIT #{pageSize}")
 	List<TaskLogChunkPO> selectByTaskIdAndSeq(@Param("taskId") Long taskId, @Param("fromSeq") Integer fromSeq, @Param("pageSize") Integer pageSize);

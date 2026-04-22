@@ -34,6 +34,7 @@ public class ScheduleAppService {
 	private final ScheduleStrategy scheduleStrategy;
 	private final NodeAgentClient nodeAgentClient;
 	private final SolverClient solverClient;
+	private final NodeAppService nodeAppService;
 
 	public ScheduleAppService(ComputeNodeRepository computeNodeRepository,
 							NodeReservationRepository nodeReservationRepository,
@@ -42,7 +43,8 @@ public class ScheduleAppService {
 							ScheduleDomainService scheduleDomainService,
 							ScheduleStrategy scheduleStrategy,
 							NodeAgentClient nodeAgentClient,
-							SolverClient solverClient) {
+							SolverClient solverClient,
+							NodeAppService nodeAppService) {
 		this.computeNodeRepository = computeNodeRepository;
 		this.nodeReservationRepository = nodeReservationRepository;
 		this.nodeSolverCapabilityRepository = nodeSolverCapabilityRepository;
@@ -51,6 +53,7 @@ public class ScheduleAppService {
 		this.scheduleStrategy = scheduleStrategy;
 		this.nodeAgentClient = nodeAgentClient;
 		this.solverClient = solverClient;
+		this.nodeAppService = nodeAppService;
 	}
 
 	@Transactional
@@ -146,18 +149,7 @@ public class ScheduleAppService {
 		if (nodeId == null || taskId == null) {
 			return;
 		}
-		NodeReservation reservation = nodeReservationRepository.findByNodeIdAndTaskIdForUpdate(nodeId, taskId).orElse(null);
-		if (reservation == null || !reservation.isReserved()) {
-			return;
-		}
-		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId).orElse(null);
-		if (node == null) {
-			return;
-		}
-		node.releaseReservation();
-		computeNodeRepository.update(node);
-		reservation.markReleased();
-		nodeReservationRepository.update(reservation);
+		nodeAppService.releaseReservation(nodeId, taskId);
 	}
 
 	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {

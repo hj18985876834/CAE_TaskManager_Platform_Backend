@@ -46,6 +46,7 @@ public class TaskResultManager {
 	}
 
 	public void appendLog(Long taskId, Integer seqNo, String content) {
+		ensureLogReportAllowed(taskId);
 		TaskLogChunk chunk = new TaskLogChunk();
 		chunk.setTaskId(taskId);
 		chunk.setSeqNo(seqNo);
@@ -54,6 +55,7 @@ public class TaskResultManager {
 	}
 
 	public void saveResultSummary(Long taskId, ResultSummaryReportRequest request) {
+		ensureResultSummaryAllowed(taskId);
 		TaskResultSummary summary = new TaskResultSummary();
 		summary.setTaskId(taskId);
 		Integer successFlag = request.getSuccessFlag();
@@ -68,6 +70,7 @@ public class TaskResultManager {
 	}
 
 	public void saveResultFile(Long taskId, ResultFileReportRequest request) {
+		ensureResultFileAllowed(taskId);
 		TaskResultFile file = new TaskResultFile();
 		file.setTaskId(taskId);
 		file.setFileType(request.getFileType());
@@ -127,5 +130,41 @@ public class TaskResultManager {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported finalStatus: " + target);
 		}
 		return target;
+	}
+
+	private void ensureLogReportAllowed(Long taskId) {
+		Task task = loadTask(taskId);
+		if (task.isFinished()) {
+			return;
+		}
+		if (TaskStatusEnum.DISPATCHED.name().equals(task.getStatus())
+				|| TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			return;
+		}
+		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+				"illegal status for log report: " + task.getStatus());
+	}
+
+	private void ensureResultSummaryAllowed(Long taskId) {
+		Task task = loadTask(taskId);
+		if (task.isFinished() || TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			return;
+		}
+		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+				"illegal status for result summary report: " + task.getStatus());
+	}
+
+	private void ensureResultFileAllowed(Long taskId) {
+		Task task = loadTask(taskId);
+		if (task.isFinished() || TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			return;
+		}
+		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+				"illegal status for result file report: " + task.getStatus());
+	}
+
+	private Task loadTask(Long taskId) {
+		return taskRepository.findById(taskId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 	}
 }

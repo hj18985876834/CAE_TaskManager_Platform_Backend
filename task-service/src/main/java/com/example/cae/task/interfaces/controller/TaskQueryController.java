@@ -34,11 +34,6 @@ public class TaskQueryController {
 		return Result.success(taskQueryAppService.pageMyTasks(request, userId));
 	}
 
-	@GetMapping("/admin")
-	public Result<PageResult<TaskListItemResponse>> pageAdminTasks(@Valid TaskListQueryRequest request) {
-		return Result.success(taskQueryAppService.pageAdminTasks(request));
-	}
-
 	@GetMapping("/{taskId}")
 	public Result<TaskDetailResponse> getTaskDetail(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId, @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskDetail(taskId, userId, roleCode));

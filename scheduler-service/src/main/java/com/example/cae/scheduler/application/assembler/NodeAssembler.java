@@ -25,7 +25,6 @@ public final class NodeAssembler {
 
 	public static NodeDetailResponse toDetailResponse(ComputeNode node) {
 		NodeDetailResponse response = new NodeDetailResponse();
-		response.setId(node.getId());
 		response.setNodeId(node.getId());
 		response.setNodeCode(node.getNodeCode());
 		response.setNodeName(node.getNodeName());

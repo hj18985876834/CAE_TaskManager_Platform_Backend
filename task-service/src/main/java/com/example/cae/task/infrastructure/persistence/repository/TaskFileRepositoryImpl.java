@@ -7,6 +7,7 @@ import com.example.cae.task.infrastructure.persistence.mapper.TaskFileMapper;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class TaskFileRepositoryImpl implements TaskFileRepository {
@@ -19,16 +20,14 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 	@Override
 	public void save(TaskFile file) {
 		TaskFilePO po = toPO(file);
-		taskFileMapper.insert(po);
+		taskFileMapper.upsert(po);
 		file.setId(po.getId());
 	}
 
 	@Override
 	public void saveBatch(List<TaskFile> files) {
 		for (TaskFile file : files) {
-			TaskFilePO po = toPO(file);
-			taskFileMapper.insert(po);
-			file.setId(po.getId());
+			save(file);
 		}
 	}
 
@@ -42,6 +41,12 @@ public class TaskFileRepositoryImpl implements TaskFileRepository {
 	@Override
 	public List<TaskFile> listByTaskId(Long taskId) {
 		return taskFileMapper.selectByTaskId(taskId).stream().map(this::toDomain).toList();
+	}
+
+	@Override
+	public Optional<TaskFile> findByTaskIdAndFileRoleAndFileKey(Long taskId, String fileRole, String fileKey) {
+		return Optional.ofNullable(taskFileMapper.selectByTaskIdAndFileRoleAndFileKey(taskId, fileRole, fileKey))
+				.map(this::toDomain);
 	}
 
 	@Override

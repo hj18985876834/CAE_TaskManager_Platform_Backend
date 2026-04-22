@@ -3,7 +3,6 @@ package com.example.cae.scheduler.interfaces.response;
 import java.time.LocalDateTime;
 
 public class ScheduleRecordResponse {
-	private Long id;
 	private Long scheduleId;
 	private Long taskId;
 	private Long nodeId;
@@ -12,14 +11,6 @@ public class ScheduleRecordResponse {
 	private String scheduleStatus;
 	private String scheduleMessage;
 	private LocalDateTime createdAt;
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
-	}
 
 	public Long getScheduleId() {
 		return scheduleId;

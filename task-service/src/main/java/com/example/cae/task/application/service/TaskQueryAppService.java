@@ -143,7 +143,7 @@ public class TaskQueryAppService {
 
 	private TaskFileResponse toTaskFileResponse(TaskFile file) {
 		TaskFileResponse response = new TaskFileResponse();
-		response.setId(file.getId());
+		response.setFileId(file.getId());
 		response.setTaskId(file.getTaskId());
 		response.setFileRole(file.getFileRole());
 		response.setFileKey(file.getFileKey());
@@ -205,7 +205,7 @@ public class TaskQueryAppService {
 
 	private TaskScheduleRecordResponse toTaskScheduleRecordResponse(SchedulerClient.ScheduleRecordItem item) {
 		TaskScheduleRecordResponse response = new TaskScheduleRecordResponse();
-		response.setId(item.getId());
+		response.setScheduleId(item.getScheduleId());
 		response.setTaskId(item.getTaskId());
 		response.setNodeId(item.getNodeId());
 		response.setNodeName(item.getNodeName());

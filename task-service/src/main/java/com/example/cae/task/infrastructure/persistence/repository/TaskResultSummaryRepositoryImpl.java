@@ -18,14 +18,7 @@ public class TaskResultSummaryRepositoryImpl implements TaskResultSummaryReposit
 
 	@Override
 	public void saveOrUpdate(TaskResultSummary summary) {
-		TaskResultSummaryPO exists = taskResultSummaryMapper.selectByTaskId(summary.getTaskId());
-		TaskResultSummaryPO po = toPO(summary);
-		if (exists == null) {
-			taskResultSummaryMapper.insert(po);
-		} else {
-			po.setId(exists.getId());
-			taskResultSummaryMapper.updateById(po);
-		}
+		taskResultSummaryMapper.insertOrUpdate(toPO(summary));
 	}
 
 	@Override
