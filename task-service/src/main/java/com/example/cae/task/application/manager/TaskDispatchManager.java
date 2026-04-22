@@ -114,10 +114,15 @@ public class TaskDispatchManager {
 		}
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (!Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(task.getStatus())) {
+			if (Set.of(TaskStatusEnum.RUNNING.name(), TaskStatusEnum.SUCCESS.name(),
+					TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name()).contains(task.getStatus())) {
+				ensureTaskBoundToNode(task, nodeId);
+				return;
+			}
 			if (Boolean.TRUE.equals(recoverable) && TaskStatusEnum.QUEUED.name().equals(task.getStatus())) {
 				return;
 			}
-			if (!Boolean.TRUE.equals(recoverable) && TaskStatusEnum.FAILED.name().equals(task.getStatus())) {
+			if (TaskStatusEnum.FAILED.name().equals(task.getStatus())) {
 				return;
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
@@ -149,12 +154,6 @@ public class TaskDispatchManager {
 		result.setNodeId(task != null && task.getNodeId() != null ? task.getNodeId() : requestedNodeId);
 		result.setStatus(task == null ? null : task.getStatus());
 		return result;
-	}
-
-	public String getTaskStatus(Long taskId) {
-		return taskRepository.findById(taskId)
-				.map(Task::getStatus)
-				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 	}
 
 	@Transactional

@@ -101,16 +101,6 @@ public class TaskClientStub implements TaskClient {
 		restTemplate.postForEntity(url, request, Result.class);
 	}
 
-	@Override
-	public String getTaskStatus(Long taskId) {
-		String url = taskServiceBaseUrl + "/internal/tasks/" + taskId + "/status";
-		Result<String> result = restTemplate.getForObject(url, Result.class);
-		if (result == null || result.getData() == null) {
-			return null;
-		}
-		return String.valueOf(result.getData());
-	}
-
 	private Boolean toBoolean(Object value) {
 		if (value == null) {
 			return Boolean.FALSE;

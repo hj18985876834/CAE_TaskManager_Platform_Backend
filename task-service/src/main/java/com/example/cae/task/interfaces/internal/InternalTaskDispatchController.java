@@ -32,11 +32,6 @@ public class InternalTaskDispatchController {
 		return Result.success(taskDispatchManager.listQueuedTasks(limit));
 	}
 
-	@GetMapping("/{taskId}/status")
-	public Result<String> getTaskStatus(@PathVariable("taskId") Long taskId) {
-		return Result.success(taskDispatchManager.getTaskStatus(taskId));
-	}
-
 	@PostMapping("/{taskId}/mark-scheduled")
 	public Result<TaskScheduleClaimDTO> markScheduled(@PathVariable("taskId") Long taskId,
 								 @RequestBody(required = false) TaskNodeMarkRequest request,

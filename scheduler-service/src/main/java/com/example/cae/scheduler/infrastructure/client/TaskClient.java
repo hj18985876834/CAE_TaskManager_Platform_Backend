@@ -15,6 +15,4 @@ public interface TaskClient {
 	void markTaskFailed(Long taskId, Long nodeId, String failType, String reason, boolean recoverable);
 
 	void markNodeOfflineTasksFailed(Long nodeId, String reason);
-
-	String getTaskStatus(Long taskId);
 }

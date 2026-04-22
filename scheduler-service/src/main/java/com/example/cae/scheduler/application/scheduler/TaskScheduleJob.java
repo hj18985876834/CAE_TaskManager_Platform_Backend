@@ -13,7 +13,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
-import java.util.Set;
 
 @Component
 public class TaskScheduleJob {
@@ -51,18 +50,13 @@ public class TaskScheduleJob {
 					taskScheduleManager.releaseNodeReservation(nodeId, task == null ? null : task.getTaskId());
 				}
 				if (taskMarkedScheduled && !dispatchAccepted && task != null && task.getTaskId() != null) {
-					String currentStatus = taskClient.getTaskStatus(task.getTaskId());
-					boolean alreadyAdvanced = currentStatus != null
-							&& Set.of("RUNNING", "SUCCESS", "FAILED", "CANCELED", "TIMEOUT").contains(currentStatus);
-					if (!alreadyAdvanced) {
-						taskClient.markTaskFailed(
-								task.getTaskId(),
-								nodeId,
-								FailTypeEnum.DISPATCH_ERROR.name(),
-								ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
-								isRecoverableDispatchError(ex)
-						);
-					}
+					taskClient.markTaskFailed(
+							task.getTaskId(),
+							nodeId,
+							FailTypeEnum.DISPATCH_ERROR.name(),
+							ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
+							isRecoverableDispatchError(ex)
+					);
 				}
 				taskScheduleManager.recordScheduleFailure(task == null ? null : task.getTaskId(), nodeId, ex.getMessage());
 			}
