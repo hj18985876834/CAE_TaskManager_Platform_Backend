@@ -112,7 +112,7 @@ CREATE TABLE solver_task_profile (
     task_type VARCHAR(50) NOT NULL COMMENT '任务类型，如 STRUCT_STATIC / CFD_STEADY',
     profile_name VARCHAR(100) NOT NULL COMMENT '模板名称',
     upload_mode VARCHAR(30) NOT NULL DEFAULT 'ZIP_ONLY' COMMENT '上传模式：ZIP_ONLY',
-    command_template VARCHAR(255) NOT NULL COMMENT '命令模板',
+    command_template VARCHAR(255) NOT NULL COMMENT '轻量命令模板，主要描述主执行命令',
     params_schema_json TEXT DEFAULT NULL COMMENT '参数模板定义JSON',
     parser_name VARCHAR(100) DEFAULT NULL COMMENT '结果解析器名称',
     timeout_seconds INT NOT NULL DEFAULT 3600 COMMENT '超时时间（秒）',
@@ -141,7 +141,7 @@ CREATE TABLE solver_profile_file_rule (
     file_type VARCHAR(30) NOT NULL COMMENT 'FILE / DIR / ZIP',
     required_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否必需',
     sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
-    rule_json TEXT DEFAULT NULL COMMENT '扩展约束JSON（数量/后缀/大小）',
+    rule_json TEXT DEFAULT NULL COMMENT '扩展约束JSON（数量/后缀/大小等简单约束）',
     description VARCHAR(255) DEFAULT NULL COMMENT '说明',
     PRIMARY KEY (id),
     KEY idx_profile_id (profile_id),
@@ -155,28 +155,15 @@ INSERT INTO solver_definition (id, solver_code, solver_name, version, exec_mode,
 (2, 'CALCULIX', 'CalculiX Solver', '2.20', 'LOCAL', '/opt/calculix/bin/ccx', 1, '结构分析求解器', NOW(), NOW());
 
 INSERT INTO solver_task_profile (id, solver_id, profile_code, task_type, profile_name, upload_mode, command_template, params_schema_json, parser_name, timeout_seconds, enabled, description, created_at, updated_at) VALUES
-(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', '${openfoamApplication} -case ${taskDir}; code=$?; mkdir -p ${outputDir}; cp -r ${taskDir}/[0-9]* ${taskDir}/postProcessing ${outputDir}/ 2>/dev/null || true; exit $code', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
+(1, 1, 'CFD_STEADY_DEFAULT', 'SIMULATION', 'CFD稳态默认模板', 'ZIP_ONLY', '${solverExecPath} -case ${taskDir}', '{"maxIter":1000,"residual":1e-6}', 'openfoam-default-parser', 3600, 1, '用于烟测的默认CFD模板', NOW(), NOW()),
 (2, 2, 'STRUCT_STATIC_DEFAULT', 'SIMULATION', '结构静力默认模板', 'ZIP_ONLY', '${solverExecPath} ${taskDir}/model', '{"steps":10}', 'calculix-default-parser', 3600, 1, '用于烟测的默认结构模板', NOW(), NOW());
 
 INSERT INTO solver_profile_file_rule (id, profile_id, file_key, path_pattern, file_name_pattern, file_type, required_flag, sort_order, rule_json, description) VALUES
-(1, 1, 'input_archive', '**', '*.zip', 'ZIP', 1, 1, '{"allowSuffix":["zip"],"maxSizeMb":2048}', 'OpenFOAM算例压缩包'),
-(2, 1, 'system_control_dict', 'system/controlDict', 'controlDict', 'FILE', 1, 2, '{"solverCodes":["OPENFOAM"],"deriveParam":{"name":"openfoamApplication","source":"fileContentRegex","pattern":"(?m)^\\\\s*application\\\\s+([^;]+?)\\\\s*;","group":1,"stripQuotes":true,"sanitizeRegex":"^[A-Za-z][A-Za-z0-9_+-]*$","required":true,"preprocess":[{"pattern":"(?s)/\\\\*.*?\\\\*/","replacement":" "},{"pattern":"(?m)//.*$","replacement":" "}]}}', 'OpenFOAM controlDict'),
+(1, 1, 'input_archive', '**', '*.zip', 'ZIP', 1, 1, '{"allowSuffix":["zip"],"maxSizeMb":2048}', 'OpenFOAM案例压缩包'),
+(2, 1, 'system_control_dict', 'system/controlDict', 'controlDict', 'FILE', 1, 2, '{"solverCodes":["OPENFOAM"]}', 'OpenFOAM controlDict'),
 (3, 1, 'system_fv_schemes', 'system/fvSchemes', 'fvSchemes', 'FILE', 1, 3, '{"solverCodes":["OPENFOAM"]}', 'OpenFOAM fvSchemes'),
 (4, 1, 'system_fv_solution', 'system/fvSolution', 'fvSolution', 'FILE', 1, 4, '{"solverCodes":["OPENFOAM"]}', 'OpenFOAM fvSolution'),
-(5, 1, 'of_incompressible_u', '0/U', 'U', 'FILE', 1, 10, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM速度场'),
-(6, 1, 'of_incompressible_p', '0/p', 'p', 'FILE', 1, 11, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM压力场'),
-(7, 1, 'of_incompressible_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 12, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["simpleFoam","icoFoam","pimpleFoam","pisoFoam"]}', '不可压OpenFOAM transportProperties'),
-(8, 1, 'of_compressible_u', '0/U', 'U', 'FILE', 1, 20, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM速度场'),
-(9, 1, 'of_compressible_p', '0/p', 'p', 'FILE', 1, 21, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM压力场'),
-(10, 1, 'of_compressible_thermo', 'constant/thermophysicalProperties', 'thermophysicalProperties', 'FILE', 1, 22, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["rhoSimpleFoam","rhoPimpleFoam","rhoPisoFoam","sonicFoam"]}', '可压OpenFOAM thermophysicalProperties'),
-(11, 1, 'of_interfoam_u', '0/U', 'U', 'FILE', 1, 30, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam速度场'),
-(12, 1, 'of_interfoam_p_rgh', '0/p_rgh', 'p_rgh', 'FILE', 1, 31, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam p_rgh场'),
-(13, 1, 'of_interfoam_alpha', '0/alpha.*', 'alpha.*', 'FILE', 1, 32, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"],"minCount":1}', 'interFoam alpha相分数字段'),
-(14, 1, 'of_interfoam_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 33, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam transportProperties'),
-(15, 1, 'of_interfoam_g', 'constant/g', 'g', 'FILE', 1, 34, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["interFoam"]}', 'interFoam重力文件'),
-(16, 1, 'of_laplacian_t', '0/T', 'T', 'FILE', 1, 40, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["laplacianFoam"]}', 'laplacianFoam标量场'),
-(17, 1, 'of_laplacian_transport', 'constant/transportProperties', 'transportProperties', 'FILE', 1, 41, '{"solverCodes":["OPENFOAM"],"openfoamApplications":["laplacianFoam"]}', 'laplacianFoam transportProperties'),
-(18, 2, 'main_inp', '**', '*.inp', 'FILE', 1, 1, '{"allowSuffix":["inp"],"minCount":1,"maxCount":1}', 'CalculiX主输入文件');
+(5, 2, 'main_inp', '**', '*.inp', 'FILE', 1, 1, '{"allowSuffix":["inp"],"minCount":1,"maxCount":1}', 'CalculiX主输入文件');
 
 -- =========================================================
 -- 3. task_db
