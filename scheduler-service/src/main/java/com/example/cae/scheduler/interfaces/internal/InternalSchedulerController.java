@@ -1,11 +1,12 @@
 package com.example.cae.scheduler.interfaces.internal;
 
+import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
-import com.example.cae.scheduler.interfaces.request.InternalTaskDispatchFailureRequest;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
+import com.example.cae.scheduler.interfaces.request.InternalTaskDispatchFailureRequest;
 import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,7 +50,9 @@ public class InternalSchedulerController {
 
 	@PostMapping("/tasks/{taskId}/dispatch-failed")
 	public Result<TaskStatusAckDTO> dispatchFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
-												   @Valid @RequestBody InternalTaskDispatchFailureRequest request) {
+												   @Valid @RequestBody InternalTaskDispatchFailureRequest request,
+												   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
+		nodeAppService.ensureValidNodeToken(request.getNodeId(), nodeToken);
 		return Result.success(scheduleAppService.handleDispatchFailure(
 				taskId,
 				request.getNodeId(),
@@ -59,7 +63,7 @@ public class InternalSchedulerController {
 	}
 
 	@GetMapping("/tasks/{taskId}/schedules")
-	public Result<List<ScheduleRecordResponse>> listTaskSchedules(@PathVariable("taskId") @Positive(message = "taskId蹇呴』澶т簬0") Long taskId) {
+	public Result<List<ScheduleRecordResponse>> listTaskSchedules(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId) {
 		return Result.success(scheduleAppService.listByTaskId(taskId));
 	}
 

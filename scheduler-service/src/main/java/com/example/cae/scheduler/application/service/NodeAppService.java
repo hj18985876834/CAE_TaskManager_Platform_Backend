@@ -116,12 +116,7 @@ public class NodeAppService {
 		nodeDomainService.validateHeartbeatRequest(request);
 		ComputeNode node = resolveNode(request);
 		if (nodeToken != null) {
-			if (nodeToken.isBlank()) {
-				throw new BizException(ErrorCodeConstants.NODE_TOKEN_REQUIRED, "node token required");
-			}
-			if (node.getNodeToken() == null || !nodeToken.equals(node.getNodeToken())) {
-				throw new BizException(ErrorCodeConstants.INVALID_NODE_TOKEN, "invalid node token");
-			}
+			ensureValidNodeToken(node.getId(), nodeToken);
 		}
 		node.refreshHeartbeat(request.getCpuUsage(), request.getMemoryUsage(), request.getRunningCount(), LocalDateTime.now());
 		node.markOnline();
@@ -236,6 +231,20 @@ public class NodeAppService {
 		return computeNodeRepository.findById(nodeId)
 				.map(node -> nodeToken.equals(node.getNodeToken()))
 				.orElse(false);
+	}
+
+	public void ensureValidNodeToken(Long nodeId, String nodeToken) {
+		if (nodeId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
+		}
+		if (nodeToken == null || nodeToken.isBlank()) {
+			throw new BizException(ErrorCodeConstants.NODE_TOKEN_REQUIRED, "node token required");
+		}
+		ComputeNode node = computeNodeRepository.findById(nodeId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		if (node.getNodeToken() == null || !nodeToken.equals(node.getNodeToken())) {
+			throw new BizException(ErrorCodeConstants.INVALID_NODE_TOKEN, "invalid node token");
+		}
 	}
 
 	private NodeDetailResponse toNodeDetail(ComputeNode node) {

@@ -41,7 +41,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/status-report")
 	public Result<TaskStatusAckDTO> reportStatus(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 								 @Valid @RequestBody StatusReportRequest request,
-								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		return Result.success(taskLifecycleManager.reportStatus(taskId, request));
 	}
@@ -49,7 +49,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/log-report")
 	public Result<Void> reportLog(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 							  @Valid @RequestBody LogReportRequest request,
-							  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+							  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.appendLog(taskId, request.getSeqNo(), request.getLogContent());
 		return Result.success();
@@ -58,7 +58,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/result-summary-report")
 	public Result<Void> reportResultSummary(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 									@Valid @RequestBody ResultSummaryReportRequest request,
-									@RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+									@RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.saveResultSummary(taskId, request);
 		return Result.success();
@@ -67,7 +67,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/result-file-report")
 	public Result<Void> reportResultFile(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 								 @Valid @RequestBody ResultFileReportRequest request,
-								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		taskResultManager.saveResultFile(taskId, request);
 		return Result.success();
@@ -76,7 +76,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/mark-finished")
 	public Result<TaskStatusAckDTO> markFinished(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 								 @Valid @RequestBody MarkFinishedRequest request,
-								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+								 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		return Result.success(taskResultManager.finishTask(taskId, request.getFinalStatus()));
 	}
@@ -84,7 +84,7 @@ public class InternalTaskReportController {
 	@PostMapping("/{taskId}/mark-failed")
 	public Result<TaskStatusAckDTO> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 							   @Valid @RequestBody MarkFailedRequest request,
-							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+							   @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
 		return Result.success(taskResultManager.failTask(taskId, request.getFailType(), request.getFailMessage()));
 	}
