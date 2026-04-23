@@ -24,6 +24,8 @@ public class TaskReportManager {
 	private static final long RUNNING_REPORT_RETRY_INTERVAL_MS = 100L;
 	private static final int TERMINAL_REPORT_MAX_ATTEMPTS = 10;
 	private static final long TERMINAL_REPORT_RETRY_INTERVAL_MS = 200L;
+	private static final int DISPATCH_FAILURE_REPORT_MAX_ATTEMPTS = 10;
+	private static final long DISPATCH_FAILURE_REPORT_RETRY_INTERVAL_MS = 200L;
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
 	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
@@ -90,23 +92,30 @@ public class TaskReportManager {
 	}
 
 	public void reportPreRunFailure(ExecutionContext context, Exception ex) {
+		Long taskId = context == null ? null : context.getTaskId();
 		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
 				? "node-agent prepare task failed"
 				: ex.getMessage();
 		if (isRecoverablePreRunFailure(ex)) {
-			taskReportAppService.dispatchFailed(
-					context.getTaskId(),
-					FailTypeEnum.DISPATCH_ERROR.name(),
-					message,
-					true
+			retryDispatchFailureReport(
+					taskId,
+					() -> taskReportAppService.dispatchFailed(
+							taskId,
+							FailTypeEnum.DISPATCH_ERROR.name(),
+							message,
+							true
+					)
 			);
 			return;
 		}
-		taskReportAppService.dispatchFailed(
-				context.getTaskId(),
-				FailTypeEnum.EXECUTOR_START_ERROR.name(),
-				message,
-				false
+		retryDispatchFailureReport(
+				taskId,
+				() -> taskReportAppService.dispatchFailed(
+						taskId,
+						FailTypeEnum.EXECUTOR_START_ERROR.name(),
+						message,
+						false
+				)
 		);
 	}
 
@@ -164,6 +173,25 @@ public class TaskReportManager {
 		}
 	}
 
+	private void retryDispatchFailureReport(Long taskId, Runnable runnable) {
+		Exception lastException = null;
+		for (int attempt = 1; attempt <= DISPATCH_FAILURE_REPORT_MAX_ATTEMPTS; attempt++) {
+			try {
+				runnable.run();
+				return;
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryDispatchFailureReport(ex) || attempt == DISPATCH_FAILURE_REPORT_MAX_ATTEMPTS) {
+					throw propagateRunningReportException(ex);
+				}
+				sleepBeforeRetry(taskId, attempt, ex, DISPATCH_FAILURE_REPORT_RETRY_INTERVAL_MS, "dispatch failure report");
+			}
+		}
+		if (lastException != null) {
+			throw propagateRunningReportException(lastException);
+		}
+	}
+
 	private RuntimeException propagateRunningReportException(Exception ex) {
 		if (ex instanceof RuntimeException runtimeException) {
 			return runtimeException;
@@ -184,6 +212,16 @@ public class TaskReportManager {
 		}
 		return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
 				|| bizException.getCode() == ErrorCodeConstants.CONFLICT;
+	}
+
+	private boolean shouldRetryDispatchFailureReport(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (!(ex instanceof BizException bizException) || bizException.getCode() == null) {
+			return false;
+		}
+		return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY;
 	}
 
 	private void sleepBeforeRetry(Long taskId, int attempt, Exception ex, long intervalMs, String action) {
