@@ -75,7 +75,8 @@ public class CommandBuilder {
 			if (entry.getValue() == null) {
 				continue;
 			}
-			result = result.replace("${" + entry.getKey() + "}", String.valueOf(entry.getValue()));
+			String resolvedValue = validateAndNormalizeVariableValue(entry.getKey(), entry.getValue());
+			result = result.replace("${" + entry.getKey() + "}", resolvedValue);
 		}
 		Set<String> unresolved = collectUnresolvedPlaceholders(result);
 		if (!unresolved.isEmpty()) {
@@ -105,6 +106,19 @@ public class CommandBuilder {
 						"commandTemplate does not support ${workDir}, use ${taskDir} instead");
 			}
 		}
+	}
+
+	private String validateAndNormalizeVariableValue(String variableName, Object rawValue) {
+		String resolvedValue = String.valueOf(rawValue);
+		for (String snippet : FORBIDDEN_COMMAND_SNIPPETS) {
+			if (resolvedValue.contains(snippet)) {
+				throw new BizException(
+						ErrorCodeConstants.BAD_REQUEST,
+						"commandTemplate variable contains unsupported shell control: " + variableName
+				);
+			}
+		}
+		return resolvedValue;
 	}
 
 	private Set<String> collectUnresolvedPlaceholders(String command) {

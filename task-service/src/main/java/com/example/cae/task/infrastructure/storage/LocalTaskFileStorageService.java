@@ -113,6 +113,7 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		}
 		deleteDirectory(Path.of(taskPathResolver.resolveLogDir(taskId)), "delete task runtime artifacts failed");
 		deleteDirectory(Path.of(taskPathResolver.resolveResultDir(taskId)), "delete task runtime artifacts failed");
+		deleteDirectory(Path.of(taskPathResolver.resolveMetaDir(taskId)), "delete task runtime artifacts failed");
 	}
 
 	@Override

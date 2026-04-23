@@ -15,12 +15,16 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.Set;
 
 @Service
@@ -31,19 +35,22 @@ public class TaskResultManager {
 	private final TaskResultFileRepository taskResultFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final TaskStoragePathSupport taskStoragePathSupport;
+	private final TaskPathResolver taskPathResolver;
 
 	public TaskResultManager(TaskRepository taskRepository,
 							 TaskLogRepository taskLogRepository,
 							 TaskResultSummaryRepository taskResultSummaryRepository,
 							 TaskResultFileRepository taskResultFileRepository,
 							 TaskStatusDomainService taskStatusDomainService,
-							 TaskStoragePathSupport taskStoragePathSupport) {
+							 TaskStoragePathSupport taskStoragePathSupport,
+							 TaskPathResolver taskPathResolver) {
 		this.taskRepository = taskRepository;
 		this.taskLogRepository = taskLogRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.taskStoragePathSupport = taskStoragePathSupport;
+		this.taskPathResolver = taskPathResolver;
 	}
 
 	public void appendLog(Long taskId, Integer seqNo, String content) {
@@ -72,12 +79,13 @@ public class TaskResultManager {
 
 	public void saveResultFile(Long taskId, ResultFileReportRequest request) {
 		ensureResultFileAllowed(taskId);
+		Path resultPath = validateResultFilePath(taskId, request);
 		TaskResultFile file = new TaskResultFile();
 		file.setTaskId(taskId);
-		file.setFileType(request.getFileType());
-		file.setFileName(request.getFileName());
-		file.setStoragePath(taskStoragePathSupport.toStoredResultPath(request.getStoragePath()));
-		file.setFileSize(request.getFileSize());
+		file.setFileType(request.getFileType().trim().toUpperCase());
+		file.setFileName(request.getFileName().trim());
+		file.setStoragePath(taskStoragePathSupport.toStoredResultPath(resultPath.toString()));
+		file.setFileSize(readActualFileSize(resultPath));
 		taskResultFileRepository.save(file);
 	}
 
@@ -182,6 +190,40 @@ public class TaskResultManager {
 	private Task loadTask(Long taskId) {
 		return taskRepository.findById(taskId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+	}
+
+	private Path validateResultFilePath(Long taskId, ResultFileReportRequest request) {
+		String fileName = request.getFileName() == null ? "" : request.getFileName().trim();
+		if (fileName.isBlank() || fileName.contains("/") || fileName.contains("\\")) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result fileName must be a plain file name");
+		}
+		Path resultDir = Path.of(taskPathResolver.resolveResultDir(taskId)).toAbsolutePath().normalize();
+		Path resultPath;
+		try {
+			resultPath = Path.of(taskStoragePathSupport.toAbsoluteResultPath(request.getStoragePath()))
+					.toAbsolutePath()
+					.normalize();
+		} catch (InvalidPathException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result storagePath is invalid");
+		}
+		if (!resultPath.startsWith(resultDir)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result storagePath must be under task output directory");
+		}
+		if (!Files.exists(resultPath) || !Files.isRegularFile(resultPath)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result file does not exist");
+		}
+		if (resultPath.getFileName() == null || !fileName.equals(resultPath.getFileName().toString())) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result fileName does not match storagePath");
+		}
+		return resultPath;
+	}
+
+	private long readActualFileSize(Path resultPath) {
+		try {
+			return Files.size(resultPath);
+		} catch (Exception ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result file cannot be accessed");
+		}
 	}
 
 	private TaskStatusAckDTO buildTaskStatusAck(Task task) {

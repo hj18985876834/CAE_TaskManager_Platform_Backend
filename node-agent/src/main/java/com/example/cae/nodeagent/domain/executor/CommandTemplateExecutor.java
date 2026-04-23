@@ -4,6 +4,8 @@ import com.example.cae.common.exception.BizException;
 import com.example.cae.nodeagent.application.manager.TaskReportManager;
 import com.example.cae.nodeagent.domain.model.ExecutionContext;
 import com.example.cae.nodeagent.domain.model.ExecutionResult;
+import com.example.cae.nodeagent.domain.parser.ResultParser;
+import com.example.cae.nodeagent.domain.service.ResultParserSelectDomainService;
 import com.example.cae.nodeagent.infrastructure.process.ProcessRunner;
 import com.example.cae.nodeagent.infrastructure.storage.ResultFileCollector;
 import com.example.cae.nodeagent.infrastructure.support.CommandBuilder;
@@ -12,8 +14,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
 @Component
 @Order(100)
@@ -22,15 +22,18 @@ public class CommandTemplateExecutor extends AbstractSolverExecutor {
 	private final ProcessRunner processRunner;
 	private final ResultFileCollector resultFileCollector;
 	private final TaskReportManager taskReportManager;
+	private final ResultParserSelectDomainService resultParserSelectDomainService;
 
 	public CommandTemplateExecutor(CommandBuilder commandBuilder,
 								   ProcessRunner processRunner,
 								   ResultFileCollector resultFileCollector,
-								   TaskReportManager taskReportManager) {
+								   TaskReportManager taskReportManager,
+								   ResultParserSelectDomainService resultParserSelectDomainService) {
 		this.commandBuilder = commandBuilder;
 		this.processRunner = processRunner;
 		this.resultFileCollector = resultFileCollector;
 		this.taskReportManager = taskReportManager;
+		this.resultParserSelectDomainService = resultParserSelectDomainService;
 	}
 
 	@Override
@@ -63,15 +66,7 @@ public class CommandTemplateExecutor extends AbstractSolverExecutor {
 			throw new BizException("solver execute failed with exit code " + exitCode);
 		}
 		List<File> resultFiles = resultFileCollector.collect(context);
-		int duration = (int) ((System.currentTimeMillis() - start) / 1000);
-		return ExecutionResult.success(duration, buildSuccessSummary(context), Map.of("exitCode", exitCode), resultFiles);
-	}
-
-	private String buildSuccessSummary(ExecutionContext context) {
-		String solverCode = context == null ? null : context.getSolverCode();
-		if (solverCode == null || solverCode.isBlank()) {
-			return "solver execute success";
-		}
-		return solverCode.toLowerCase(Locale.ROOT) + " execute success";
+		ResultParser resultParser = resultParserSelectDomainService.select(context == null ? null : context.getParserName());
+		return resultParser.parse(context, exitCode, start, resultFiles);
 	}
 }

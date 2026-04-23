@@ -1,5 +1,6 @@
 package com.example.cae.scheduler.infrastructure.client.impl;
 
+import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.exception.BizException;
@@ -10,6 +11,7 @@ import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -57,7 +59,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		Result<NodeAgentActionAck> result = restTemplate.exchange(
 				url,
 				HttpMethod.POST,
-				new HttpEntity<>(request),
+				withNodeToken(request, node),
 				new ParameterizedTypeReference<Result<NodeAgentActionAck>>() {
 				}
 		).getBody();
@@ -86,7 +88,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		Result<NodeAgentActionAck> result = restTemplate.exchange(
 				url,
 				HttpMethod.POST,
-				new HttpEntity<>(request),
+				withNodeToken(request, node),
 				new ParameterizedTypeReference<Result<NodeAgentActionAck>>() {
 				}
 		).getBody();
@@ -149,6 +151,15 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		if (result.getCode() != null && result.getCode() != 0) {
 			throw new BizException(result.getCode(), result.getMessage() == null ? "node-agent " + action + " failed" : result.getMessage());
 		}
+	}
+
+	private HttpEntity<?> withNodeToken(Object body, ComputeNode node) {
+		if (node == null || node.getNodeToken() == null || node.getNodeToken().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "node token is empty");
+		}
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HeaderConstants.X_NODE_TOKEN, node.getNodeToken());
+		return new HttpEntity<>(body, headers);
 	}
 
 	private static class NodeAgentActionAck {

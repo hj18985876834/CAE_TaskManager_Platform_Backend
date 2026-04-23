@@ -22,6 +22,8 @@ public class TaskReportManager {
 	private static final Logger log = LoggerFactory.getLogger(TaskReportManager.class);
 	private static final int RUNNING_REPORT_MAX_ATTEMPTS = 50;
 	private static final long RUNNING_REPORT_RETRY_INTERVAL_MS = 100L;
+	private static final int TERMINAL_REPORT_MAX_ATTEMPTS = 10;
+	private static final long TERMINAL_REPORT_RETRY_INTERVAL_MS = 200L;
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
 	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
@@ -66,21 +68,25 @@ public class TaskReportManager {
 				? (int) ((System.currentTimeMillis() - startMillis) / 1000)
 				: result.getDurationSeconds();
 		result.setDurationSeconds(duration);
-		taskReportAppService.reportResultSummary(context.getTaskId(), result);
-		if (result.getResultFiles() != null) {
-			for (File file : result.getResultFiles()) {
-				taskReportAppService.reportResultFile(context.getTaskId(), file);
+		retryTerminalReport(context == null ? null : context.getTaskId(), "report success", () -> {
+			taskReportAppService.reportResultSummary(context.getTaskId(), result);
+			if (result.getResultFiles() != null) {
+				for (File file : result.getResultFiles()) {
+					taskReportAppService.reportResultFile(context.getTaskId(), file);
+				}
 			}
-		}
-		taskReportAppService.markFinished(context.getTaskId());
+			taskReportAppService.markFinished(context.getTaskId());
+		});
 	}
 
 	public void reportFail(ExecutionContext context, Exception ex) {
 		if (ex instanceof ProcessTimeoutException) {
-			taskReportAppService.markTimeout(context.getTaskId());
+			retryTerminalReport(context == null ? null : context.getTaskId(), "mark timeout",
+					() -> taskReportAppService.markTimeout(context.getTaskId()));
 			return;
 		}
-		taskReportAppService.markFailed(context.getTaskId(), FailTypeEnum.RUNTIME_ERROR.name(), ex.getMessage());
+		retryTerminalReport(context == null ? null : context.getTaskId(), "mark failed",
+				() -> taskReportAppService.markFailed(context.getTaskId(), FailTypeEnum.RUNTIME_ERROR.name(), ex.getMessage()));
 	}
 
 	public void reportPreRunFailure(ExecutionContext context, Exception ex) {
@@ -110,6 +116,13 @@ public class TaskReportManager {
 				reason == null || reason.isBlank() ? "task canceled" : reason);
 	}
 
+	public void reportPostSuccessCallbackFailure(ExecutionContext context, Exception ex) {
+		log.error("task finished successfully but callback reporting did not complete, taskId={}, message={}",
+				context == null ? null : context.getTaskId(),
+				ex == null ? null : ex.getMessage(),
+				ex);
+	}
+
 	public void completeTask(Long taskId) {
 		logSeqMap.remove(taskId);
 		taskRuntimeRegistry.finish(taskId);
@@ -132,6 +145,25 @@ public class TaskReportManager {
 		return shouldRetryRunningReport(ex);
 	}
 
+	private void retryTerminalReport(Long taskId, String action, Runnable runnable) {
+		Exception lastException = null;
+		for (int attempt = 1; attempt <= TERMINAL_REPORT_MAX_ATTEMPTS; attempt++) {
+			try {
+				runnable.run();
+				return;
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryTerminalReport(ex) || attempt == TERMINAL_REPORT_MAX_ATTEMPTS) {
+					throw propagateRunningReportException(ex);
+				}
+				sleepBeforeRetry(taskId, attempt, ex, TERMINAL_REPORT_RETRY_INTERVAL_MS, action);
+			}
+		}
+		if (lastException != null) {
+			throw propagateRunningReportException(lastException);
+		}
+	}
+
 	private RuntimeException propagateRunningReportException(Exception ex) {
 		if (ex instanceof RuntimeException runtimeException) {
 			return runtimeException;
@@ -140,15 +172,30 @@ public class TaskReportManager {
 	}
 
 	private void sleepBeforeRetry(Long taskId, int attempt, Exception ex) {
+		sleepBeforeRetry(taskId, attempt, ex, RUNNING_REPORT_RETRY_INTERVAL_MS, "running report");
+	}
+
+	private boolean shouldRetryTerminalReport(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (!(ex instanceof BizException bizException) || bizException.getCode() == null) {
+			return false;
+		}
+		return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
+				|| bizException.getCode() == ErrorCodeConstants.CONFLICT;
+	}
+
+	private void sleepBeforeRetry(Long taskId, int attempt, Exception ex, long intervalMs, String action) {
 		try {
-			Thread.sleep(RUNNING_REPORT_RETRY_INTERVAL_MS);
+			Thread.sleep(intervalMs);
 		} catch (InterruptedException interruptedException) {
 			Thread.currentThread().interrupt();
 			throw new BizException(
 					ErrorCodeConstants.BAD_GATEWAY,
-					"running report retry interrupted, taskId=" + taskId
+					action + " retry interrupted, taskId=" + taskId
 			);
 		}
-		log.debug("retry running report, taskId={}, attempt={}, reason={}", taskId, attempt, ex.getMessage());
+		log.debug("retry {}, taskId={}, attempt={}, reason={}", action, taskId, attempt, ex.getMessage());
 	}
 }

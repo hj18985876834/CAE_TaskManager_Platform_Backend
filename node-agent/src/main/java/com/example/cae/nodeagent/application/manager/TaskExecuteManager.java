@@ -32,6 +32,7 @@ public class TaskExecuteManager {
 	public void execute(ExecutionContext context) {
 		long start = System.currentTimeMillis();
 		boolean runningReported = false;
+		boolean solverSucceeded = false;
 		try {
 			taskRuntimeRegistry.attachWorker(context.getTaskId(), Thread.currentThread());
 			if (taskRuntimeRegistry.isCancelRequested(context.getTaskId())) {
@@ -44,7 +45,8 @@ public class TaskExecuteManager {
 			runningReported = true;
 			SolverExecutor executor = selectExecutor(context);
 			ExecutionResult result = executor.execute(context);
-			if (Boolean.TRUE.equals(result.getSuccess())) {
+			solverSucceeded = Boolean.TRUE.equals(result.getSuccess());
+			if (solverSucceeded) {
 				taskReportManager.reportSuccess(context, result, start);
 			} else {
 				taskReportManager.reportFail(context, new RuntimeException(result.getSummaryText()));
@@ -54,6 +56,8 @@ public class TaskExecuteManager {
 				taskReportManager.reportCanceled(context, taskRuntimeRegistry.getCancelReason(context.getTaskId()));
 			} else if (!runningReported) {
 				taskReportManager.reportPreRunFailure(context, ex);
+			} else if (solverSucceeded) {
+				taskReportManager.reportPostSuccessCallbackFailure(context, ex);
 			} else {
 				taskReportManager.reportFail(context, ex);
 			}

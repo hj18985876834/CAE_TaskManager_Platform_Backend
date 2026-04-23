@@ -26,7 +26,7 @@ public class TaskPathResolver {
 	}
 
 	public String resolveLogDir(Long taskId) {
-		return resolvePath(resolveTaskRoot(taskId), "log");
+		return resolvePath(resolveTaskRoot(taskId), "logs");
 	}
 
 	public String resolveResultDir(Long taskId) {
@@ -35,6 +35,10 @@ public class TaskPathResolver {
 
 	public String resolveWorkDir(Long taskId) {
 		return resolvePath(resolveTaskRoot(taskId), "workdir");
+	}
+
+	public String resolveMetaDir(Long taskId) {
+		return resolvePath(resolveTaskRoot(taskId), "meta");
 	}
 
 	public String resolveLogFile(Long taskId) {
