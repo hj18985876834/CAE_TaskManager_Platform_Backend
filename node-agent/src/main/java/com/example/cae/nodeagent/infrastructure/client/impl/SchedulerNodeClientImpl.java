@@ -16,7 +16,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class SchedulerNodeClientImpl implements SchedulerNodeClient {
@@ -31,13 +34,14 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 	@Override
 	public void register(NodeInfo nodeInfo) {
 		String url = nodeAgentConfig.getSchedulerBaseUrl() + "/api/node-agent/register";
+		List<Long> solverIds = normalizeSolverIds(nodeInfo == null ? null : nodeInfo.getSolverIds());
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeCode", nodeInfo.getNodeCode());
 		body.put("nodeName", nodeInfo.getNodeName());
 		body.put("host", nodeInfo.getHost());
 		body.put("port", nodeInfo.getPort());
 		body.put("maxConcurrency", nodeInfo.getMaxConcurrency());
-		body.put("solvers", toSolverItems(nodeInfo.getSolverIds()));
+		body.put("solvers", toSolverItems(solverIds));
 		Result<NodeRegisterAck> result = restTemplate.exchange(
 				url,
 				HttpMethod.POST,
@@ -109,7 +113,7 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		}
 	}
 
-	private java.util.List<Map<String, Object>> toSolverItems(java.util.List<Long> solverIds) {
+	private List<Map<String, Object>> toSolverItems(List<Long> solverIds) {
 		if (solverIds == null || solverIds.isEmpty()) {
 			return java.util.List.of();
 		}
@@ -121,15 +125,35 @@ public class SchedulerNodeClientImpl implements SchedulerNodeClient {
 		}).toList();
 	}
 
+	private List<Long> normalizeSolverIds(List<Long> solverIds) {
+		if (solverIds == null || solverIds.isEmpty()) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "solverIds cannot be empty");
+		}
+		Set<Long> uniqueSolverIds = new LinkedHashSet<>();
+		for (Long solverId : solverIds) {
+			if (solverId == null || solverId < 1) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid solverId in node config");
+			}
+			if (!uniqueSolverIds.add(solverId)) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "duplicate solverId in node config: " + solverId);
+			}
+		}
+		return List.copyOf(uniqueSolverIds);
+	}
+
 	private String resolveSolverVersion(Long solverId) {
-		if (solverId == null || nodeAgentConfig.getSolverVersions() == null) {
-			return "v1";
+		if (solverId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "solverId is required");
+		}
+		if (nodeAgentConfig.getSolverVersions() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "solverVersions config is missing");
 		}
 		String version = nodeAgentConfig.getSolverVersions().get(String.valueOf(solverId));
 		if (version == null || version.isBlank()) {
-			return "v1";
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST,
+					"solver version config missing for solverId=" + solverId);
 		}
-		return version;
+		return version.trim();
 	}
 
 	private static class NodeRegisterAck {

@@ -5,6 +5,7 @@ import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.enums.FailTypeEnum;
+import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
@@ -20,6 +21,8 @@ import java.util.List;
 @Component
 public class TaskScheduleJob {
 	private static final Logger log = LoggerFactory.getLogger(TaskScheduleJob.class);
+	private static final int TASK_CONFIRM_MAX_ATTEMPTS = 5;
+	private static final long TASK_CONFIRM_RETRY_INTERVAL_MS = 100L;
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -39,15 +42,15 @@ public class TaskScheduleJob {
 			boolean dispatchAccepted = false;
 			try {
 				nodeId = taskScheduleManager.schedule(task);
-				TaskScheduleClaimDTO scheduleClaim = taskClient.markTaskScheduled(task.getTaskId(), nodeId);
-				taskMarkedScheduled = scheduleClaim != null && Boolean.TRUE.equals(scheduleClaim.getClaimed());
+				TaskScheduleClaimDTO scheduleClaim = markTaskScheduledWithRetry(task.getTaskId(), nodeId);
+				taskMarkedScheduled = isScheduleClaimAccepted(scheduleClaim, nodeId);
 				if (!taskMarkedScheduled) {
 					taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
 					continue;
 				}
 				nodeAgentClient.notifyDispatch(nodeId, task);
 				dispatchAccepted = true;
-				TaskDispatchAckDTO dispatchAck = markTaskDispatchedQuietly(task.getTaskId(), nodeId);
+				TaskDispatchAckDTO dispatchAck = markTaskDispatchedWithRetry(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
 			} catch (Exception ex) {
 				handleScheduleException(task, nodeId, taskMarkedScheduled, dispatchAccepted, ex);
@@ -70,8 +73,42 @@ public class TaskScheduleJob {
 		recordScheduleFailureQuietly(task == null ? null : task.getTaskId(), nodeId, ex);
 	}
 
-	private TaskDispatchAckDTO markTaskDispatchedQuietly(Long taskId, Long nodeId) {
-		return taskClient.markTaskDispatched(taskId, nodeId);
+	private TaskScheduleClaimDTO markTaskScheduledWithRetry(Long taskId, Long nodeId) {
+		Exception lastException = null;
+		for (int attempt = 1; attempt <= TASK_CONFIRM_MAX_ATTEMPTS; attempt++) {
+			try {
+				return taskClient.markTaskScheduled(taskId, nodeId);
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryTaskStateConfirm(ex) || attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+					throw ex;
+				}
+				sleepBeforeRetry("mark-scheduled", taskId, nodeId, attempt, ex);
+			}
+		}
+		if (lastException instanceof RuntimeException runtimeException) {
+			throw runtimeException;
+		}
+		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark scheduled failed");
+	}
+
+	private TaskDispatchAckDTO markTaskDispatchedWithRetry(Long taskId, Long nodeId) {
+		Exception lastException = null;
+		for (int attempt = 1; attempt <= TASK_CONFIRM_MAX_ATTEMPTS; attempt++) {
+			try {
+				return taskClient.markTaskDispatched(taskId, nodeId);
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryTaskStateConfirm(ex) || attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+					throw ex;
+				}
+				sleepBeforeRetry("mark-dispatched", taskId, nodeId, attempt, ex);
+			}
+		}
+		if (lastException instanceof RuntimeException runtimeException) {
+			throw runtimeException;
+		}
+		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark dispatched failed");
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {
@@ -122,5 +159,48 @@ public class TaskScheduleJob {
 					|| bizException.getCode() == ErrorCodeConstants.NODE_AGENT_REJECTED;
 		}
 		return ex instanceof RestClientException;
+	}
+
+	private boolean shouldRetryTaskStateConfirm(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (ex instanceof BizException bizException && bizException.getCode() != null) {
+			return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
+					|| bizException.getCode() == ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE;
+		}
+		return false;
+	}
+
+	private boolean isScheduleClaimAccepted(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
+		if (scheduleClaim == null) {
+			return false;
+		}
+		if (Boolean.TRUE.equals(scheduleClaim.getClaimed())) {
+			return true;
+		}
+		if (expectedNodeId == null || !expectedNodeId.equals(scheduleClaim.getNodeId())) {
+			return false;
+		}
+		String status = scheduleClaim.getStatus();
+		return TaskStatusEnum.SCHEDULED.name().equals(status)
+				|| TaskStatusEnum.DISPATCHED.name().equals(status)
+				|| TaskStatusEnum.RUNNING.name().equals(status)
+				|| TaskStatusEnum.SUCCESS.name().equals(status)
+				|| TaskStatusEnum.FAILED.name().equals(status)
+				|| TaskStatusEnum.CANCELED.name().equals(status)
+				|| TaskStatusEnum.TIMEOUT.name().equals(status);
+	}
+
+	private void sleepBeforeRetry(String action, Long taskId, Long nodeId, int attempt, Exception ex) {
+		try {
+			Thread.sleep(TASK_CONFIRM_RETRY_INTERVAL_MS);
+		} catch (InterruptedException interruptedException) {
+			Thread.currentThread().interrupt();
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					action + " retry interrupted, taskId=" + taskId + ", nodeId=" + nodeId);
+		}
+		log.debug("retry {}, taskId={}, nodeId={}, attempt={}, reason={}",
+				action, taskId, nodeId, attempt, ex == null ? null : ex.getMessage());
 	}
 }

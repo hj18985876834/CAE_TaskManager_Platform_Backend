@@ -60,52 +60,29 @@ public class NodeAppService {
 		this.nodeCapacityManager = nodeCapacityManager;
 	}
 
+	@Transactional
 	public Long registerNode(NodeRegisterRequest request) {
 		nodeDomainService.validateRegisterRequest(request);
-		Optional<ComputeNode> existingNode = computeNodeRepository.findByNodeCode(request.getNodeCode());
-		if (existingNode.isPresent()) {
-			ComputeNode node = existingNode.get();
-			node.setNodeName(request.getNodeName());
-			node.setHost(request.getHost());
-			node.setPort(request.getPort());
-			node.setMaxConcurrency(request.getMaxConcurrency());
-			if (node.getNodeToken() == null || node.getNodeToken().isBlank()) {
-				node.setNodeToken(generateNodeToken(node.getNodeCode()));
-			}
-			node.markOnline();
-			node.setLastHeartbeatTime(LocalDateTime.now());
-			node.setReservedCount(node.getReservedCount() == null ? 0 : node.getReservedCount());
-			computeNodeRepository.update(node);
-			nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
-					mergeCapabilities(node.getId(), request.getSolverIds(), null));
-			return node.getId();
-		}
-
-		ComputeNode node = NodeAssembler.toNode(request);
-		node.setNodeToken(generateNodeToken(node.getNodeCode()));
-		node.markOnline();
-		node.enable();
-		node.setRunningCount(0);
-		node.setReservedCount(0);
-		node.setLastHeartbeatTime(LocalDateTime.now());
-		computeNodeRepository.save(node);
+		ComputeNode node = saveOrUpdateNode(request.getNodeCode(),
+				request.getNodeName(),
+				request.getHost(),
+				request.getPort(),
+				request.getMaxConcurrency());
 		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(),
 				mergeCapabilities(node.getId(), request.getSolverIds(), null));
 		return node.getId();
 	}
 
+	@Transactional
 	public Long registerNodeFromAgent(NodeAgentRegisterRequest request) {
-		NodeRegisterRequest registerRequest = new NodeRegisterRequest();
-		registerRequest.setNodeCode(request == null ? null : request.getNodeCode());
-		registerRequest.setNodeName(request == null ? null : request.getNodeName());
-		registerRequest.setHost(composeHost(request == null ? null : request.getHost()));
-		registerRequest.setPort(request == null ? null : request.getPort());
-		registerRequest.setMaxConcurrency(request == null ? null : request.getMaxConcurrency());
-		registerRequest.setSolverIds(extractSolverIds(request));
-
-		Long nodeId = registerNode(registerRequest);
-		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(nodeId, mergeCapabilities(nodeId, null, request));
-		return nodeId;
+		nodeDomainService.validateAgentRegisterRequest(request);
+		ComputeNode node = saveOrUpdateNode(request.getNodeCode(),
+				request.getNodeName(),
+				composeHost(request.getHost()),
+				request.getPort(),
+				request.getMaxConcurrency());
+		nodeSolverCapabilityRepository.replaceNodeCapabilitiesWithDetails(node.getId(), mergeCapabilities(node.getId(), null, request));
+		return node.getId();
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request) {
@@ -321,6 +298,45 @@ public class NodeAppService {
 		return host;
 	}
 
+	private ComputeNode saveOrUpdateNode(String nodeCode,
+										 String nodeName,
+										 String host,
+										 Integer port,
+										 Integer maxConcurrency) {
+		Optional<ComputeNode> existingNode = computeNodeRepository.findByNodeCode(nodeCode);
+		if (existingNode.isPresent()) {
+			ComputeNode node = existingNode.get();
+			node.setNodeName(nodeName);
+			node.setHost(host);
+			node.setPort(port);
+			node.setMaxConcurrency(maxConcurrency);
+			if (node.getNodeToken() == null || node.getNodeToken().isBlank()) {
+				node.setNodeToken(generateNodeToken(node.getNodeCode()));
+			}
+			node.markOnline();
+			node.setLastHeartbeatTime(LocalDateTime.now());
+			node.setRunningCount(node.getRunningCount() == null ? 0 : node.getRunningCount());
+			node.setReservedCount(node.getReservedCount() == null ? 0 : node.getReservedCount());
+			computeNodeRepository.update(node);
+			return node;
+		}
+
+		ComputeNode node = new ComputeNode();
+		node.setNodeCode(nodeCode);
+		node.setNodeName(nodeName);
+		node.setHost(host);
+		node.setPort(port);
+		node.setMaxConcurrency(maxConcurrency);
+		node.setNodeToken(generateNodeToken(node.getNodeCode()));
+		node.markOnline();
+		node.enable();
+		node.setRunningCount(0);
+		node.setReservedCount(0);
+		node.setLastHeartbeatTime(LocalDateTime.now());
+		computeNodeRepository.save(node);
+		return node;
+	}
+
 	private ComputeNode resolveNode(NodeHeartbeatRequest request) {
 		return computeNodeRepository.findById(request.getNodeId())
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
@@ -329,16 +345,6 @@ public class NodeAppService {
 	private String generateNodeToken(String nodeCode) {
 		String source = (nodeCode == null ? "node" : nodeCode) + ":" + UUID.randomUUID();
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(source.getBytes(StandardCharsets.UTF_8));
-	}
-
-	private List<Long> extractSolverIds(NodeAgentRegisterRequest request) {
-		if (request == null || request.getSolvers() == null || request.getSolvers().isEmpty()) {
-			return List.of();
-		}
-		return request.getSolvers().stream()
-				.map(NodeAgentRegisterRequest.SolverItem::getSolverId)
-				.filter(id -> id != null)
-				.toList();
 	}
 
 	private List<NodeSolverCapability> mergeCapabilities(Long nodeId, List<Long> solverIds, NodeAgentRegisterRequest request) {
