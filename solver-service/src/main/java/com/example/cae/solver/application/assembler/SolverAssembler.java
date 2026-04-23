@@ -18,7 +18,7 @@ public class SolverAssembler {
 		solver.setVersion(request.getVersion());
 		solver.setExecMode(request.getExecMode());
 		solver.setExecPath(request.getExecPath());
-		solver.setRemark(resolveDescription(request.getDescription(), request.getRemark()));
+		solver.setDescription(request.getDescription());
 		if (request.getEnabled() != null) {
 			solver.setEnabled(request.getEnabled());
 		}
@@ -35,7 +35,7 @@ public class SolverAssembler {
 		response.setExecMode(solver.getExecMode());
 		response.setExecPath(solver.getExecPath());
 		response.setEnabled(solver.getEnabled());
-		response.setDescription(solver.getRemark());
+		response.setDescription(solver.getDescription());
 		return response;
 	}
 
@@ -49,8 +49,7 @@ public class SolverAssembler {
 		response.setExecMode(solver.getExecMode());
 		response.setExecPath(solver.getExecPath());
 		response.setEnabled(solver.getEnabled());
-		response.setDescription(solver.getRemark());
-		response.setRemark(solver.getRemark());
+		response.setDescription(solver.getDescription());
 		return response;
 	}
 
@@ -63,13 +62,6 @@ public class SolverAssembler {
 		return response;
 	}
 
-	private static String resolveDescription(String description, String remark) {
-		if (description != null && !description.isBlank()) {
-			return description;
-		}
-		return remark;
-	}
-
 	public static SolverDefinition fromPO(SolverDefinitionPO po) {
 		SolverDefinition solver = new SolverDefinition();
 		solver.setId(po.getId());
@@ -79,7 +71,7 @@ public class SolverAssembler {
 		solver.setExecMode(po.getExecMode());
 		solver.setExecPath(po.getExecPath());
 		solver.setEnabled(po.getEnabled());
-		solver.setRemark(po.getRemark());
+		solver.setDescription(po.getDescription());
 		solver.setCreatedAt(po.getCreatedAt());
 		solver.setUpdatedAt(po.getUpdatedAt());
 		return solver;
@@ -94,7 +86,7 @@ public class SolverAssembler {
 		po.setExecMode(solver.getExecMode());
 		po.setExecPath(solver.getExecPath());
 		po.setEnabled(solver.getEnabled());
-		po.setRemark(solver.getRemark());
+		po.setDescription(solver.getDescription());
 		return po;
 	}
 }

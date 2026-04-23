@@ -88,7 +88,7 @@ public class SolverClient {
 			dto.setRequiredFlag(toInteger(map.get("requiredFlag")));
 			dto.setSortOrder(toInteger(map.get("sortOrder")));
 			dto.setRuleJson(toString(map.get("ruleJson")));
-			dto.setRemark(toString(map.get("remark")));
+			dto.setDescription(toString(map.get("description")));
 			rules.add(dto);
 		}
 		return rules;

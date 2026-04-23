@@ -10,7 +10,6 @@ public class SolverDetailResponse {
 	private String execPath;
 	private Integer enabled;
 	private String description;
-	private String remark;
 
 	public Long getId() {
 		return id;
@@ -83,13 +82,4 @@ public class SolverDetailResponse {
 	public void setDescription(String description) {
 		this.description = description;
 	}
-
-	public String getRemark() {
-		return remark;
-	}
-
-	public void setRemark(String remark) {
-		this.remark = remark;
-	}
 }
-

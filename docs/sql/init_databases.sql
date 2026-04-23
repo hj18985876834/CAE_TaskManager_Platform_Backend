@@ -239,7 +239,7 @@ CREATE TABLE task_file (
     file_key VARCHAR(50) NOT NULL COMMENT '对应模板中的文件标识',
     origin_name VARCHAR(255) NOT NULL COMMENT '原文件名',
     storage_path VARCHAR(500) NOT NULL COMMENT '存储路径',
-    unpack_dir VARCHAR(500) DEFAULT NULL COMMENT '解压后工作目录',
+    unpack_dir VARCHAR(500) DEFAULT NULL COMMENT '校验后真实执行目录，可等于 workdir 或其子目录',
     relative_path VARCHAR(500) DEFAULT NULL COMMENT '相对路径（解压后）',
     archive_flag TINYINT NOT NULL DEFAULT 0 COMMENT '是否归档包：1是，0否',
     file_size BIGINT NOT NULL DEFAULT 0 COMMENT '文件大小',

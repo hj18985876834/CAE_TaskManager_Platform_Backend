@@ -10,7 +10,7 @@ public class SolverDefinition {
 	private String execMode;
 	private String execPath;
 	private Integer enabled;
-	private String remark;
+	private String description;
 	private LocalDateTime createdAt;
 	private LocalDateTime updatedAt;
 
@@ -82,12 +82,12 @@ public class SolverDefinition {
 		this.enabled = enabled;
 	}
 
-	public String getRemark() {
-		return remark;
+	public String getDescription() {
+		return description;
 	}
 
-	public void setRemark(String remark) {
-		this.remark = remark;
+	public void setDescription(String description) {
+		this.description = description;
 	}
 
 	public LocalDateTime getCreatedAt() {
@@ -106,4 +106,3 @@ public class SolverDefinition {
 		this.updatedAt = updatedAt;
 	}
 }
-

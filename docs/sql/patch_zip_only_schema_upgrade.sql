@@ -93,7 +93,7 @@ SET @sql = (
               AND COLUMN_NAME = 'unpack_dir'
         ),
         'SELECT 1',
-        'ALTER TABLE task_file ADD COLUMN unpack_dir VARCHAR(500) DEFAULT NULL COMMENT ''解压后工作目录'' AFTER storage_path'
+        'ALTER TABLE task_file ADD COLUMN unpack_dir VARCHAR(500) DEFAULT NULL COMMENT ''校验后真实执行目录，可等于 workdir 或其子目录'' AFTER storage_path'
     )
 );
 PREPARE stmt FROM @sql;

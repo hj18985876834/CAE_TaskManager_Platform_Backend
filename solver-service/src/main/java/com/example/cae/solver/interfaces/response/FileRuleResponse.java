@@ -12,7 +12,6 @@ public class FileRuleResponse {
 	private Integer sortOrder;
 	private String ruleJson;
 	private String description;
-	private String remark;
 
 	public Long getId() {
 		return id;
@@ -100,13 +99,5 @@ public class FileRuleResponse {
 
 	public void setDescription(String description) {
 		this.description = description;
-	}
-
-	public String getRemark() {
-		return remark;
-	}
-
-	public void setRemark(String remark) {
-		this.remark = remark;
 	}
 }

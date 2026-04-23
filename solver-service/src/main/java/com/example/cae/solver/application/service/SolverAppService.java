@@ -67,11 +67,7 @@ public class SolverAppService {
 		solver.setVersion(request.getVersion());
 		solver.setExecMode(request.getExecMode());
 		solver.setExecPath(request.getExecPath());
-		if (request.getDescription() != null && !request.getDescription().isBlank()) {
-			solver.setRemark(request.getDescription());
-		} else {
-			solver.setRemark(request.getRemark());
-		}
+		solver.setDescription(request.getDescription());
 		solverRepository.update(solver);
 	}
 

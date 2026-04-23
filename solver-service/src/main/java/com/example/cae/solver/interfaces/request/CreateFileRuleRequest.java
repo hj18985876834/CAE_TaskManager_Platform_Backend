@@ -28,8 +28,6 @@ public class CreateFileRuleRequest {
 	private Integer sortOrder;
 	@Size(max = 255, message = "description长度不能超过255")
 	private String description;
-	@Size(max = 255, message = "remark长度不能超过255")
-	private String remark;
 	private String ruleJson;
 
 	public String getFileKey() {
@@ -86,14 +84,6 @@ public class CreateFileRuleRequest {
 
 	public void setDescription(String description) {
 		this.description = description;
-	}
-
-	public String getRemark() {
-		return remark;
-	}
-
-	public void setRemark(String remark) {
-		this.remark = remark;
 	}
 
 	public String getRuleJson() {

@@ -20,7 +20,7 @@ public class FileRuleAssembler {
 		rule.setRequiredFlag(request.getRequiredFlag());
 		rule.setSortOrder(request.getSortOrder());
 		rule.setRuleJson(request.getRuleJson());
-		rule.setRemark(resolveDescription(request.getDescription(), request.getRemark()));
+		rule.setDescription(request.getDescription());
 		return rule;
 	}
 
@@ -36,8 +36,7 @@ public class FileRuleAssembler {
 		response.setRequiredFlag(rule.getRequiredFlag());
 		response.setSortOrder(rule.getSortOrder());
 		response.setRuleJson(rule.getRuleJson());
-		response.setDescription(rule.getRemark());
-		response.setRemark(rule.getRemark());
+		response.setDescription(rule.getDescription());
 		return response;
 	}
 
@@ -55,13 +54,6 @@ public class FileRuleAssembler {
 		return response;
 	}
 
-	private static String resolveDescription(String description, String remark) {
-		if (description != null && !description.isBlank()) {
-			return description;
-		}
-		return remark;
-	}
-
 	public static SolverProfileFileRule fromPO(SolverProfileFileRulePO po) {
 		SolverProfileFileRule rule = new SolverProfileFileRule();
 		rule.setId(po.getId());
@@ -73,7 +65,7 @@ public class FileRuleAssembler {
 		rule.setRequiredFlag(po.getRequiredFlag());
 		rule.setSortOrder(po.getSortOrder());
 		rule.setRuleJson(po.getRuleJson());
-		rule.setRemark(po.getRemark());
+		rule.setDescription(po.getDescription());
 		return rule;
 	}
 
@@ -88,7 +80,7 @@ public class FileRuleAssembler {
 		po.setRequiredFlag(rule.getRequiredFlag());
 		po.setSortOrder(rule.getSortOrder());
 		po.setRuleJson(rule.getRuleJson());
-		po.setRemark(rule.getRemark());
+		po.setDescription(rule.getDescription());
 		return po;
 	}
 }

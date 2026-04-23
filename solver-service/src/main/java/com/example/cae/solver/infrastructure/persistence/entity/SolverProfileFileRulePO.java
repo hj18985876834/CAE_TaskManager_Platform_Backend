@@ -10,7 +10,7 @@ public class SolverProfileFileRulePO {
 	private Integer requiredFlag;
 	private Integer sortOrder;
 	private String ruleJson;
-	private String remark;
+	private String description;
 
 	public Long getId() {
 		return id;
@@ -84,11 +84,11 @@ public class SolverProfileFileRulePO {
 		this.ruleJson = ruleJson;
 	}
 
-	public String getRemark() {
-		return remark;
+	public String getDescription() {
+		return description;
 	}
 
-	public void setRemark(String remark) {
-		this.remark = remark;
+	public void setDescription(String description) {
+		this.description = description;
 	}
 }
