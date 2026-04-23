@@ -10,6 +10,7 @@ import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
 import com.example.cae.nodeagent.interfaces.request.DispatchTaskRequest;
 import com.example.cae.nodeagent.interfaces.response.CancelTaskResponse;
 import com.example.cae.nodeagent.interfaces.response.DispatchTaskResponse;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -28,7 +29,7 @@ public class DispatchController {
 	}
 
 	@PostMapping("/dispatch-task")
-	public Result<DispatchTaskResponse> dispatch(@RequestBody DispatchTaskRequest request,
+	public Result<DispatchTaskResponse> dispatch(@Valid @RequestBody DispatchTaskRequest request,
 											 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		ensureValidNodeToken(nodeToken);
 		taskDispatchManager.acceptTask(request);
@@ -39,7 +40,7 @@ public class DispatchController {
 	}
 
 	@PostMapping("/cancel-task")
-	public Result<CancelTaskResponse> cancel(@RequestBody CancelTaskRequest request,
+	public Result<CancelTaskResponse> cancel(@Valid @RequestBody CancelTaskRequest request,
 										 @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
 		ensureValidNodeToken(nodeToken);
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED,

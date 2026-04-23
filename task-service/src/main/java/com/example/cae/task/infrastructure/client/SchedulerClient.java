@@ -32,15 +32,6 @@ public class SchedulerClient {
 		// reserved for async dispatch integration
 	}
 
-	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
-		String url = schedulerServiceBaseUrl + "/internal/nodes/" + nodeId + "/cancel-task";
-		Map<String, Object> body = new java.util.HashMap<>();
-		body.put("taskId", taskId);
-		body.put("reason", reason);
-		Result<?> result = restTemplate.postForObject(url, body, Result.class);
-		ensureSuccess(result, "cancel task on node");
-	}
-
 	public NodeReservationActionResult releaseNodeReservation(Long nodeId, Long taskId) {
 		if (nodeId == null || taskId == null) {
 			return null;

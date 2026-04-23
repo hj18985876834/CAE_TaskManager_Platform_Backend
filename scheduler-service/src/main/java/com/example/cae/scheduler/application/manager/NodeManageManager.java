@@ -5,7 +5,6 @@ import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
 import com.example.cae.scheduler.interfaces.request.NodePageQueryRequest;
-import com.example.cae.scheduler.interfaces.request.NodeRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateNodeSolverStatusRequest;
 import com.example.cae.scheduler.interfaces.request.UpdateNodeStatusRequest;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
@@ -24,16 +23,8 @@ public class NodeManageManager {
 		this.nodeAppService = nodeAppService;
 	}
 
-	public Long registerNode(NodeRegisterRequest request) {
-		return nodeAppService.registerNode(request);
-	}
-
 	public Long registerNodeFromAgent(NodeAgentRegisterRequest request) {
 		return nodeAppService.registerNodeFromAgent(request);
-	}
-
-	public void heartbeat(NodeHeartbeatRequest request) {
-		nodeAppService.heartbeat(request);
 	}
 
 	public void heartbeat(NodeHeartbeatRequest request, String nodeToken) {

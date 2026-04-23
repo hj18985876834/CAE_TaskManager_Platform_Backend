@@ -9,7 +9,6 @@ public class AvailableNodeResponse {
 	private Integer runningCount;
 	private Integer reservedCount;
 	private Integer maxConcurrency;
-	private Integer effectiveLoad;
 
 	public Long getNodeId() {
 		return nodeId;
@@ -73,13 +72,5 @@ public class AvailableNodeResponse {
 
 	public void setMaxConcurrency(Integer maxConcurrency) {
 		this.maxConcurrency = maxConcurrency;
-	}
-
-	public Integer getEffectiveLoad() {
-		return effectiveLoad;
-	}
-
-	public void setEffectiveLoad(Integer effectiveLoad) {
-		this.effectiveLoad = effectiveLoad;
 	}
 }

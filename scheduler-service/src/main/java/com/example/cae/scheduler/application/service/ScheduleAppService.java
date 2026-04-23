@@ -169,14 +169,6 @@ public class ScheduleAppService {
 		nodeCapacityManager.release(nodeId, taskId);
 	}
 
-	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
-		if (nodeId == null || taskId == null) {
-			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId and taskId are required");
-		}
-		throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED,
-				"runtime cancel is not supported in first-version status contract");
-	}
-
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
 		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
 		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();

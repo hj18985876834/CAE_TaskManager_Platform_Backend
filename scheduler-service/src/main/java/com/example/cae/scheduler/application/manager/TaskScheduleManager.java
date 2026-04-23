@@ -38,10 +38,6 @@ public class TaskScheduleManager {
 		return scheduleAppService.handleDispatchFailure(taskId, nodeId, failType, reason, recoverable);
 	}
 
-	public void cancelTaskOnNode(Long nodeId, Long taskId, String reason) {
-		scheduleAppService.cancelTaskOnNode(nodeId, taskId, reason);
-	}
-
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
 		return scheduleAppService.pageRecords(request);
 	}

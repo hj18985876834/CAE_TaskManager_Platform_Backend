@@ -15,8 +15,6 @@ public class NodeDetailResponse {
 	private Integer maxConcurrency;
 	private Integer runningCount;
 	private Integer reservedCount;
-	private Integer effectiveLoad;
-	private BigDecimal loadRatio;
 	private BigDecimal cpuUsage;
 	private BigDecimal memoryUsage;
 	private LocalDateTime lastHeartbeatTime;
@@ -100,22 +98,6 @@ public class NodeDetailResponse {
 
 	public void setReservedCount(Integer reservedCount) {
 		this.reservedCount = reservedCount;
-	}
-
-	public Integer getEffectiveLoad() {
-		return effectiveLoad;
-	}
-
-	public void setEffectiveLoad(Integer effectiveLoad) {
-		this.effectiveLoad = effectiveLoad;
-	}
-
-	public BigDecimal getLoadRatio() {
-		return loadRatio;
-	}
-
-	public void setLoadRatio(BigDecimal loadRatio) {
-		this.loadRatio = loadRatio;
 	}
 
 	public BigDecimal getCpuUsage() {

@@ -7,7 +7,6 @@ import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.application.service.ScheduleAppService;
 import com.example.cae.scheduler.interfaces.request.InternalScheduleRecordRequest;
 import com.example.cae.scheduler.interfaces.request.InternalTaskDispatchFailureRequest;
-import com.example.cae.scheduler.interfaces.request.NodeTaskCancelRequest;
 import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import jakarta.validation.Valid;
@@ -65,13 +64,6 @@ public class InternalSchedulerController {
 	@GetMapping("/tasks/{taskId}/schedules")
 	public Result<List<ScheduleRecordResponse>> listTaskSchedules(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId) {
 		return Result.success(scheduleAppService.listByTaskId(taskId));
-	}
-
-	@PostMapping("/nodes/{nodeId}/cancel-task")
-	public Result<Void> cancelTask(@PathVariable @Positive(message = "nodeId必须大于0") Long nodeId,
-								   @Valid @RequestBody NodeTaskCancelRequest request) {
-		scheduleAppService.cancelTaskOnNode(nodeId, request.getTaskId(), request.getReason());
-		return Result.success();
 	}
 
 	@GetMapping("/nodes/{nodeId}/token/verify")
