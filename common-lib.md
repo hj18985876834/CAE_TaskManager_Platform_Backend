@@ -488,7 +488,7 @@ common-lib/src/main/java/com/example/cae/common/dto/
 - 模板 ID、任务类型
 - 命令模板、解析器名、超时
 - 优先级
-- 参数 JSON 和参数 Map
+- 参数 Map
 - 输入文件列表
 - 绑定节点 ID
 - 提交时间
@@ -593,7 +593,7 @@ common-lib/src/main/java/com/example/cae/common/dto/
 - `requiredFlag`
 - `sortOrder`
 - `ruleJson`
-- `remark`
+- `description`
 
 ---
 

@@ -479,12 +479,10 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/request/
 - `execPath`
 - `enabled`
 - `description`
-- `remark`
 
 注意点：
 
-- 同时存在 `description` 和 `remark` 两个字段。
-- 当前实现会优先使用 `description`，回退到 `remark`。
+- 当前已统一使用 `description` 字段，不再保留 `remark` 兼容口径。
 
 #### `UpdateSolverRequest.java`
 
@@ -563,12 +561,11 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/request/
 - `requiredFlag`
 - `sortOrder`
 - `description`
-- `remark`
 - `ruleJson`
 
 注意点：
 
-- 同样存在 `description` 和 `remark` 两个兼容字段。
+- 当前已统一使用 `description` 字段。
 
 #### `UpdateFileRuleRequest.java`
 
@@ -633,7 +630,7 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/response/
 
 说明：
 
-- 当前同时包含 `description` 和 `remark` 风格字段。
+- 当前已统一为 `description` 风格字段。
 
 #### `SolverCreateResponse.java`
 
@@ -684,7 +681,7 @@ solver-service/src/main/java/com/example/cae/solver/interfaces/response/
 特点：
 
 - 同时存在 `id` 和 `ruleId`
-- 同时存在 `description` 和 `remark`
+- 当前已统一使用 `description`
 
 这属于接口兼容式冗余字段设计。
 
@@ -777,7 +774,7 @@ solver-service/src/main/java/com/example/cae/solver/application/assembler/
 
 实现细节：
 
-- `resolveDescription(...)` 会优先取 `description`，回退到 `remark`，最终都落到领域对象的 `remark` 字段。
+- `resolveDescription(...)` 已统一按 `description` 读取并写入领域对象的 `description` 字段。
 
 #### `ProfileAssembler.java`
 
@@ -815,7 +812,7 @@ solver-service/src/main/java/com/example/cae/solver/application/assembler/
 
 实现细节：
 
-- 也有 `description` / `remark` 的兼容合并逻辑。
+- 已统一为 `description` 字段映射逻辑。
 
 ---
 
@@ -900,7 +897,7 @@ solver-service/src/main/java/com/example/cae/solver/application/service/
 
 实现细节：
 
-- `updateSolver(...)` 中若 `description` 非空，则优先写入描述；否则才用 `remark`。
+- `updateSolver(...)` 已统一按 `description` 更新描述字段。
 
 #### `ProfileAppService.java`
 
@@ -1043,7 +1040,7 @@ solver-service/src/main/java/com/example/cae/solver/domain/model/
 - `execMode`
 - `execPath`
 - `enabled`
-- `remark`
+- `description`
 
 领域行为：
 
@@ -1096,7 +1093,7 @@ solver-service/src/main/java/com/example/cae/solver/domain/model/
 - `requiredFlag`
 - `sortOrder`
 - `ruleJson`
-- `remark`
+- `description`
 
 领域行为：
 
@@ -1284,7 +1281,7 @@ solver-service/src/main/java/com/example/cae/solver/infrastructure/persistence/m
 
 实现细节：
 
-- 数据库中的 `description` 字段被映射到 PO 的 `remark` 字段。
+- 数据库中的 `description` 字段已直接映射到 PO 的 `description` 字段。
 
 ##### `SolverTaskProfileMapper.java`
 
@@ -1572,7 +1569,7 @@ InternalProfileController.getProfileDetail
 
 ### 16.2 当前是“简化实现”或“兼容式实现”的部分
 
-- `description` / `remark` 双字段并存，本质上是兼容式入参与返回设计。
+- `description` 字段已统一为正式说明字段，不再保留 `remark` 双口径。
 - `paramsSchema` / `paramsSchemaJson` 双字段并存，也是兼容式设计。
 - 状态更新接口同时支持 `PUT` 和 `POST`。
 - 多个响应对象同时返回 `id` 和 `solverId/profileId/ruleId`。

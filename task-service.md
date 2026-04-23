@@ -910,7 +910,7 @@ task-service/src/main/java/com/example/cae/task/interfaces/request/
 - `NodeOfflineTasksRequest.java`
   作用：节点离线时批量标记任务失败的请求体。
 - `StatusReportRequest.java`
-  作用：节点回传状态变更请求体，可传 `fromStatus`、`toStatus`、`status`、`changeReason`、`reason`、`nodeId` 等字段。
+  作用：节点回传状态变更请求体，正式字段为 `nodeId`、`fromStatus`、`toStatus`、`changeReason`、`operatorType`。
 - `LogReportRequest.java`
   作用：节点回传日志分片，请求中包含 `nodeId`、`seqNo`、`logContent`。
 - `ResultSummaryReportRequest.java`

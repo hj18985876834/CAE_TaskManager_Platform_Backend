@@ -242,7 +242,6 @@ public class TaskDispatchManager {
 		dto.setProfileId(task.getProfileId());
 		dto.setTaskType(task.getTaskType());
 		dto.setPriority(task.getPriority());
-		dto.setParamsJson(task.getParamsJson());
 		dto.setParams(parseParams(task.getParamsJson()));
 		dto.setInputFiles(loadInputFiles(task.getId()));
 		enrichExecutionMeta(task, dto);
