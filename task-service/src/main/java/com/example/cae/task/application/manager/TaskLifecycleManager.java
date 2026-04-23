@@ -298,9 +298,6 @@ public class TaskLifecycleManager {
 		if (request.getToStatus() != null && !request.getToStatus().isBlank()) {
 			return request.getToStatus();
 		}
-		if (request.getStatus() != null && !request.getStatus().isBlank()) {
-			return request.getStatus();
-		}
 		throw new BizException(ErrorCodeConstants.BAD_REQUEST, "status is required");
 	}
 
@@ -308,10 +305,7 @@ public class TaskLifecycleManager {
 		if (request == null) {
 			return null;
 		}
-		if (request.getChangeReason() != null && !request.getChangeReason().isBlank()) {
-			return request.getChangeReason();
-		}
-		return request.getReason();
+		return request.getChangeReason();
 	}
 
 	private boolean isIdempotentRunningReport(Task task, StatusReportRequest request, String targetStatus) {

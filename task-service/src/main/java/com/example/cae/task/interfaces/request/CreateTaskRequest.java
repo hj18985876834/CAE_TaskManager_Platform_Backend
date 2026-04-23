@@ -1,6 +1,5 @@
 package com.example.cae.task.interfaces.request;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,7 +23,6 @@ public class CreateTaskRequest {
 	private String taskType;
 	@Min(value = 0, message = "priority不能小于0")
 	private Integer priority;
-	@JsonAlias("paramsJson")
 	private Map<String, Object> params;
 
 	public String getTaskName() {
