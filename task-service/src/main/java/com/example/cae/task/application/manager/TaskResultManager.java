@@ -66,11 +66,7 @@ public class TaskResultManager {
 		ensureResultSummaryAllowed(taskId);
 		TaskResultSummary summary = new TaskResultSummary();
 		summary.setTaskId(taskId);
-		Integer successFlag = request.getSuccessFlag();
-		if (successFlag == null) {
-			successFlag = Boolean.TRUE.equals(request.getSuccess()) ? 1 : 0;
-		}
-		summary.setSuccessFlag(successFlag);
+		summary.setSuccessFlag(request.getSuccessFlag());
 		summary.setDurationSeconds(request.getDurationSeconds());
 		summary.setSummaryText(request.getSummaryText());
 		summary.setMetricsJson(request.getMetrics() == null ? null : JsonUtil.toJson(request.getMetrics()));

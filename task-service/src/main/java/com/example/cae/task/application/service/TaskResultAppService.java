@@ -9,6 +9,7 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.infrastructure.storage.TaskFileStorageService;
+import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
 import com.example.cae.task.interfaces.response.TaskResultFileResponse;
@@ -16,6 +17,9 @@ import com.example.cae.task.interfaces.response.TaskResultSummaryResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.List;
 
 @Service
@@ -27,6 +31,7 @@ public class TaskResultAppService {
 	private final TaskResultAssembler taskResultAssembler;
 	private final TaskFileStorageService taskFileStorageService;
 	private final TaskStoragePathSupport taskStoragePathSupport;
+	private final TaskPathResolver taskPathResolver;
 
 	public TaskResultAppService(TaskRepository taskRepository,
 								TaskResultSummaryRepository taskResultSummaryRepository,
@@ -34,7 +39,8 @@ public class TaskResultAppService {
 								TaskPermissionChecker taskPermissionChecker,
 								TaskResultAssembler taskResultAssembler,
 								TaskFileStorageService taskFileStorageService,
-								TaskStoragePathSupport taskStoragePathSupport) {
+								TaskStoragePathSupport taskStoragePathSupport,
+								TaskPathResolver taskPathResolver) {
 		this.taskRepository = taskRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
@@ -42,6 +48,7 @@ public class TaskResultAppService {
 		this.taskResultAssembler = taskResultAssembler;
 		this.taskFileStorageService = taskFileStorageService;
 		this.taskStoragePathSupport = taskStoragePathSupport;
+		this.taskPathResolver = taskPathResolver;
 	}
 
 	public TaskResultSummaryResponse getResultSummary(Long taskId, Long userId, String roleCode) {
@@ -66,6 +73,36 @@ public class TaskResultAppService {
 	}
 
 	public InputStream openResultFile(TaskResultFile file) {
-		return taskFileStorageService.openFile(taskStoragePathSupport.toAbsoluteResultPath(file.getStoragePath()));
+		Path resultFilePath = validateDownloadableResultFile(file);
+		try {
+			return taskFileStorageService.openFile(resultFilePath.toString());
+		} catch (RuntimeException ex) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+	}
+
+	private Path validateDownloadableResultFile(TaskResultFile file) {
+		if (file == null || file.getTaskId() == null || file.getStoragePath() == null || file.getStoragePath().isBlank()) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+		Path resultDir = Path.of(taskPathResolver.resolveResultDir(file.getTaskId())).toAbsolutePath().normalize();
+		Path filePath;
+		try {
+			filePath = Path.of(taskStoragePathSupport.toAbsoluteResultPath(file.getStoragePath()))
+					.toAbsolutePath()
+					.normalize();
+		} catch (InvalidPathException ex) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+		if (!filePath.startsWith(resultDir)) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+		if (filePath.getFileName() == null || file.getFileName() == null || !file.getFileName().equals(filePath.getFileName().toString())) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+		if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
+		}
+		return filePath;
 	}
 }

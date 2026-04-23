@@ -1,5 +1,6 @@
 package com.example.cae.task.interfaces.request;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -11,8 +12,10 @@ public class ResultSummaryReportRequest {
 	@NotNull(message = "nodeId不能为空")
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@NotNull(message = "successFlag不能为空")
+	@Min(value = 0, message = "successFlag只能是0或1")
+	@Max(value = 1, message = "successFlag只能是0或1")
 	private Integer successFlag;
-	private Boolean success;
 	@Min(value = 0, message = "durationSeconds不能小于0")
 	private Integer durationSeconds;
 	@Size(max = 500, message = "summaryText长度不能超过500")
@@ -33,16 +36,6 @@ public class ResultSummaryReportRequest {
 
 	public void setSuccessFlag(Integer successFlag) {
 		this.successFlag = successFlag;
-		this.success = successFlag != null && successFlag == 1;
-	}
-
-	public Boolean getSuccess() {
-		return success;
-	}
-
-	public void setSuccess(Boolean success) {
-		this.success = success;
-		this.successFlag = Boolean.TRUE.equals(success) ? 1 : 0;
 	}
 
 	public Integer getDurationSeconds() {

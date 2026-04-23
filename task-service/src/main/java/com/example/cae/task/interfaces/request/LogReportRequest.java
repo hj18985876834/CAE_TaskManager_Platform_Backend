@@ -38,12 +38,4 @@ public class LogReportRequest {
 	public void setLogContent(String logContent) {
 		this.logContent = logContent;
 	}
-
-	public String getContent() {
-		return logContent;
-	}
-
-	public void setContent(String content) {
-		this.logContent = content;
-	}
 }
