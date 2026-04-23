@@ -15,4 +15,6 @@ public interface TaskFileStorageService {
 	void deleteTaskArtifacts(Long taskId);
 
 	void deleteTaskRuntimeArtifacts(Long taskId);
+
+	void deleteTaskPreparedArtifacts(Long taskId);
 }

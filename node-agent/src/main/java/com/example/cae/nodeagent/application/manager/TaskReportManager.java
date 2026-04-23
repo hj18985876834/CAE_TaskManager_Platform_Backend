@@ -10,6 +10,7 @@ import com.example.cae.nodeagent.infrastructure.process.ProcessTimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 
 import java.io.File;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,21 +36,21 @@ public class TaskReportManager {
 	}
 
 	public void reportRunning(ExecutionContext context) {
-		BizException lastException = null;
+		Exception lastException = null;
 		for (int attempt = 1; attempt <= RUNNING_REPORT_MAX_ATTEMPTS; attempt++) {
 			try {
 				taskReportAppService.reportRunning(context.getTaskId(), "node-agent start execute");
 				return;
-			} catch (BizException ex) {
+			} catch (Exception ex) {
 				lastException = ex;
 				if (!shouldRetryRunningReport(ex) || attempt == RUNNING_REPORT_MAX_ATTEMPTS) {
-					throw ex;
+					throw propagateRunningReportException(ex);
 				}
 				sleepBeforeRetry(context.getTaskId(), attempt, ex);
 			}
 		}
 		if (lastException != null) {
-			throw lastException;
+			throw propagateRunningReportException(lastException);
 		}
 	}
 
@@ -86,7 +87,21 @@ public class TaskReportManager {
 		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
 				? "node-agent prepare task failed"
 				: ex.getMessage();
-		taskReportAppService.dispatchFailed(context.getTaskId(), FailTypeEnum.EXECUTOR_START_ERROR.name(), message, false);
+		if (isRecoverablePreRunFailure(ex)) {
+			taskReportAppService.dispatchFailed(
+					context.getTaskId(),
+					FailTypeEnum.DISPATCH_ERROR.name(),
+					message,
+					true
+			);
+			return;
+		}
+		taskReportAppService.dispatchFailed(
+				context.getTaskId(),
+				FailTypeEnum.EXECUTOR_START_ERROR.name(),
+				message,
+				false
+		);
 	}
 
 	public void reportCanceled(ExecutionContext context, String reason) {
@@ -100,16 +115,31 @@ public class TaskReportManager {
 		taskRuntimeRegistry.finish(taskId);
 	}
 
-	private boolean shouldRetryRunningReport(BizException ex) {
-		if (ex == null || ex.getCode() == null) {
+	private boolean shouldRetryRunningReport(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (!(ex instanceof BizException bizException) || bizException.getCode() == null) {
 			return false;
 		}
-		return ex.getCode() == ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL
-				|| ex.getCode() == ErrorCodeConstants.TASK_STATUS_MISMATCH
-				|| ex.getCode() == ErrorCodeConstants.CONFLICT;
+		return bizException.getCode() == ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL
+				|| bizException.getCode() == ErrorCodeConstants.TASK_STATUS_MISMATCH
+				|| bizException.getCode() == ErrorCodeConstants.CONFLICT
+				|| bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY;
 	}
 
-	private void sleepBeforeRetry(Long taskId, int attempt, BizException ex) {
+	private boolean isRecoverablePreRunFailure(Exception ex) {
+		return shouldRetryRunningReport(ex);
+	}
+
+	private RuntimeException propagateRunningReportException(Exception ex) {
+		if (ex instanceof RuntimeException runtimeException) {
+			return runtimeException;
+		}
+		return new BizException(ErrorCodeConstants.BAD_GATEWAY, "running report failed", ex);
+	}
+
+	private void sleepBeforeRetry(Long taskId, int attempt, Exception ex) {
 		try {
 			Thread.sleep(RUNNING_REPORT_RETRY_INTERVAL_MS);
 		} catch (InterruptedException interruptedException) {

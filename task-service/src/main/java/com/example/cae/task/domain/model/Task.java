@@ -40,13 +40,11 @@ public class Task {
 	}
 
 	public void submit() {
-		this.nodeId = null;
-		this.failType = null;
-		this.failMessage = null;
-		this.startTime = null;
-		this.endTime = null;
-		this.status = TaskStatusEnum.QUEUED.name();
-		this.submitTime = LocalDateTime.now();
+		queue(true);
+	}
+
+	public void requeue() {
+		queue(false);
 	}
 
 	public void bindNode(Long nodeId) {
@@ -92,6 +90,18 @@ public class Task {
 		this.failType = TaskStatusEnum.TIMEOUT.name();
 		this.failMessage = failMessage;
 		this.endTime = LocalDateTime.now();
+	}
+
+	private void queue(boolean refreshSubmitTime) {
+		this.nodeId = null;
+		this.failType = null;
+		this.failMessage = null;
+		this.startTime = null;
+		this.endTime = null;
+		this.status = TaskStatusEnum.QUEUED.name();
+		if (refreshSubmitTime) {
+			this.submitTime = LocalDateTime.now();
+		}
 	}
 
 	public boolean isOwner(Long userId) {

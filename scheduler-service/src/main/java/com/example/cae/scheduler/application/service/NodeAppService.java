@@ -189,6 +189,10 @@ public class NodeAppService {
 		return computeNodeRepository.listByStatus("ONLINE");
 	}
 
+	public List<ComputeNode> listOfflineNodes() {
+		return computeNodeRepository.listByStatus("OFFLINE");
+	}
+
 	public List<AvailableNodeResponse> listAvailableNodes(Long solverId) {
 		if (solverId == null) {
 			return List.of();

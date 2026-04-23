@@ -167,7 +167,7 @@ public class TaskQueryAppService {
 		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
 		response.setStoragePath(taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath()));
-		response.setUnpackDir(file.getUnpackDir());
+		response.setUnpackDir(taskStoragePathSupport.toDisplayTaskPath(file.getUnpackDir()));
 		response.setFileSize(file.getFileSize());
 		response.setFileSuffix(file.getFileSuffix());
 		response.setCreatedAt(file.getCreatedAt());

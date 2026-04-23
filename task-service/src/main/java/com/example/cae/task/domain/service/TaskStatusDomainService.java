@@ -1,6 +1,7 @@
 package com.example.cae.task.domain.service;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskStatusHistory;
@@ -28,7 +29,7 @@ public class TaskStatusDomainService {
 		switch (normalizedTargetStatus) {
 			case "CREATED" -> task.resetToCreated();
 			case "VALIDATED" -> task.markValidated();
-			case "QUEUED" -> task.submit();
+			case "QUEUED" -> applyQueuedTransition(task, fromStatus);
 			case "SCHEDULED" -> task.markScheduled();
 			case "DISPATCHED" -> task.markDispatched();
 			case "RUNNING" -> task.markRunning();
@@ -47,6 +48,24 @@ public class TaskStatusDomainService {
 		history.setOperatorType(operatorType);
 		history.setOperatorId(operatorId);
 		taskStatusHistoryRepository.save(history);
+	}
+
+	private void applyQueuedTransition(Task task, String fromStatus) {
+		if (TaskStatusEnum.VALIDATED.name().equals(fromStatus)
+				|| TaskStatusEnum.FAILED.name().equals(fromStatus)
+				|| TaskStatusEnum.TIMEOUT.name().equals(fromStatus)) {
+			task.submit();
+			return;
+		}
+		if (TaskStatusEnum.SCHEDULED.name().equals(fromStatus)
+				|| TaskStatusEnum.DISPATCHED.name().equals(fromStatus)) {
+			task.requeue();
+			return;
+		}
+		throw new BizException(
+				ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+				"illegal queued transition from status: " + fromStatus
+		);
 	}
 
 	public void recordInitialStatus(Task task, String reason, String operatorType, Long operatorId) {

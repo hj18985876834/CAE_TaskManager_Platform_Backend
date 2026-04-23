@@ -143,13 +143,14 @@ public class TaskLifecycleManager {
 		taskValidationDomainService.checkTaskEditable(task);
 		UploadConstraint constraint = resolveUploadConstraint(task);
 		validateArchiveUpload(task, file, constraint);
-		replaceExistingArchiveIfNeeded(task, constraint, userId);
+		TaskFile existingArchive = findExistingArchive(task, constraint);
 		TaskFile taskFile = taskFileStorageService.saveInputFile(taskId, file, constraint.fileKey(), constraint.fileRole());
 		taskFile.setArchiveFlag(1);
 		try {
 			taskFileRepository.save(taskFile);
+			finishArchiveReplacement(task, existingArchive, taskFile, userId);
 		} catch (RuntimeException ex) {
-			deleteStoredFileQuietly(taskFile.getStoragePath());
+			rollbackUploadedFileOnFailure(existingArchive, taskFile);
 			throw ex;
 		}
 		TaskFileUploadResponse response = toTaskFileUploadResponse(taskFile);
@@ -275,6 +276,7 @@ public class TaskLifecycleManager {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "status-report only supports RUNNING");
 		}
 		if (isIdempotentRunningReport(task, request, targetStatus)) {
+			releaseReservation(task.getNodeId(), task.getId());
 			return buildTaskStatusAck(task);
 		}
 		if (request.getFromStatus() != null && !request.getFromStatus().isBlank() && !request.getFromStatus().equalsIgnoreCase(task.getStatus())) {
@@ -285,7 +287,7 @@ public class TaskLifecycleManager {
 		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.RUNNING.name(), reason, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
-		releaseReservationQuietly(task.getNodeId(), task.getId());
+		releaseReservation(task.getNodeId(), task.getId());
 		return buildTaskStatusAck(task);
 	}
 
@@ -366,20 +368,35 @@ public class TaskLifecycleManager {
 		}
 	}
 
-	private TaskFile replaceExistingArchiveIfNeeded(Task task, UploadConstraint constraint, Long userId) {
-		TaskFile existingArchive = taskFileRepository
+	private TaskFile findExistingArchive(Task task, UploadConstraint constraint) {
+		return taskFileRepository
 				.findByTaskIdAndFileRoleAndFileKey(task.getId(), constraint.fileRole(), constraint.fileKey())
 				.orElse(null);
-		if (existingArchive == null) {
-			return null;
+	}
+
+	private void finishArchiveReplacement(Task task, TaskFile existingArchive, TaskFile uploadedArchive, Long userId) {
+		if (uploadedArchive == null) {
+			return;
 		}
-		taskFileStorageService.deleteTaskArtifacts(task.getId());
-		deleteOtherTaskFiles(task.getId(), existingArchive.getId());
 		if (TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
 			taskStatusDomainService.transfer(task, TaskStatusEnum.CREATED.name(), "input archive replaced, re-validation required", OperatorTypeEnum.USER.name(), userId);
 			taskRepository.update(task);
 		}
-		return existingArchive;
+		deleteOtherTaskFiles(task.getId(), uploadedArchive.getId());
+		taskFileStorageService.deleteTaskPreparedArtifacts(task.getId());
+		if (existingArchive != null && !sameStoragePath(existingArchive.getStoragePath(), uploadedArchive.getStoragePath())) {
+			deleteStoredFileQuietly(existingArchive.getStoragePath());
+		}
+	}
+
+	private void rollbackUploadedFileOnFailure(TaskFile existingArchive, TaskFile uploadedArchive) {
+		if (uploadedArchive == null) {
+			return;
+		}
+		if (existingArchive != null && sameStoragePath(existingArchive.getStoragePath(), uploadedArchive.getStoragePath())) {
+			return;
+		}
+		deleteStoredFileQuietly(uploadedArchive.getStoragePath());
 	}
 
 	private void deleteStoredFileQuietly(String storagePath) {
@@ -400,6 +417,13 @@ public class TaskLifecycleManager {
 			}
 			taskFileRepository.deleteById(taskFile.getId());
 		}
+	}
+
+	private boolean sameStoragePath(String left, String right) {
+		if (left == null || right == null) {
+			return false;
+		}
+		return left.equals(right);
 	}
 
 	private void discardTaskInternal(Task task, String reason) {
@@ -504,6 +528,13 @@ public class TaskLifecycleManager {
 				&& !profileMeta.getTaskType().equals(taskType)) {
 			throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
 		}
+	}
+
+	private void releaseReservation(Long nodeId, Long taskId) {
+		if (nodeId == null || taskId == null) {
+			return;
+		}
+		schedulerClient.releaseNodeReservation(nodeId, taskId);
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {

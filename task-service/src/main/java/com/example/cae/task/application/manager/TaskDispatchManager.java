@@ -19,8 +19,6 @@ import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,7 +28,6 @@ import java.util.Set;
 
 @Service
 public class TaskDispatchManager {
-	private static final Logger log = LoggerFactory.getLogger(TaskDispatchManager.class);
 	private static final Set<String> NODE_OFFLINE_AFFECTED_STATUSES = Set.of(
 			TaskStatusEnum.SCHEDULED.name(),
 			TaskStatusEnum.DISPATCHED.name(),
@@ -204,7 +201,7 @@ public class TaskDispatchManager {
 			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
 				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 				taskRepository.update(lockedTask);
-				releaseReservationQuietly(nodeId, lockedTask.getId());
+				releaseReservationStrictly(nodeId, lockedTask.getId());
 				changedCount++;
 			}
 		}
@@ -302,14 +299,10 @@ public class TaskDispatchManager {
 		throw new BizException(ErrorCodeConstants.CONFLICT, "queued task paramsJson is invalid");
 	}
 
-	private void releaseReservationQuietly(Long nodeId, Long taskId) {
+	private void releaseReservationStrictly(Long nodeId, Long taskId) {
 		if (nodeId == null || taskId == null) {
 			return;
 		}
-		try {
-			schedulerClient.releaseNodeReservation(nodeId, taskId);
-		} catch (Exception ex) {
-			log.warn("failed to release node reservation, nodeId={}, taskId={}", nodeId, taskId, ex);
-		}
+		schedulerClient.releaseNodeReservation(nodeId, taskId);
 	}
 }

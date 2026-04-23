@@ -33,6 +33,10 @@ public class TaskPathResolver {
 		return resolvePath(resolveTaskRoot(taskId), "output");
 	}
 
+	public String resolveWorkDir(Long taskId) {
+		return resolvePath(resolveTaskRoot(taskId), "workdir");
+	}
+
 	public String resolveLogFile(Long taskId) {
 		return resolvePath(resolveLogDir(taskId), "task.log");
 	}

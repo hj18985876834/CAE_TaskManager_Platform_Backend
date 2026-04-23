@@ -108,6 +108,15 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 		deleteDirectory(Path.of(taskPathResolver.resolveResultDir(taskId)), "delete task runtime artifacts failed");
 	}
 
+	@Override
+	public void deleteTaskPreparedArtifacts(Long taskId) {
+		if (taskId == null) {
+			return;
+		}
+		deleteDirectory(Path.of(taskPathResolver.resolveWorkDir(taskId)), "delete task prepared artifacts failed");
+		deleteTaskRuntimeArtifacts(taskId);
+	}
+
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
