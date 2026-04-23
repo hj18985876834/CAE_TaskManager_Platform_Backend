@@ -1,5 +1,6 @@
 package com.example.cae.common.exception;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.response.Result;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -19,22 +20,22 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UnauthorizedException.class)
     public Result<Void> handleUnauthorizedException(UnauthorizedException ex) {
-        return Result.fail(401, ex.getMessage());
+        return Result.fail(ErrorCodeConstants.UNAUTHORIZED, ex.getMessage());
     }
 
     @ExceptionHandler(ForbiddenException.class)
     public Result<Void> handleForbiddenException(ForbiddenException ex) {
-        return Result.fail(403, ex.getMessage());
+        return Result.fail(ErrorCodeConstants.FORBIDDEN, ex.getMessage());
     }
 
     @ExceptionHandler(NotFoundException.class)
     public Result<Void> handleNotFoundException(NotFoundException ex) {
-        return Result.fail(404, ex.getMessage());
+        return Result.fail(ErrorCodeConstants.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(BindException.class)
     public Result<Void> handleBindException(BindException ex) {
-        return Result.fail(400, ex.getBindingResult().getFieldErrors().stream()
+        return Result.fail(ErrorCodeConstants.BAD_REQUEST, ex.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getDefaultMessage() == null || error.getDefaultMessage().isBlank()
                         ? error.getField() + " is invalid"
@@ -48,12 +49,12 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .map(ConstraintViolation::getMessage)
                 .orElse("request parameter validation failed");
-        return Result.fail(400, message);
+        return Result.fail(ErrorCodeConstants.BAD_REQUEST, message);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
-        return Result.fail(400, (ex.getName() == null ? "parameter" : ex.getName()) + " type mismatch");
+        return Result.fail(ErrorCodeConstants.BAD_REQUEST, (ex.getName() == null ? "parameter" : ex.getName()) + " type mismatch");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -62,11 +63,11 @@ public class GlobalExceptionHandler {
         if (message != null && message.contains(":")) {
             message = message.substring(0, message.indexOf(':'));
         }
-        return Result.fail(400, message == null || message.isBlank() ? "request body is invalid" : message);
+        return Result.fail(ErrorCodeConstants.BAD_REQUEST, message == null || message.isBlank() ? "request body is invalid" : message);
     }
 
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception ex) {
-        return Result.fail(500, ex.getMessage());
+        return Result.fail(ErrorCodeConstants.INTERNAL_SERVER_ERROR, ex.getMessage());
     }
 }

@@ -1,5 +1,6 @@
 package com.example.cae.gateway.handler;
 
+import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.exception.ForbiddenException;
 import com.example.cae.common.exception.UnauthorizedException;
 import com.example.cae.common.response.Result;
@@ -29,13 +30,13 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
         Result<Void> result;
         HttpStatus status;
         if (ex instanceof UnauthorizedException) {
-            result = Result.fail(401, ex.getMessage());
+            result = Result.fail(ErrorCodeConstants.UNAUTHORIZED, ex.getMessage());
             status = HttpStatus.UNAUTHORIZED;
         } else if (ex instanceof ForbiddenException) {
-            result = Result.fail(403, ex.getMessage());
+            result = Result.fail(ErrorCodeConstants.FORBIDDEN, ex.getMessage());
             status = HttpStatus.FORBIDDEN;
         } else {
-            result = Result.fail(500, ex.getMessage());
+            result = Result.fail(ErrorCodeConstants.INTERNAL_SERVER_ERROR, ex.getMessage());
             status = HttpStatus.INTERNAL_SERVER_ERROR;
         }
         exchange.getResponse().setStatusCode(status);
@@ -43,7 +44,8 @@ public class GatewayExceptionHandler implements ErrorWebExceptionHandler {
         try {
             bytes = objectMapper.writeValueAsString(result).getBytes(StandardCharsets.UTF_8);
         } catch (JsonProcessingException jsonProcessingException) {
-            bytes = "{\"code\":500,\"message\":\"gateway error\",\"data\":null}".getBytes(StandardCharsets.UTF_8);
+            bytes = ("{\"code\":" + ErrorCodeConstants.INTERNAL_SERVER_ERROR + ",\"message\":\"gateway error\",\"data\":null}")
+                    .getBytes(StandardCharsets.UTF_8);
         }
         DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
         return exchange.getResponse().writeWith(Mono.just(buffer));

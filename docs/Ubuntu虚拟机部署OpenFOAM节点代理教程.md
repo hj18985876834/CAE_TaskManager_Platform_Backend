@@ -534,7 +534,7 @@ bash -lc "set -o pipefail; ${openfoamApplication} -case ${taskDir} 2>&1 | tee ${
 这样你就可以在 Ubuntu 容器中直接：
 
 ```bash
-tail -f /cae-data/workspaces/<taskId>/log/<application>.log
+tail -f /cae-data/workspaces/<taskId>/logs/<application>.log
 ```
 
 但要注意：
