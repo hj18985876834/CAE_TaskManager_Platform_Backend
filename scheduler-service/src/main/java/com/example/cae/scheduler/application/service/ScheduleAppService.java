@@ -75,13 +75,31 @@ public class ScheduleAppService {
 				nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())
 		);
 
-		ComputeNode selected = scheduleStrategy.selectNode(task, availableNodes);
-		if (selected == null) {
+		List<ComputeNode> orderedCandidates = scheduleStrategy.orderNodes(task, availableNodes);
+		if (orderedCandidates.isEmpty()) {
 			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 		}
 
-		NodeReservationActionResponse reservation = nodeCapacityManager.reserve(selected.getId(), task.getTaskId());
-		return reservation.getNodeId();
+		BizException lastCapacityFailure = null;
+		for (ComputeNode candidate : orderedCandidates) {
+			if (candidate == null || candidate.getId() == null) {
+				continue;
+			}
+			try {
+				NodeReservationActionResponse reservation = nodeCapacityManager.reserve(candidate.getId(), task.getTaskId());
+				return reservation.getNodeId();
+			} catch (BizException ex) {
+				if (ex.getCode() == null || ex.getCode() != ErrorCodeConstants.NO_AVAILABLE_NODE) {
+					throw ex;
+				}
+				lastCapacityFailure = ex;
+			}
+		}
+
+		if (lastCapacityFailure != null) {
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+		}
+		throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
 	}
 
 	private void validateSolverAndProfile(TaskDTO task) {

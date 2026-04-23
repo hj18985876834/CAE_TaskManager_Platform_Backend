@@ -21,6 +21,9 @@ import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Map;
@@ -40,19 +43,23 @@ public class TaskDispatchManager {
 	private final SchedulerClient schedulerClient;
 	private final SolverClient solverClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
+	private final TransactionTemplate offlineCompensationTransactionTemplate;
 
 	public TaskDispatchManager(TaskRepository taskRepository,
 						   TaskFileRepository taskFileRepository,
 						   TaskStatusDomainService taskStatusDomainService,
 						   SchedulerClient schedulerClient,
 						   SolverClient solverClient,
-						   TaskStoragePathSupport taskStoragePathSupport) {
+						   TaskStoragePathSupport taskStoragePathSupport,
+						   PlatformTransactionManager transactionManager) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.schedulerClient = schedulerClient;
 		this.solverClient = solverClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
+		this.offlineCompensationTransactionTemplate = new TransactionTemplate(transactionManager);
+		this.offlineCompensationTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 	}
 
 	public List<TaskDTO> listQueuedTasks() {
@@ -114,7 +121,14 @@ public class TaskDispatchManager {
 		}
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		if (!Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(task.getStatus())) {
-			if (Set.of(TaskStatusEnum.RUNNING.name(), TaskStatusEnum.SUCCESS.name(),
+			if (TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+				ensureTaskBoundToNode(task, nodeId);
+				throw new BizException(
+						ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+						"dispatch-failed is not allowed after task entered RUNNING"
+				);
+			}
+			if (Set.of(TaskStatusEnum.SUCCESS.name(),
 					TaskStatusEnum.CANCELED.name(), TaskStatusEnum.TIMEOUT.name()).contains(task.getStatus())) {
 				ensureTaskBoundToNode(task, nodeId);
 				return buildTaskStatusAck(task);
@@ -172,7 +186,6 @@ public class TaskDispatchManager {
 		return response;
 	}
 
-	@Transactional
 	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
@@ -183,29 +196,41 @@ public class TaskDispatchManager {
 		List<Task> affectedTasks = taskRepository.listByNodeIdAndStatuses(nodeId, List.copyOf(NODE_OFFLINE_AFFECTED_STATUSES));
 		int changedCount = 0;
 		for (Task task : affectedTasks) {
-			Task lockedTask = taskRepository.findByIdForUpdate(task.getId()).orElse(null);
-			if (lockedTask == null || !NODE_OFFLINE_AFFECTED_STATUSES.contains(lockedTask.getStatus())) {
+			if (task == null || task.getId() == null) {
 				continue;
 			}
-			if (!nodeId.equals(lockedTask.getNodeId())) {
-				continue;
-			}
-			if (TaskStatusEnum.RUNNING.name().equals(lockedTask.getStatus())) {
-				lockedTask.setFailType(FailTypeEnum.NODE_OFFLINE.name());
-				lockedTask.setFailMessage(effectiveReason);
-				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
-				taskRepository.update(lockedTask);
-				changedCount++;
-				continue;
-			}
-			if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
-				taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
-				taskRepository.update(lockedTask);
-				releaseReservationStrictly(nodeId, lockedTask.getId());
+			Boolean changed = offlineCompensationTransactionTemplate.execute(
+					status -> processSingleOfflineTask(nodeId, task.getId(), effectiveReason)
+			);
+			if (Boolean.TRUE.equals(changed)) {
 				changedCount++;
 			}
 		}
 		return changedCount;
+	}
+
+	private Boolean processSingleOfflineTask(Long nodeId, Long taskId, String effectiveReason) {
+		Task lockedTask = taskRepository.findByIdForUpdate(taskId).orElse(null);
+		if (lockedTask == null || !NODE_OFFLINE_AFFECTED_STATUSES.contains(lockedTask.getStatus())) {
+			return Boolean.FALSE;
+		}
+		if (!nodeId.equals(lockedTask.getNodeId())) {
+			return Boolean.FALSE;
+		}
+		if (TaskStatusEnum.RUNNING.name().equals(lockedTask.getStatus())) {
+			lockedTask.setFailType(FailTypeEnum.NODE_OFFLINE.name());
+			lockedTask.setFailMessage(effectiveReason);
+			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+			taskRepository.update(lockedTask);
+			return Boolean.TRUE;
+		}
+		if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
+			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
+			taskRepository.update(lockedTask);
+			releaseReservationStrictly(nodeId, lockedTask.getId());
+			return Boolean.TRUE;
+		}
+		return Boolean.FALSE;
 	}
 
 	private TaskDTO toTaskDTO(Task task) {

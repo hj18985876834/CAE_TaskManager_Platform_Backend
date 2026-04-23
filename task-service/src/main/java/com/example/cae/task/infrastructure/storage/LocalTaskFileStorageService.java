@@ -15,6 +15,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.UUID;
 
 @Service
 public class LocalTaskFileStorageService implements TaskFileStorageService {
@@ -32,17 +33,23 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "file is required");
 		}
 		String normalizedFileRole = normalizeFileRole(fileRole);
-		String fileName = file.getOriginalFilename() == null ? "unknown.bin" : file.getOriginalFilename();
+		String fileName = sanitizeUploadFileName(file.getOriginalFilename());
+		String storedFileName = buildStoredFileName(fileName);
 		String normalizedFileKey = normalizeFileKey(fileKey, fileName);
 		String dir = taskPathResolver.resolveInputDir(taskId);
+		Path inputDir;
 		Path path;
 		try {
-			path = Path.of(dir, fileName);
+			inputDir = Path.of(dir).toAbsolutePath().normalize();
+			path = inputDir.resolve(storedFileName).normalize();
 		} catch (InvalidPathException ex) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid file name");
 		}
+		if (!path.startsWith(inputDir)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid file name");
+		}
 		try {
-			Files.createDirectories(path.getParent());
+			Files.createDirectories(inputDir);
 			file.transferTo(path);
 		} catch (IOException ex) {
 			throw new IllegalStateException("save input file failed", ex);
@@ -120,6 +127,32 @@ public class LocalTaskFileStorageService implements TaskFileStorageService {
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
+	}
+
+	private String sanitizeUploadFileName(String originalFilename) {
+		String candidate = originalFilename;
+		if (candidate == null || candidate.isBlank()) {
+			return "unknown.bin";
+		}
+		try {
+			Path rawPath = Path.of(candidate);
+			Path fileName = rawPath.getFileName();
+			if (fileName == null || fileName.toString().isBlank()) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid file name");
+			}
+			return fileName.toString();
+		} catch (InvalidPathException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid file name");
+		}
+	}
+
+	private String buildStoredFileName(String originName) {
+		String suffix = extractSuffix(originName);
+		String randomName = UUID.randomUUID().toString().replace("-", "");
+		if (suffix.isBlank()) {
+			return randomName;
+		}
+		return randomName + "." + suffix;
 	}
 
 	private String normalizeFileRole(String fileRole) {
