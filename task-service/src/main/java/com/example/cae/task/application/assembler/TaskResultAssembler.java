@@ -22,21 +22,17 @@ public class TaskResultAssembler {
 
 	public TaskResultSummaryResponse toSummaryResponse(TaskResultSummary summary) {
 		TaskResultSummaryResponse response = new TaskResultSummaryResponse();
-		response.setId(summary.getId());
 		response.setTaskId(summary.getTaskId());
 		response.setSuccessFlag(summary.getSuccessFlag());
 		response.setDurationSeconds(summary.getDurationSeconds());
 		response.setSummaryText(summary.getSummaryText());
 		response.setMetrics(parseMetrics(summary.getMetricsJson()));
-		response.setCreatedAt(summary.getCreatedAt());
-		response.setUpdatedAt(summary.getUpdatedAt());
 		return response;
 	}
 
 	public TaskResultFileResponse toFileResponse(TaskResultFile file) {
 		TaskResultFileResponse response = new TaskResultFileResponse();
 		response.setFileId(file.getId());
-		response.setTaskId(file.getTaskId());
 		response.setFileType(file.getFileType());
 		response.setFileName(file.getFileName());
 		response.setStoragePath(taskStoragePathSupport.toDisplayResultPath(file.getStoragePath()));

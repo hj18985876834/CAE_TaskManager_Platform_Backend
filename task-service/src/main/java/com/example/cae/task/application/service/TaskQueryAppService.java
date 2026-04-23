@@ -18,10 +18,12 @@ import com.example.cae.task.infrastructure.client.UserClient;
 import com.example.cae.task.infrastructure.support.TaskQueryBuilder;
 import com.example.cae.task.infrastructure.support.TaskPermissionChecker;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
+import com.example.cae.task.interfaces.request.AdminTaskListQueryRequest;
+import com.example.cae.task.interfaces.request.MyTaskListQueryRequest;
 import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskInputFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskScheduleRecordResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
@@ -69,9 +71,9 @@ public class TaskQueryAppService {
 		this.taskStoragePathSupport = taskStoragePathSupport;
 	}
 
-	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
-		request = taskQueryBuilder.sanitize(request);
-		PageResult<Task> page = taskRepository.pageMyTasks(request, userId);
+	public PageResult<TaskListItemResponse> pageMyTasks(MyTaskListQueryRequest request, Long userId) {
+		TaskListQueryRequest query = taskQueryBuilder.sanitize(toMyTaskQuery(request));
+		PageResult<Task> page = taskRepository.pageMyTasks(query, userId);
 		QueueReasonContext queueReasonContext = buildQueueReasonContext();
 		List<TaskListItemResponse> records = page.getRecords().stream()
 				.map(task -> enrichTaskListItem(taskAssembler.toListItemResponse(task), queueReasonContext))
@@ -79,9 +81,9 @@ public class TaskQueryAppService {
 		return PageResult.of(page.getTotal(), page.getPageNum(), page.getPageSize(), records);
 	}
 
-	public PageResult<AdminTaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
-		request = taskQueryBuilder.sanitize(request);
-		PageResult<Task> page = taskRepository.pageAdminTasks(request);
+	public PageResult<AdminTaskListItemResponse> pageAdminTasks(AdminTaskListQueryRequest request) {
+		TaskListQueryRequest query = taskQueryBuilder.sanitize(toAdminTaskQuery(request));
+		PageResult<Task> page = taskRepository.pageAdminTasks(query);
 		QueueReasonContext queueReasonContext = buildQueueReasonContext();
 		Map<Long, String> usernameMap = buildUsernameMap(page.getRecords());
 		List<AdminTaskListItemResponse> records = page.getRecords().stream()
@@ -102,10 +104,10 @@ public class TaskQueryAppService {
 		return taskStatusHistoryRepository.listByTaskId(taskId).stream().map(this::toStatusHistoryResponse).toList();
 	}
 
-	public List<TaskFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
+	public List<TaskInputFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
-		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskFileResponse).toList();
+		return taskFileRepository.listByTaskId(taskId).stream().map(this::toTaskInputFileResponse).toList();
 	}
 
 	public List<TaskScheduleRecordResponse> getTaskScheduleRecords(Long taskId, Long userId, String roleCode) {
@@ -150,31 +152,24 @@ public class TaskQueryAppService {
 
 	private TaskStatusHistoryResponse toStatusHistoryResponse(TaskStatusHistory history) {
 		TaskStatusHistoryResponse response = new TaskStatusHistoryResponse();
-		response.setId(history.getId());
-		response.setTaskId(history.getTaskId());
 		response.setFromStatus(history.getFromStatus());
 		response.setToStatus(history.getToStatus());
 		response.setChangeReason(history.getChangeReason());
 		response.setOperatorType(history.getOperatorType());
-		response.setOperatorId(history.getOperatorId());
 		response.setCreatedAt(history.getCreatedAt());
 		return response;
 	}
 
-	private TaskFileResponse toTaskFileResponse(TaskFile file) {
-		TaskFileResponse response = new TaskFileResponse();
+	private TaskInputFileResponse toTaskInputFileResponse(TaskFile file) {
+		TaskInputFileResponse response = new TaskInputFileResponse();
 		response.setFileId(file.getId());
-		response.setTaskId(file.getTaskId());
 		response.setFileRole(file.getFileRole());
 		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
 		response.setStoragePath(taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath()));
 		response.setUnpackDir(file.getUnpackDir());
-		response.setRelativePath(file.getRelativePath());
-		response.setArchiveFlag(file.getArchiveFlag());
 		response.setFileSize(file.getFileSize());
 		response.setFileSuffix(file.getFileSuffix());
-		response.setChecksum(file.getChecksum());
 		response.setCreatedAt(file.getCreatedAt());
 		return response;
 	}
@@ -274,5 +269,42 @@ public class TaskQueryAppService {
 
 	private record QueueReasonContext(Map<Long, Integer> queuedTaskOrder,
 									  Map<Long, SchedulerClient.QueueNodeSnapshot> queueSnapshotCache) {
+	}
+
+	private TaskListQueryRequest toMyTaskQuery(MyTaskListQueryRequest request) {
+		TaskListQueryRequest query = new TaskListQueryRequest();
+		if (request == null) {
+			return query;
+		}
+		query.setPageNum(request.getPageNum());
+		query.setPageSize(request.getPageSize());
+		query.setTaskName(request.getTaskName());
+		query.setStatus(request.getStatus());
+		query.setPriority(request.getPriority());
+		query.setSolverId(request.getSolverId());
+		query.setTaskType(request.getTaskType());
+		query.setStartTime(request.getStartTime());
+		query.setEndTime(request.getEndTime());
+		return query;
+	}
+
+	private TaskListQueryRequest toAdminTaskQuery(AdminTaskListQueryRequest request) {
+		TaskListQueryRequest query = new TaskListQueryRequest();
+		if (request == null) {
+			return query;
+		}
+		query.setPageNum(request.getPageNum());
+		query.setPageSize(request.getPageSize());
+		query.setTaskName(request.getTaskName());
+		query.setStatus(request.getStatus());
+		query.setPriority(request.getPriority());
+		query.setSolverId(request.getSolverId());
+		query.setTaskType(request.getTaskType());
+		query.setUserId(request.getUserId());
+		query.setNodeId(request.getNodeId());
+		query.setFailType(request.getFailType());
+		query.setStartTime(request.getStartTime());
+		query.setEndTime(request.getEndTime());
+		return query;
 	}
 }

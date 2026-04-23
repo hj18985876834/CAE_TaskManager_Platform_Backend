@@ -4,11 +4,12 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.application.service.TaskQueryAppService;
+import com.example.cae.task.interfaces.request.AdminTaskListQueryRequest;
 import com.example.cae.task.interfaces.request.RetryTaskRequest;
-import com.example.cae.task.interfaces.request.TaskListQueryRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
 import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
-import com.example.cae.task.interfaces.response.TaskSubmitResponse;
+import com.example.cae.task.interfaces.response.TaskActionResponse;
+import com.example.cae.task.interfaces.response.TaskPriorityUpdateResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -33,20 +34,19 @@ public class AdminTaskController {
 	}
 
 	@GetMapping
-	public Result<PageResult<AdminTaskListItemResponse>> pageAdminTasks(@Valid TaskListQueryRequest request) {
+	public Result<PageResult<AdminTaskListItemResponse>> pageAdminTasks(@Valid AdminTaskListQueryRequest request) {
 		return Result.success(taskQueryAppService.pageAdminTasks(request));
 	}
 
 	@PostMapping("/{taskId}/priority")
-	public Result<Void> adjustPriority(@PathVariable("taskId") @Positive(message = "taskId must be greater than 0") Long taskId,
-									   @Valid @RequestBody UpdateTaskPriorityRequest request,
-									   @RequestHeader("X-User-Id") @Positive(message = "X-User-Id must be greater than 0") Long adminUserId) {
-		taskCommandAppService.adjustPriority(taskId, request, adminUserId);
-		return Result.success();
+	public Result<TaskPriorityUpdateResponse> adjustPriority(@PathVariable("taskId") @Positive(message = "taskId must be greater than 0") Long taskId,
+													 @Valid @RequestBody UpdateTaskPriorityRequest request,
+													 @RequestHeader("X-User-Id") @Positive(message = "X-User-Id must be greater than 0") Long adminUserId) {
+		return Result.success(taskCommandAppService.adjustPriority(taskId, request, adminUserId));
 	}
 
 	@PostMapping("/{taskId}/retry")
-	public Result<TaskSubmitResponse> retryTask(@PathVariable("taskId") @Positive(message = "taskId must be greater than 0") Long taskId,
+	public Result<TaskActionResponse> retryTask(@PathVariable("taskId") @Positive(message = "taskId must be greater than 0") Long taskId,
 												@Valid @RequestBody(required = false) RetryTaskRequest request,
 												@RequestHeader("X-User-Id") @Positive(message = "X-User-Id must be greater than 0") Long adminUserId) {
 		return Result.success(taskCommandAppService.retryTask(taskId, adminUserId, request == null ? null : request.getReason()));

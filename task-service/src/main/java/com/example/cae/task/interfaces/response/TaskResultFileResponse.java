@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 
 public class TaskResultFileResponse {
 	private Long fileId;
-	private Long taskId;
 	private String fileType;
 	private String fileName;
 	private String storagePath;
@@ -17,14 +16,6 @@ public class TaskResultFileResponse {
 
 	public void setFileId(Long fileId) {
 		this.fileId = fileId;
-	}
-
-	public Long getTaskId() {
-		return taskId;
-	}
-
-	public void setTaskId(Long taskId) {
-		this.taskId = taskId;
 	}
 
 	public String getFileType() {

@@ -1,6 +1,6 @@
 package com.example.cae.task.interfaces.response;
 
-public class TaskUpdateResponse {
+public class TaskActionResponse {
 	private Long taskId;
 	private String status;
 

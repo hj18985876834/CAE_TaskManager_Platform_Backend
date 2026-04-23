@@ -1,8 +1,9 @@
 package com.example.cae.task.interfaces.response;
 
-public class TaskUpdateResponse {
+public class TaskPriorityUpdateResponse {
 	private Long taskId;
 	private String status;
+	private Integer priority;
 
 	public Long getTaskId() {
 		return taskId;
@@ -18,5 +19,13 @@ public class TaskUpdateResponse {
 
 	public void setStatus(String status) {
 		this.status = status;
+	}
+
+	public Integer getPriority() {
+		return priority;
+	}
+
+	public void setPriority(Integer priority) {
+		this.priority = priority;
 	}
 }

@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 public class TaskLogAssembler {
 	public TaskLogResponse toResponse(TaskLogChunk chunk) {
 		TaskLogResponse response = new TaskLogResponse();
-		response.setId(chunk.getId());
-		response.setTaskId(chunk.getTaskId());
 		response.setSeqNo(chunk.getSeqNo());
 		response.setLogContent(chunk.getLogContent());
 		response.setCreatedAt(chunk.getCreatedAt());
@@ -36,4 +34,3 @@ public class TaskLogAssembler {
 		return chunk;
 	}
 }
-

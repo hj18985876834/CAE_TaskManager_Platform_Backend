@@ -3,10 +3,12 @@ package com.example.cae.task.application.facade;
 import com.example.cae.task.application.service.TaskCommandAppService;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.RetryTaskRequest;
-import com.example.cae.task.interfaces.request.UpdateTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskPriorityRequest;
+import com.example.cae.task.interfaces.request.UpdateTaskRequest;
+import com.example.cae.task.interfaces.response.TaskActionResponse;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskFileUploadResponse;
+import com.example.cae.task.interfaces.response.TaskPriorityUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskValidateResponse;
@@ -29,7 +31,7 @@ public class TaskCommandFacade {
 		return taskCommandAppService.updateTask(taskId, request, userId);
 	}
 
-	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
+	public TaskFileUploadResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
 		return taskCommandAppService.uploadTaskFile(taskId, file, fileKey, fileRole, userId);
 	}
 
@@ -45,15 +47,15 @@ public class TaskCommandFacade {
 		taskCommandAppService.discardTask(taskId, userId, reason);
 	}
 
-	public void cancelTask(Long taskId, Long userId, String reason) {
-		taskCommandAppService.cancelTask(taskId, userId, reason);
+	public TaskActionResponse cancelTask(Long taskId, Long userId, String reason) {
+		return taskCommandAppService.cancelTask(taskId, userId, reason);
 	}
 
-	public void adjustPriority(Long taskId, UpdateTaskPriorityRequest request, Long adminUserId) {
-		taskCommandAppService.adjustPriority(taskId, request, adminUserId);
+	public TaskPriorityUpdateResponse adjustPriority(Long taskId, UpdateTaskPriorityRequest request, Long adminUserId) {
+		return taskCommandAppService.adjustPriority(taskId, request, adminUserId);
 	}
 
-	public TaskSubmitResponse retryTask(Long taskId, RetryTaskRequest request, Long adminUserId) {
+	public TaskActionResponse retryTask(Long taskId, RetryTaskRequest request, Long adminUserId) {
 		return taskCommandAppService.retryTask(taskId, adminUserId, request == null ? null : request.getReason());
 	}
 }

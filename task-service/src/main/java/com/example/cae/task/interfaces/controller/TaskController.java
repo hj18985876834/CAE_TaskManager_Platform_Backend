@@ -6,8 +6,9 @@ import com.example.cae.task.interfaces.request.CancelTaskRequest;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.DiscardTaskRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskRequest;
+import com.example.cae.task.interfaces.response.TaskActionResponse;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskFileUploadResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskValidateResponse;
@@ -48,7 +49,7 @@ public class TaskController {
 	}
 
 	@PostMapping("/{taskId}/files")
-	public Result<TaskFileResponse> uploadTaskFile(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+	public Result<TaskFileUploadResponse> uploadTaskFile(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 											 @RequestPart("file") MultipartFile file,
 											 @RequestParam(value = "fileKey", required = false) String fileKey,
 											 @RequestParam(value = "fileRole", required = false) String fileRole,
@@ -73,8 +74,8 @@ public class TaskController {
 	}
 
 	@PostMapping("/{taskId}/cancel")
-	public Result<Void> cancelTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
-		taskCommandAppService.cancelTask(taskId, userId, request == null ? null : request.getReason());
-		return Result.success();
+	public Result<TaskActionResponse> cancelTask(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody(required = false) CancelTaskRequest request, @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
+		return Result.success(taskCommandAppService.cancelTask(taskId, userId, request == null ? null : request.getReason()));
 	}
 }
+

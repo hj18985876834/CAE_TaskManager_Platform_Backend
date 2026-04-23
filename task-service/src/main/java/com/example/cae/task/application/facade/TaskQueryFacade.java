@@ -4,10 +4,11 @@ import com.example.cae.common.response.PageResult;
 import com.example.cae.task.application.service.TaskLogAppService;
 import com.example.cae.task.application.service.TaskQueryAppService;
 import com.example.cae.task.application.service.TaskResultAppService;
-import com.example.cae.task.interfaces.request.TaskListQueryRequest;
+import com.example.cae.task.interfaces.request.AdminTaskListQueryRequest;
+import com.example.cae.task.interfaces.request.MyTaskListQueryRequest;
 import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskInputFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskLogPageResponse;
 import com.example.cae.task.interfaces.response.TaskLogResponse;
@@ -31,11 +32,11 @@ public class TaskQueryFacade {
 		this.taskResultAppService = taskResultAppService;
 	}
 
-	public PageResult<TaskListItemResponse> pageMyTasks(TaskListQueryRequest request, Long userId) {
+	public PageResult<TaskListItemResponse> pageMyTasks(MyTaskListQueryRequest request, Long userId) {
 		return taskQueryAppService.pageMyTasks(request, userId);
 	}
 
-	public PageResult<AdminTaskListItemResponse> pageAdminTasks(TaskListQueryRequest request) {
+	public PageResult<AdminTaskListItemResponse> pageAdminTasks(AdminTaskListQueryRequest request) {
 		return taskQueryAppService.pageAdminTasks(request);
 	}
 
@@ -47,7 +48,7 @@ public class TaskQueryFacade {
 		return taskQueryAppService.getTaskStatusHistory(taskId, userId, roleCode);
 	}
 
-	public List<TaskFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
+	public List<TaskInputFileResponse> getTaskFiles(Long taskId, Long userId, String roleCode) {
 		return taskQueryAppService.getTaskFiles(taskId, userId, roleCode);
 	}
 

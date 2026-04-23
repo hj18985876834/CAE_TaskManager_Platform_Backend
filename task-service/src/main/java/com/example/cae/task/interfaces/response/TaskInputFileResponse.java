@@ -2,19 +2,15 @@ package com.example.cae.task.interfaces.response;
 
 import java.time.LocalDateTime;
 
-public class TaskFileResponse {
+public class TaskInputFileResponse {
 	private Long fileId;
-	private Long taskId;
 	private String fileRole;
 	private String fileKey;
 	private String originName;
 	private String storagePath;
 	private String unpackDir;
-	private String relativePath;
-	private Integer archiveFlag;
 	private Long fileSize;
 	private String fileSuffix;
-	private String checksum;
 	private LocalDateTime createdAt;
 
 	public Long getFileId() {
@@ -23,14 +19,6 @@ public class TaskFileResponse {
 
 	public void setFileId(Long fileId) {
 		this.fileId = fileId;
-	}
-
-	public Long getTaskId() {
-		return taskId;
-	}
-
-	public void setTaskId(Long taskId) {
-		this.taskId = taskId;
 	}
 
 	public String getFileRole() {
@@ -73,22 +61,6 @@ public class TaskFileResponse {
 		this.unpackDir = unpackDir;
 	}
 
-	public String getRelativePath() {
-		return relativePath;
-	}
-
-	public void setRelativePath(String relativePath) {
-		this.relativePath = relativePath;
-	}
-
-	public Integer getArchiveFlag() {
-		return archiveFlag;
-	}
-
-	public void setArchiveFlag(Integer archiveFlag) {
-		this.archiveFlag = archiveFlag;
-	}
-
 	public Long getFileSize() {
 		return fileSize;
 	}
@@ -103,14 +75,6 @@ public class TaskFileResponse {
 
 	public void setFileSuffix(String fileSuffix) {
 		this.fileSuffix = fileSuffix;
-	}
-
-	public String getChecksum() {
-		return checksum;
-	}
-
-	public void setChecksum(String checksum) {
-		this.checksum = checksum;
 	}
 
 	public LocalDateTime getCreatedAt() {

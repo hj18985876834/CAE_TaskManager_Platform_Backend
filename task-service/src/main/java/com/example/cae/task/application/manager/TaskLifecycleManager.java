@@ -28,8 +28,10 @@ import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.CreateTaskRequest;
 import com.example.cae.task.interfaces.request.StatusReportRequest;
 import com.example.cae.task.interfaces.request.UpdateTaskRequest;
+import com.example.cae.task.interfaces.response.TaskActionResponse;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskFileUploadResponse;
+import com.example.cae.task.interfaces.response.TaskPriorityUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskSubmitResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import org.slf4j.Logger;
@@ -136,7 +138,7 @@ public class TaskLifecycleManager {
 	}
 
 	@Transactional
-	public TaskFileResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
+	public TaskFileUploadResponse uploadTaskFile(Long taskId, MultipartFile file, String fileKey, String fileRole, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskEditable(task);
 		UploadConstraint constraint = resolveUploadConstraint(task);
@@ -150,7 +152,9 @@ public class TaskLifecycleManager {
 			deleteStoredFileQuietly(taskFile.getStoragePath());
 			throw ex;
 		}
-		return toTaskFileResponse(taskFile);
+		TaskFileUploadResponse response = toTaskFileUploadResponse(taskFile);
+		response.setStatus(task.getStatus());
+		return response;
 	}
 
 	private UploadConstraint resolveUploadConstraint(Task task) {
@@ -180,22 +184,23 @@ public class TaskLifecycleManager {
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), "task submitted", OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(taskId);
-		TaskSubmitResponse response = new TaskSubmitResponse();
-		response.setTaskId(taskId);
-		response.setStatus(task.getStatus());
-		return response;
+		return buildTaskSubmitResponse(task);
 	}
 
-	public void cancelTask(Long taskId, Long userId, String reason) {
+	public TaskActionResponse cancelTask(Long taskId, Long userId, String reason) {
 		Task task = loadAndCheckOwner(taskId, userId);
+		if (TaskStatusEnum.CANCELED.name().equals(task.getStatus())) {
+			return buildTaskActionResponse(task);
+		}
 		if (!taskDomainService.canCancel(task)) {
 			throw new BizException(ErrorCodeConstants.TASK_CANCEL_NOT_ALLOWED, "task cannot be canceled in current status");
 		}
 		taskStatusDomainService.transfer(task, TaskStatusEnum.CANCELED.name(), reason, OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
+		return buildTaskActionResponse(task);
 	}
 
-	public void adjustPriority(Long taskId, Integer priority, Long adminUserId) {
+	public TaskPriorityUpdateResponse adjustPriority(Long taskId, Integer priority, Long adminUserId) {
 		Task task = loadTask(taskId);
 		if (!List.of(TaskStatusEnum.CREATED.name(), TaskStatusEnum.VALIDATED.name(), TaskStatusEnum.QUEUED.name())
 				.contains(task.getStatus())) {
@@ -216,9 +221,10 @@ public class TaskLifecycleManager {
 		history.setOperatorType(OperatorTypeEnum.ADMIN.name());
 		history.setOperatorId(adminUserId);
 		taskStatusHistoryRepository.save(history);
+		return taskAssembler.toPriorityUpdateResponse(task);
 	}
 
-	public TaskSubmitResponse retryTask(Long taskId, String reason, Long adminUserId) {
+	public TaskActionResponse retryTask(Long taskId, String reason, Long adminUserId) {
 		Task task = loadTask(taskId);
 		if (!TaskStatusEnum.FAILED.name().equals(task.getStatus()) && !TaskStatusEnum.TIMEOUT.name().equals(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_RETRY_NOT_ALLOWED, "only failed or timeout tasks can be retried");
@@ -232,10 +238,7 @@ public class TaskLifecycleManager {
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(task.getId());
 
-		TaskSubmitResponse response = new TaskSubmitResponse();
-		response.setTaskId(task.getId());
-		response.setStatus(task.getStatus());
-		return response;
+		return buildTaskActionResponse(task);
 	}
 
 	public void discardTask(Long taskId, Long userId, String reason) {
@@ -327,21 +330,11 @@ public class TaskLifecycleManager {
 				|| TaskStatusEnum.RUNNING.name().equalsIgnoreCase(fromStatus);
 	}
 
-	private TaskFileResponse toTaskFileResponse(TaskFile file) {
-		TaskFileResponse response = new TaskFileResponse();
+	private TaskFileUploadResponse toTaskFileUploadResponse(TaskFile file) {
+		TaskFileUploadResponse response = new TaskFileUploadResponse();
 		response.setFileId(file.getId());
-		response.setTaskId(file.getTaskId());
-		response.setFileRole(file.getFileRole());
-		response.setFileKey(file.getFileKey());
 		response.setOriginName(file.getOriginName());
 		response.setStoragePath(taskStoragePathSupport.toDisplayTaskPath(file.getStoragePath()));
-		response.setUnpackDir(file.getUnpackDir());
-		response.setRelativePath(file.getRelativePath());
-		response.setArchiveFlag(file.getArchiveFlag());
-		response.setFileSize(file.getFileSize());
-		response.setFileSuffix(file.getFileSuffix());
-		response.setChecksum(file.getChecksum());
-		response.setCreatedAt(file.getCreatedAt());
 		return response;
 	}
 
@@ -459,6 +452,21 @@ public class TaskLifecycleManager {
 		return response;
 	}
 
+	private TaskSubmitResponse buildTaskSubmitResponse(Task task) {
+		TaskSubmitResponse response = new TaskSubmitResponse();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setStatus(task == null ? null : task.getStatus());
+		response.setSubmitTime(task == null ? null : task.getSubmitTime());
+		return response;
+	}
+
+	private TaskActionResponse buildTaskActionResponse(Task task) {
+		TaskActionResponse response = new TaskActionResponse();
+		response.setTaskId(task == null ? null : task.getId());
+		response.setStatus(task == null ? null : task.getStatus());
+		return response;
+	}
+
 	private void validateTaskParams(Long profileId, Map<String, Object> params, Long taskId, String status) {
 		String schemaText = solverClient.getProfileParamsSchema(profileId);
 		List<com.example.cae.task.interfaces.response.TaskValidateResponse.ValidationIssue> issues =
@@ -509,3 +517,4 @@ public class TaskLifecycleManager {
 		}
 	}
 }
+

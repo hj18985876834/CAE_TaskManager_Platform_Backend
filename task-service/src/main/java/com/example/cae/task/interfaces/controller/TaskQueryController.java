@@ -3,9 +3,9 @@ package com.example.cae.task.interfaces.controller;
 import com.example.cae.common.response.PageResult;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.service.TaskQueryAppService;
-import com.example.cae.task.interfaces.request.TaskListQueryRequest;
+import com.example.cae.task.interfaces.request.MyTaskListQueryRequest;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
-import com.example.cae.task.interfaces.response.TaskFileResponse;
+import com.example.cae.task.interfaces.response.TaskInputFileResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskScheduleRecordResponse;
 import com.example.cae.task.interfaces.response.TaskStatusHistoryResponse;
@@ -31,7 +31,7 @@ public class TaskQueryController {
 	}
 
 	@GetMapping
-	public Result<PageResult<TaskListItemResponse>> pageMyTasks(@Valid TaskListQueryRequest request,
+	public Result<PageResult<TaskListItemResponse>> pageMyTasks(@Valid MyTaskListQueryRequest request,
 																@RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId) {
 		return Result.success(taskQueryAppService.pageMyTasks(request, userId));
 	}
@@ -51,7 +51,7 @@ public class TaskQueryController {
 	}
 
 	@GetMapping("/{taskId}/files")
-	public Result<List<TaskFileResponse>> getTaskFiles(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+	public Result<List<TaskInputFileResponse>> getTaskFiles(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
 													   @RequestHeader("X-User-Id") @Positive(message = "X-User-Id必须大于0") Long userId,
 													   @RequestHeader(value = "X-Role-Code", required = false) String roleCode) {
 		return Result.success(taskQueryAppService.getTaskFiles(taskId, userId, roleCode));

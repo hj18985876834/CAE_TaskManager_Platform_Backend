@@ -99,7 +99,6 @@ public class TaskValidationManager {
         response.setTaskId(taskId);
         response.setValid(Boolean.TRUE);
         response.setStatus(task.getStatus());
-        response.setIssues(List.of());
         return response;
     }
 

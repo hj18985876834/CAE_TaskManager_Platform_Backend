@@ -1,5 +1,8 @@
 package com.example.cae.task.interfaces.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TaskValidateResponse {
 	private Long taskId;
 	private Boolean valid;

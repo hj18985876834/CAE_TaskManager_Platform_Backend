@@ -12,6 +12,7 @@ import com.example.cae.task.interfaces.response.AdminTaskListItemResponse;
 import com.example.cae.task.interfaces.response.TaskCreateResponse;
 import com.example.cae.task.interfaces.response.TaskDetailResponse;
 import com.example.cae.task.interfaces.response.TaskListItemResponse;
+import com.example.cae.task.interfaces.response.TaskPriorityUpdateResponse;
 import com.example.cae.task.interfaces.response.TaskUpdateResponse;
 import org.springframework.stereotype.Component;
 
@@ -41,12 +42,18 @@ public class TaskAssembler {
 		response.setTaskId(task.getId());
 		response.setTaskNo(task.getTaskNo());
 		response.setStatus(task.getStatus());
-		response.setPriority(task.getPriority());
 		return response;
 	}
 
 	public TaskUpdateResponse toUpdateResponse(Task task) {
 		TaskUpdateResponse response = new TaskUpdateResponse();
+		response.setTaskId(task.getId());
+		response.setStatus(task.getStatus());
+		return response;
+	}
+
+	public TaskPriorityUpdateResponse toPriorityUpdateResponse(Task task) {
+		TaskPriorityUpdateResponse response = new TaskPriorityUpdateResponse();
 		response.setTaskId(task.getId());
 		response.setStatus(task.getStatus());
 		response.setPriority(task.getPriority());
