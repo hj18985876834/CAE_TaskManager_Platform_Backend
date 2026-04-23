@@ -137,6 +137,7 @@ public class TaskDispatchManager {
 				return buildTaskStatusAck(task);
 			}
 			if (TaskStatusEnum.FAILED.name().equals(task.getStatus())) {
+				ensureTaskBoundToNode(task, nodeId);
 				return buildTaskStatusAck(task);
 			}
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());

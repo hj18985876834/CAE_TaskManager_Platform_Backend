@@ -219,7 +219,7 @@ public class TaskQueryAppService {
 		if (queueReasonContext != null) {
 			Integer queueOrder = queueReasonContext.queuedTaskOrder().get(taskId);
 			if (queueOrder != null && queueOrder > 0) {
-				return "前方仍有更高优先级或更早提交任务";
+				return "前方仍有更高优先级或更早提交的任务，等待调度";
 			}
 		}
 		QueueReasonContext effectiveContext = queueReasonContext == null ? buildQueueReasonContext() : queueReasonContext;
@@ -237,7 +237,7 @@ public class TaskQueryAppService {
 			}
 			return "候选节点当前满载，等待资源释放";
 		}
-		return "前方仍有更高优先级或更早提交任务";
+		return "排队中，等待调度器处理";
 	}
 
 	private QueueReasonContext buildQueueReasonContext() {
