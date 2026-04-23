@@ -47,7 +47,9 @@ public class TaskResultAppService {
 	public TaskResultSummaryResponse getResultSummary(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
-		return taskResultSummaryRepository.findByTaskId(taskId).map(taskResultAssembler::toSummaryResponse).orElse(null);
+		return taskResultSummaryRepository.findByTaskId(taskId)
+				.map(taskResultAssembler::toSummaryResponse)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NOT_FOUND, "task result summary not found"));
 	}
 
 	public List<TaskResultFileResponse> getResultFiles(Long taskId, Long userId, String roleCode) {

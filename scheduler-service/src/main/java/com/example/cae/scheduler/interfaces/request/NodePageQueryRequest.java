@@ -12,7 +12,7 @@ public class NodePageQueryRequest {
 	private String nodeName;
 	private String status;
 	private Integer enabled;
-	private String solverId;
+	private Long solverId;
 
 	public Integer getPageNum() {
 		return pageNum;
@@ -54,26 +54,11 @@ public class NodePageQueryRequest {
 		this.enabled = enabled;
 	}
 
-	public String getSolverId() {
+	public Long getSolverId() {
 		return solverId;
 	}
 
-	public void setSolverId(String solverId) {
+	public void setSolverId(Long solverId) {
 		this.solverId = solverId;
-	}
-
-	public Long getSolverIdAsLong() {
-		if (solverId == null) {
-			return null;
-		}
-		String value = solverId.trim();
-		if (value.isEmpty() || "undefined".equalsIgnoreCase(value) || "null".equalsIgnoreCase(value)) {
-			return null;
-		}
-		try {
-			return Long.valueOf(value);
-		} catch (NumberFormatException ex) {
-			return null;
-		}
 	}
 }

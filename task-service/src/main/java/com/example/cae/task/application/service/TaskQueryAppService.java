@@ -222,26 +222,22 @@ public class TaskQueryAppService {
 				return "前方仍有更高优先级或更早提交任务";
 			}
 		}
-		try {
-			QueueReasonContext effectiveContext = queueReasonContext == null ? buildQueueReasonContext() : queueReasonContext;
-			SchedulerClient.QueueNodeSnapshot snapshot = effectiveContext.queueSnapshotCache().computeIfAbsent(
-					solverId,
-					key -> schedulerClient.getQueueNodeSnapshot(key)
-			);
-			int dispatchableNodeCount = snapshot.getDispatchableNodeCount() == null ? 0 : snapshot.getDispatchableNodeCount();
-			if (dispatchableNodeCount <= 0) {
-				int onlineEnabledCapableNodeCount = snapshot.getOnlineEnabledCapableNodeCount() == null
-						? 0
-						: snapshot.getOnlineEnabledCapableNodeCount();
-				if (onlineEnabledCapableNodeCount <= 0) {
-					return "暂无满足条件的可用节点";
-				}
-				return "候选节点当前满载，等待资源释放";
+		QueueReasonContext effectiveContext = queueReasonContext == null ? buildQueueReasonContext() : queueReasonContext;
+		SchedulerClient.QueueNodeSnapshot snapshot = effectiveContext.queueSnapshotCache().computeIfAbsent(
+				solverId,
+				key -> schedulerClient.getQueueNodeSnapshot(key)
+		);
+		int dispatchableNodeCount = snapshot.getDispatchableNodeCount() == null ? 0 : snapshot.getDispatchableNodeCount();
+		if (dispatchableNodeCount <= 0) {
+			int onlineEnabledCapableNodeCount = snapshot.getOnlineEnabledCapableNodeCount() == null
+					? 0
+					: snapshot.getOnlineEnabledCapableNodeCount();
+			if (onlineEnabledCapableNodeCount <= 0) {
+				return "暂无满足条件的可用节点";
 			}
-			return "前方仍有更高优先级或更早提交任务";
-		} catch (Exception ignored) {
-			return "排队中，等待调度器处理";
+			return "候选节点当前满载，等待资源释放";
 		}
+		return "前方仍有更高优先级或更早提交任务";
 	}
 
 	private QueueReasonContext buildQueueReasonContext() {

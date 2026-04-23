@@ -44,7 +44,7 @@ public interface TaskMapper {
 		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
 		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
-		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
+		"ORDER BY COALESCE(submit_time, created_at) DESC, id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
 	})
 	List<TaskPO> selectMyPage(@Param("request") TaskListQueryRequest request, @Param("userId") Long userId, @Param("offset") long offset, @Param("pageSize") long pageSize);
@@ -88,7 +88,7 @@ public interface TaskMapper {
 		"  <if test='request.startTime != null'>AND submit_time <![CDATA[ >= ]]> #{request.startTime}</if>",
 		"  <if test='request.endTime != null'>AND submit_time <![CDATA[ <= ]]> #{request.endTime}</if>",
 		"</where>",
-		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
+		"ORDER BY COALESCE(submit_time, created_at) DESC, id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
 	})
 	List<TaskPO> selectAdminPage(@Param("request") TaskListQueryRequest request, @Param("offset") long offset, @Param("pageSize") long pageSize);
