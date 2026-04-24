@@ -45,6 +45,7 @@ public class ProfileAppService {
 	}
 
 	public PageResult<ProfileListItemResponse> pageProfiles(ProfilePageQueryRequest request) {
+		normalizePageQuery(request);
 		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
 		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();
 		long offset = (long) (pageNum - 1) * pageSize;
@@ -110,5 +111,21 @@ public class ProfileAppService {
 
 	public List<FileRuleResponse> getFileRules(Long profileId) {
 		return fileRuleRepository.listByProfileId(profileId).stream().map(FileRuleAssembler::toResponse).toList();
+	}
+
+	private void normalizePageQuery(ProfilePageQueryRequest request) {
+		if (request == null) {
+			return;
+		}
+		request.setTaskType(trimToNull(request.getTaskType()));
+		request.setProfileCode(trimToNull(request.getProfileCode()));
+	}
+
+	private String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
 	}
 }

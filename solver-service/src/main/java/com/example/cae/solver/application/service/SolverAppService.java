@@ -35,6 +35,7 @@ public class SolverAppService {
 	}
 
 	public PageResult<SolverListItemResponse> pageSolvers(SolverPageQueryRequest request) {
+		normalizePageQuery(request);
 		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
 		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();
 		long offset = (long) (pageNum - 1) * pageSize;
@@ -87,5 +88,21 @@ public class SolverAppService {
 
 	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
 		return profileRepository.listBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
+	}
+
+	private void normalizePageQuery(SolverPageQueryRequest request) {
+		if (request == null) {
+			return;
+		}
+		request.setSolverCode(trimToNull(request.getSolverCode()));
+		request.setSolverName(trimToNull(request.getSolverName()));
+	}
+
+	private String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
 	}
 }

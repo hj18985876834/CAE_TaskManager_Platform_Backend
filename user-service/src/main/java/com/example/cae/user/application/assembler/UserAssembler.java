@@ -17,7 +17,6 @@ public class UserAssembler {
 		LoginResponse response = new LoginResponse();
 		response.setToken(token);
 		response.setTokenType("Bearer");
-		response.setId(user.getId());
 		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
@@ -30,7 +29,6 @@ public class UserAssembler {
 	public static CurrentUserResponse toCurrentUserResponse(User user, Role role) {
 		CurrentUserResponse response = new CurrentUserResponse();
 		response.setId(user.getId());
-		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
 		response.setRoleId(role.getId());
@@ -43,7 +41,6 @@ public class UserAssembler {
 	public static UserDetailResponse toUserDetailResponse(User user, Role role) {
 		UserDetailResponse response = new UserDetailResponse();
 		response.setId(user.getId());
-		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
 		response.setRoleId(user.getRoleId());
@@ -56,7 +53,6 @@ public class UserAssembler {
 	public static UserCreateResponse toUserCreateResponse(User user, Role role) {
 		UserCreateResponse response = new UserCreateResponse();
 		response.setId(user.getId());
-		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
 		response.setRoleId(user.getRoleId());
@@ -69,7 +65,6 @@ public class UserAssembler {
 	public static UserListItemResponse toUserListItem(User user, Role role) {
 		UserListItemResponse response = new UserListItemResponse();
 		response.setId(user.getId());
-		response.setUserId(user.getId());
 		response.setUsername(user.getUsername());
 		response.setRealName(user.getRealName());
 		response.setRoleId(user.getRoleId());

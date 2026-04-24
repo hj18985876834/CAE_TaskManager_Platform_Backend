@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 
 public class UserListItemResponse {
 	private Long id;
-	private Long userId;
 	private String username;
 	private String realName;
 	private Long roleId;
@@ -19,14 +18,6 @@ public class UserListItemResponse {
 
 	public void setId(Long id) {
 		this.id = id;
-	}
-
-	public Long getUserId() {
-		return userId;
-	}
-
-	public void setUserId(Long userId) {
-		this.userId = userId;
 	}
 
 	public String getUsername() {
@@ -85,4 +76,3 @@ public class UserListItemResponse {
 		this.createdAt = createdAt;
 	}
 }
-

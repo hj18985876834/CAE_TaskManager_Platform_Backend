@@ -31,7 +31,7 @@ public class InternalProfileController {
 			profileTemplateContractValidator.validateRuleJson(fileRule.getRuleJson());
 		}
 		InternalProfileDetailResponse response = new InternalProfileDetailResponse();
-		response.setProfileId(detail.getProfileId());
+		response.setProfileId(detail.getId());
 		response.setSolverId(detail.getSolverId());
 		response.setProfileCode(detail.getProfileCode());
 		response.setTaskType(detail.getTaskType());

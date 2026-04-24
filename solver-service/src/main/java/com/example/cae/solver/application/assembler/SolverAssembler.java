@@ -28,7 +28,6 @@ public class SolverAssembler {
 	public static SolverListItemResponse toListItemResponse(SolverDefinition solver) {
 		SolverListItemResponse response = new SolverListItemResponse();
 		response.setId(solver.getId());
-		response.setSolverId(solver.getId());
 		response.setSolverCode(solver.getSolverCode());
 		response.setSolverName(solver.getSolverName());
 		response.setVersion(solver.getVersion());
@@ -42,7 +41,6 @@ public class SolverAssembler {
 	public static SolverDetailResponse toDetailResponse(SolverDefinition solver) {
 		SolverDetailResponse response = new SolverDetailResponse();
 		response.setId(solver.getId());
-		response.setSolverId(solver.getId());
 		response.setSolverCode(solver.getSolverCode());
 		response.setSolverName(solver.getSolverName());
 		response.setVersion(solver.getVersion());

@@ -3,7 +3,6 @@ package com.example.cae.user.interfaces.response;
 public class LoginResponse {
 	private String token;
 	private String tokenType;
-	private Long id;
 	private Long userId;
 	private String username;
 	private String realName;
@@ -25,14 +24,6 @@ public class LoginResponse {
 
 	public void setTokenType(String tokenType) {
 		this.tokenType = tokenType;
-	}
-
-	public Long getId() {
-		return id;
-	}
-
-	public void setId(Long id) {
-		this.id = id;
 	}
 
 	public Long getUserId() {
@@ -83,4 +74,3 @@ public class LoginResponse {
 		this.roleName = roleName;
 	}
 }
-

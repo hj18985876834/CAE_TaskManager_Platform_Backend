@@ -3,6 +3,7 @@ package com.example.cae.solver.interfaces.request;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public class ProfilePageQueryRequest {
 	@Min(value = 1, message = "pageNum必须大于等于1")
@@ -12,8 +13,12 @@ public class ProfilePageQueryRequest {
 	private Integer pageSize;
 	@Positive(message = "solverId必须大于0")
 	private Long solverId;
+	@Size(max = 50, message = "taskType长度不能超过50")
 	private String taskType;
+	@Size(max = 50, message = "profileCode长度不能超过50")
 	private String profileCode;
+	@Min(value = 0, message = "enabled只能为0或1")
+	@Max(value = 1, message = "enabled只能为0或1")
 	private Integer enabled;
 
 	public Integer getPageNum() {

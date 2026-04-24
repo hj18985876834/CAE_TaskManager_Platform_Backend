@@ -2,7 +2,6 @@ package com.example.cae.solver.interfaces.response;
 
 public class SolverDetailResponse {
 	private Long id;
-	private Long solverId;
 	private String solverCode;
 	private String solverName;
 	private String version;
@@ -17,14 +16,6 @@ public class SolverDetailResponse {
 
 	public void setId(Long id) {
 		this.id = id;
-	}
-
-	public Long getSolverId() {
-		return solverId;
-	}
-
-	public void setSolverId(Long solverId) {
-		this.solverId = solverId;
 	}
 
 	public String getSolverCode() {

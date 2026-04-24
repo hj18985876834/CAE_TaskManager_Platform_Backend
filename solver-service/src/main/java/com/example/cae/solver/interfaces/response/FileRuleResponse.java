@@ -2,7 +2,6 @@ package com.example.cae.solver.interfaces.response;
 
 public class FileRuleResponse {
 	private Long id;
-	private Long ruleId;
 	private Long profileId;
 	private String fileKey;
 	private String pathPattern;
@@ -19,14 +18,6 @@ public class FileRuleResponse {
 
 	public void setId(Long id) {
 		this.id = id;
-	}
-
-	public Long getRuleId() {
-		return ruleId;
-	}
-
-	public void setRuleId(Long ruleId) {
-		this.ruleId = ruleId;
 	}
 
 	public Long getProfileId() {

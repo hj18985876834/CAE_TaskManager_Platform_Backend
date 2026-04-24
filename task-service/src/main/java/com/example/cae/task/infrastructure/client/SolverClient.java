@@ -86,7 +86,7 @@ public class SolverClient {
 				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get internal profile fileRules row is invalid");
 			}
 			FileRuleDTO dto = new FileRuleDTO();
-			dto.setRuleId(toLong(map.get("ruleId")));
+			dto.setRuleId(toLong(map.get("id") != null ? map.get("id") : map.get("ruleId")));
 			dto.setProfileId(toLong(map.get("profileId")));
 			dto.setFileKey(toString(map.get("fileKey")));
 			dto.setPathPattern(toString(map.get("pathPattern")));

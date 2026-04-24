@@ -27,7 +27,6 @@ public class FileRuleAssembler {
 	public static FileRuleResponse toResponse(SolverProfileFileRule rule) {
 		FileRuleResponse response = new FileRuleResponse();
 		response.setId(rule.getId());
-		response.setRuleId(rule.getId());
 		response.setProfileId(rule.getProfileId());
 		response.setFileKey(rule.getFileKey());
 		response.setPathPattern(rule.getPathPattern());

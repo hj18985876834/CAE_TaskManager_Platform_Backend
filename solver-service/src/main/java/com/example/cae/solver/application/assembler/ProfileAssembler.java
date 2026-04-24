@@ -33,7 +33,6 @@ public class ProfileAssembler {
 	public static ProfileListItemResponse toListItemResponse(SolverTaskProfile profile) {
 			   ProfileListItemResponse response = new ProfileListItemResponse();
 			   response.setId(profile.getId());
-			   response.setProfileId(profile.getId());
 			   response.setSolverId(profile.getSolverId());
 			   response.setProfileCode(profile.getProfileCode());
 			   response.setTaskType(profile.getTaskType());
@@ -51,7 +50,6 @@ public class ProfileAssembler {
 	public static ProfileDetailResponse toDetailResponse(SolverTaskProfile profile) {
 		ProfileDetailResponse response = new ProfileDetailResponse();
 		response.setId(profile.getId());
-		response.setProfileId(profile.getId());
 		response.setSolverId(profile.getSolverId());
 		response.setProfileCode(profile.getProfileCode());
 		response.setTaskType(profile.getTaskType());

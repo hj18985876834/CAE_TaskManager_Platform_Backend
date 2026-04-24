@@ -62,6 +62,7 @@ public class NodeAppService {
 	@Transactional
 	public Long registerNodeFromAgent(NodeAgentRegisterRequest request) {
 		nodeDomainService.validateAgentRegisterRequest(request);
+		validateReportedSolvers(request);
 		ComputeNode node = saveOrUpdateNode(request.getNodeCode(),
 				request.getNodeName(),
 				composeHost(request.getHost()),
@@ -357,6 +358,21 @@ public class NodeAppService {
 				})
 				.sorted(Comparator.comparing(NodeSolverCapability::getSolverId))
 				.toList();
+	}
+
+	private void validateReportedSolvers(NodeAgentRegisterRequest request) {
+		if (request == null || request.getSolvers() == null) {
+			return;
+		}
+		for (NodeAgentRegisterRequest.SolverItem item : request.getSolvers()) {
+			if (item == null || item.getSolverId() == null) {
+				continue;
+			}
+			SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(item.getSolverId());
+			if (solverMeta == null || solverMeta.getSolverId() == null) {
+				throw new BizException(ErrorCodeConstants.SOLVER_NOT_FOUND, "solver not found: " + item.getSolverId());
+			}
+		}
 	}
 
 	private NodePageQueryRequest sanitizePageQueryRequest(NodePageQueryRequest request) {
