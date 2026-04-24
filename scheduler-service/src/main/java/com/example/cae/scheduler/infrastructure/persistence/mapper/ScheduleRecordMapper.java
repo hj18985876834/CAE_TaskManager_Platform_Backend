@@ -26,7 +26,7 @@ public interface ScheduleRecordMapper {
 		"  <if test='request.startTime != null'>AND created_at &gt;= #{request.startTime}</if>",
 		"  <if test='request.endTime != null'>AND created_at &lt;= #{request.endTime}</if>",
 		"</where>",
-		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
+		"ORDER BY created_at DESC, id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
 	})
 	List<ScheduleRecordPO> selectPage(@Param("request") SchedulePageQueryRequest request, @Param("offset") long offset, @Param("pageSize") int pageSize);

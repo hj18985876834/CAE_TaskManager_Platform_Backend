@@ -20,6 +20,7 @@ import java.util.Map;
 
 @Component
 public class SchedulerClient {
+	private static final int NODE_PAGE_SIZE = 200;
 	private final RestTemplate restTemplate;
 	private final String schedulerServiceBaseUrl;
 
@@ -151,26 +152,11 @@ public class SchedulerClient {
 
 	@SuppressWarnings("unchecked")
 	public NodeSummary getOnlineNodeSummary() {
-		String url = UriComponentsBuilder
-				.fromHttpUrl(schedulerServiceBaseUrl + "/api/nodes")
-				.queryParam("status", "ONLINE")
-				.queryParam("pageNum", 1)
-				.queryParam("pageSize", 1000)
-				.toUriString();
-		Result<Object> result = restTemplate.getForObject(url, Result.class);
-		ensureSuccess(result, "get online node summary");
-		Map<String, Object> pageMap = requireMapData(result, "get online node summary");
-		Object recordsObj = pageMap.get("records");
-		if (!(recordsObj instanceof List<?> records)) {
-			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get online node summary response records is invalid");
-		}
+		List<Map<String, Object>> records = fetchAllNodePages("ONLINE", null, null, "get online node summary");
 		int onlineCount = 0;
 		BigDecimal totalLoad = BigDecimal.ZERO;
 		int loadSamples = 0;
-		for (Object item : records) {
-			if (!(item instanceof Map<?, ?> nodeMap)) {
-				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get online node summary response row is invalid");
-			}
+		for (Map<String, Object> nodeMap : records) {
 			Long nodeId = toLong(nodeMap.get("nodeId"));
 			Integer enabled = toInteger(nodeMap.get("enabled"));
 			Integer runningCount = toInteger(nodeMap.get("runningCount"));
@@ -194,6 +180,46 @@ public class SchedulerClient {
 				? BigDecimal.ZERO
 				: totalLoad.divide(BigDecimal.valueOf(loadSamples), 4, RoundingMode.HALF_UP));
 		return summary;
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<Map<String, Object>> fetchAllNodePages(String status, Integer enabled, Long solverId, String action) {
+		List<Map<String, Object>> allRecords = new ArrayList<>();
+		int pageNum = 1;
+		Integer total = null;
+		while (total == null || allRecords.size() < total) {
+			String url = UriComponentsBuilder
+					.fromHttpUrl(schedulerServiceBaseUrl + "/api/nodes")
+					.queryParam("pageNum", pageNum)
+					.queryParam("pageSize", NODE_PAGE_SIZE)
+					.queryParamIfPresent("status", java.util.Optional.ofNullable(status))
+					.queryParamIfPresent("enabled", java.util.Optional.ofNullable(enabled))
+					.queryParamIfPresent("solverId", java.util.Optional.ofNullable(solverId))
+					.toUriString();
+			Result<Object> result = restTemplate.getForObject(url, Result.class);
+			ensureSuccess(result, action);
+			Map<String, Object> pageMap = requireMapData(result, action);
+			Integer pageTotal = toInteger(pageMap.get("total"));
+			if (pageTotal == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response total is invalid");
+			}
+			total = pageTotal;
+			Object recordsObj = pageMap.get("records");
+			if (!(recordsObj instanceof List<?> records)) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response records is invalid");
+			}
+			for (Object item : records) {
+				if (!(item instanceof Map<?, ?> nodeMap)) {
+					throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response row is invalid");
+				}
+				allRecords.add((Map<String, Object>) nodeMap);
+			}
+			if (records.isEmpty()) {
+				break;
+			}
+			pageNum++;
+		}
+		return allRecords;
 	}
 
 	@SuppressWarnings("unchecked")
