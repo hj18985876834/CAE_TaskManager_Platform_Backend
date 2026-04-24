@@ -32,6 +32,7 @@ import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -82,11 +83,12 @@ public class NodeAppService {
 	}
 
 	public PageResult<NodeListItemResponse> pageNodes(NodePageQueryRequest request) {
-		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
-		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();
+		NodePageQueryRequest query = sanitizePageQueryRequest(request);
+		int pageNum = query.getPageNum() == null || query.getPageNum() < 1 ? 1 : query.getPageNum();
+		int pageSize = query.getPageSize() == null || query.getPageSize() < 1 ? 10 : query.getPageSize();
 		long offset = (long) (pageNum - 1) * pageSize;
 
-		PageResult<ComputeNode> page = computeNodeRepository.page(request, offset, pageSize);
+		PageResult<ComputeNode> page = computeNodeRepository.page(query, offset, pageSize);
 		List<NodeListItemResponse> records = page.getRecords().stream().map(this::toNodeListItem).toList();
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
 	}
@@ -355,5 +357,37 @@ public class NodeAppService {
 				})
 				.sorted(Comparator.comparing(NodeSolverCapability::getSolverId))
 				.toList();
+	}
+
+	private NodePageQueryRequest sanitizePageQueryRequest(NodePageQueryRequest request) {
+		if (request == null) {
+			request = new NodePageQueryRequest();
+		}
+		request.setNodeName(normalizeBlankToNull(request.getNodeName()));
+		request.setStatus(normalizeNodeStatus(request.getStatus()));
+		if (request.getEnabled() != null && request.getEnabled() != 0 && request.getEnabled() != 1) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid enabled: " + request.getEnabled());
+		}
+		return request;
+	}
+
+	private String normalizeNodeStatus(String status) {
+		String normalized = normalizeBlankToNull(status);
+		if (normalized == null) {
+			return null;
+		}
+		try {
+			return com.example.cae.common.enums.NodeStatusEnum.valueOf(normalized.toUpperCase(Locale.ROOT)).name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid status: " + status);
+		}
+	}
+
+	private String normalizeBlankToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String normalized = value.trim();
+		return normalized.isEmpty() ? null : normalized;
 	}
 }

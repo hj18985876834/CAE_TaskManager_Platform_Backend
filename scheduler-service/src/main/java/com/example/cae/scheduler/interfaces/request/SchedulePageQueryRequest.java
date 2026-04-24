@@ -1,8 +1,13 @@
 package com.example.cae.scheduler.interfaces.request;
 
+import com.example.cae.common.constant.QueryValidationConstants;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDateTime;
 
 public class SchedulePageQueryRequest {
 	@Min(value = 1, message = "pageNum必须大于等于1")
@@ -14,10 +19,12 @@ public class SchedulePageQueryRequest {
 	private Long taskId;
 	@Positive(message = "nodeId必须大于0")
 	private Long nodeId;
+	@Size(max = QueryValidationConstants.STATUS_MAX_LENGTH, message = "scheduleStatus长度不能超过30")
 	private String scheduleStatus;
-	private String strategyName;
-	private String startTime;
-	private String endTime;
+	@DateTimeFormat(pattern = QueryValidationConstants.STANDARD_DATE_TIME_PATTERN)
+	private LocalDateTime startTime;
+	@DateTimeFormat(pattern = QueryValidationConstants.STANDARD_DATE_TIME_PATTERN)
+	private LocalDateTime endTime;
 
 	public Integer getPageNum() {
 		return pageNum;
@@ -59,27 +66,19 @@ public class SchedulePageQueryRequest {
 		this.scheduleStatus = scheduleStatus;
 	}
 
-	public String getStrategyName() {
-		return strategyName;
-	}
-
-	public void setStrategyName(String strategyName) {
-		this.strategyName = strategyName;
-	}
-
-	public String getStartTime() {
+	public LocalDateTime getStartTime() {
 		return startTime;
 	}
 
-	public void setStartTime(String startTime) {
+	public void setStartTime(LocalDateTime startTime) {
 		this.startTime = startTime;
 	}
 
-	public String getEndTime() {
+	public LocalDateTime getEndTime() {
 		return endTime;
 	}
 
-	public void setEndTime(String endTime) {
+	public void setEndTime(LocalDateTime endTime) {
 		this.endTime = endTime;
 	}
 }

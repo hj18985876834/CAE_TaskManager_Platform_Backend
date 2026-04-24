@@ -25,6 +25,7 @@ import com.example.cae.scheduler.interfaces.response.ScheduleRecordResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -170,11 +171,12 @@ public class ScheduleAppService {
 	}
 
 	public PageResult<ScheduleRecordResponse> pageRecords(SchedulePageQueryRequest request) {
-		int pageNum = request == null || request.getPageNum() == null || request.getPageNum() < 1 ? 1 : request.getPageNum();
-		int pageSize = request == null || request.getPageSize() == null || request.getPageSize() < 1 ? 10 : request.getPageSize();
+		SchedulePageQueryRequest query = sanitizePageQueryRequest(request);
+		int pageNum = query.getPageNum() == null || query.getPageNum() < 1 ? 1 : query.getPageNum();
+		int pageSize = query.getPageSize() == null || query.getPageSize() < 1 ? 10 : query.getPageSize();
 		long offset = (long) (pageNum - 1) * pageSize;
 
-		PageResult<ScheduleRecord> page = scheduleRecordRepository.page(request, offset, pageSize);
+		PageResult<ScheduleRecord> page = scheduleRecordRepository.page(query, offset, pageSize);
 		List<ScheduleRecordResponse> records = page.getRecords().stream()
 				.map(ScheduleAssembler::toResponse)
 				.toList();
@@ -258,5 +260,36 @@ public class ScheduleAppService {
 		} catch (IllegalArgumentException ex) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "invalid scheduleStatus: " + scheduleStatus);
 		}
+	}
+
+	private SchedulePageQueryRequest sanitizePageQueryRequest(SchedulePageQueryRequest request) {
+		if (request == null) {
+			request = new SchedulePageQueryRequest();
+		}
+		request.setScheduleStatus(normalizeScheduleStatusFilter(request.getScheduleStatus()));
+		validateTimeRange(request.getStartTime(), request.getEndTime());
+		return request;
+	}
+
+	private String normalizeScheduleStatusFilter(String scheduleStatus) {
+		String normalized = normalizeBlankToNull(scheduleStatus);
+		if (normalized == null) {
+			return null;
+		}
+		return normalizeScheduleStatus(normalized);
+	}
+
+	private void validateTimeRange(LocalDateTime startTime, LocalDateTime endTime) {
+		if (startTime != null && endTime != null && startTime.isAfter(endTime)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "startTime must be earlier than or equal to endTime");
+		}
+	}
+
+	private String normalizeBlankToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String normalized = value.trim();
+		return normalized.isEmpty() ? null : normalized;
 	}
 }

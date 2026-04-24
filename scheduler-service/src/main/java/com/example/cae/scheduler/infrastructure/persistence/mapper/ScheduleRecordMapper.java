@@ -23,9 +23,8 @@ public interface ScheduleRecordMapper {
 		"  <if test='request.taskId != null'>AND task_id = #{request.taskId}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
 		"  <if test='request.scheduleStatus != null and request.scheduleStatus != \"\"'>AND schedule_status = #{request.scheduleStatus}</if>",
-		"  <if test='request.strategyName != null and request.strategyName != \"\"'>AND strategy_name = #{request.strategyName}</if>",
-		"  <if test='request.startTime != null and request.startTime != \"\"'>AND created_at &gt;= #{request.startTime}</if>",
-		"  <if test='request.endTime != null and request.endTime != \"\"'>AND created_at &lt;= #{request.endTime}</if>",
+		"  <if test='request.startTime != null'>AND created_at &gt;= #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND created_at &lt;= #{request.endTime}</if>",
 		"</where>",
 		"ORDER BY id DESC LIMIT #{offset}, #{pageSize}",
 		"</script>"
@@ -39,9 +38,8 @@ public interface ScheduleRecordMapper {
 		"  <if test='request.taskId != null'>AND task_id = #{request.taskId}</if>",
 		"  <if test='request.nodeId != null'>AND node_id = #{request.nodeId}</if>",
 		"  <if test='request.scheduleStatus != null and request.scheduleStatus != \"\"'>AND schedule_status = #{request.scheduleStatus}</if>",
-		"  <if test='request.strategyName != null and request.strategyName != \"\"'>AND strategy_name = #{request.strategyName}</if>",
-		"  <if test='request.startTime != null and request.startTime != \"\"'>AND created_at &gt;= #{request.startTime}</if>",
-		"  <if test='request.endTime != null and request.endTime != \"\"'>AND created_at &lt;= #{request.endTime}</if>",
+		"  <if test='request.startTime != null'>AND created_at &gt;= #{request.startTime}</if>",
+		"  <if test='request.endTime != null'>AND created_at &lt;= #{request.endTime}</if>",
 		"</where>",
 		"</script>"
 	})
