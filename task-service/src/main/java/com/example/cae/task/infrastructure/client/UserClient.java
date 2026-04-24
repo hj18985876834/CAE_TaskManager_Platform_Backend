@@ -21,7 +21,14 @@ public class UserClient {
 
 	public String getUsername(Long userId) {
 		UserBasic userBasic = getUserBasic(userId);
-		return userBasic == null ? null : userBasic.getUsername();
+		if (userBasic == null) {
+			return null;
+		}
+		String username = userBasic.getUsername();
+		if (username == null || username.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get username response data is invalid");
+		}
+		return username;
 	}
 
 	@SuppressWarnings("unchecked")

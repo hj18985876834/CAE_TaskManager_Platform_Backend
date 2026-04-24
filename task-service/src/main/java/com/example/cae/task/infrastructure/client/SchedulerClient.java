@@ -71,7 +71,11 @@ public class SchedulerClient {
 		Result<Object> result = restTemplate.getForObject(url, Result.class);
 		ensureSuccess(result, "get node name");
 		Map<String, Object> map = requireMapData(result, "get node name");
-		return toString(map.get("nodeName"));
+		String nodeName = toString(map.get("nodeName"));
+		if (nodeName == null || nodeName.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get node name response data is invalid");
+		}
+		return nodeName;
 	}
 
 	public QueueNodeSnapshot getQueueNodeSnapshot(Long solverId) {
@@ -93,7 +97,21 @@ public class SchedulerClient {
 		Result<Object> availableResult = restTemplate.getForObject(availableUrl, Result.class);
 		ensureSuccess(availableResult, "fetch dispatchable node count");
 		List<?> records = requireListData(availableResult, "fetch dispatchable node count");
-		return (int) records.stream().filter(Map.class::isInstance).count();
+		int count = 0;
+		for (Object record : records) {
+			if (!(record instanceof Map<?, ?> nodeMap)) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch dispatchable node count response row is invalid");
+			}
+			Long nodeId = toLong(nodeMap.get("nodeId"));
+			Integer runningCount = toInteger(nodeMap.get("runningCount"));
+			Integer reservedCount = toInteger(nodeMap.get("reservedCount"));
+			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
+			if (nodeId == null || runningCount == null || reservedCount == null || maxConcurrency == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch dispatchable node count response row is incomplete");
+			}
+			count++;
+		}
+		return count;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -109,7 +127,26 @@ public class SchedulerClient {
 		Result<Object> result = restTemplate.getForObject(onlineUrl, Result.class);
 		ensureSuccess(result, "fetch online enabled capable node count");
 		Map<String, Object> pageMap = requireMapData(result, "fetch online enabled capable node count");
-		return toInteger(pageMap.get("total")) == null ? 0 : toInteger(pageMap.get("total"));
+		Integer total = toInteger(pageMap.get("total"));
+		if (total == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch online enabled capable node count response total is invalid");
+		}
+		Object recordsObj = pageMap.get("records");
+		if (!(recordsObj instanceof List<?> records)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch online enabled capable node count response records is invalid");
+		}
+		for (Object item : records) {
+			if (!(item instanceof Map<?, ?> nodeMap)) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch online enabled capable node count response row is invalid");
+			}
+			Long nodeId = toLong(nodeMap.get("nodeId"));
+			Integer enabled = toInteger(nodeMap.get("enabled"));
+			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
+			if (nodeId == null || enabled == null || maxConcurrency == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "fetch online enabled capable node count response row is incomplete");
+			}
+		}
+		return total;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -132,16 +169,20 @@ public class SchedulerClient {
 		int loadSamples = 0;
 		for (Object item : records) {
 			if (!(item instanceof Map<?, ?> nodeMap)) {
-				continue;
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get online node summary response row is invalid");
 			}
-			onlineCount++;
+			Long nodeId = toLong(nodeMap.get("nodeId"));
 			Integer enabled = toInteger(nodeMap.get("enabled"));
-			if (enabled == null || enabled != 1) {
-				continue;
-			}
 			Integer runningCount = toInteger(nodeMap.get("runningCount"));
 			Integer maxConcurrency = toInteger(nodeMap.get("maxConcurrency"));
-			if (runningCount != null && maxConcurrency != null && maxConcurrency > 0) {
+			if (nodeId == null || enabled == null || runningCount == null || maxConcurrency == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get online node summary response row is incomplete");
+			}
+			onlineCount++;
+			if (enabled != 1) {
+				continue;
+			}
+			if (maxConcurrency > 0) {
 				totalLoad = totalLoad.add(BigDecimal.valueOf(runningCount)
 						.divide(BigDecimal.valueOf(maxConcurrency), 4, RoundingMode.HALF_UP));
 				loadSamples++;
@@ -179,9 +220,35 @@ public class SchedulerClient {
 			item.setScheduleStatus(toString(map.get("scheduleStatus")));
 			item.setScheduleMessage(toString(map.get("scheduleMessage")));
 			item.setCreatedAt(toLocalDateTime(map.get("createdAt")));
+			validateScheduleRecordItem(item, taskId);
 			records.add(item);
 		}
 		return records;
+	}
+
+	private void validateScheduleRecordItem(ScheduleRecordItem item, Long expectedTaskId) {
+		if (item == null
+				|| item.getScheduleId() == null
+				|| item.getTaskId() == null
+				|| item.getTaskNo() == null
+				|| item.getTaskNo().isBlank()
+				|| item.getStrategyName() == null
+				|| item.getStrategyName().isBlank()
+				|| item.getScheduleStatus() == null
+				|| item.getScheduleStatus().isBlank()
+				|| item.getScheduleMessage() == null
+				|| item.getCreatedAt() == null) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "list task schedule records response item is incomplete");
+		}
+		if (expectedTaskId != null && !expectedTaskId.equals(item.getTaskId())) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "list task schedule records response taskId mismatch");
+		}
+		if (item.getNodeId() == null) {
+			return;
+		}
+		if (item.getNodeName() == null || item.getNodeName().isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "list task schedule records response nodeName is invalid");
+		}
 	}
 
 	@SuppressWarnings("unchecked")

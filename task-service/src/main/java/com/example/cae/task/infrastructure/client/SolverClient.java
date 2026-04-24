@@ -52,7 +52,14 @@ public class SolverClient {
 
 	public String getProfileName(Long profileId) {
 		Map<String, Object> profileMap = getInternalProfileMap(profileId);
-		return profileMap == null ? null : toString(profileMap.get("profileName"));
+		if (profileMap == null) {
+			return null;
+		}
+		String profileName = toString(profileMap.get("profileName"));
+		if (profileName == null || profileName.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get profile name response data is invalid");
+		}
+		return profileName;
 	}
 
 	public String getProfileParamsSchema(Long profileId) {
@@ -134,7 +141,14 @@ public class SolverClient {
 
 	public String getSolverName(Long solverId) {
 		SolverMeta solverMeta = getSolverMeta(solverId);
-		return solverMeta == null ? null : solverMeta.getSolverName();
+		if (solverMeta == null) {
+			return null;
+		}
+		String solverName = solverMeta.getSolverName();
+		if (solverName == null || solverName.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get solver name response data is invalid");
+		}
+		return solverName;
 	}
 
 	public SolverMeta getSolverMeta(Long solverId) {
