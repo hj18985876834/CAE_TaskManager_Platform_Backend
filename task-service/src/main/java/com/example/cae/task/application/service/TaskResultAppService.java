@@ -97,12 +97,23 @@ public class TaskResultAppService {
 		if (!filePath.startsWith(resultDir)) {
 			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
 		}
-		if (filePath.getFileName() == null || file.getFileName() == null || !file.getFileName().equals(filePath.getFileName().toString())) {
+		if (file.getFileName() == null || file.getFileName().isBlank()
+				|| file.getFileName().contains("/") || file.getFileName().contains("\\")
+				|| containsControlCharacter(file.getFileName())) {
 			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
 		}
 		if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
 			throw new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found");
 		}
 		return filePath;
+	}
+
+	private boolean containsControlCharacter(String value) {
+		for (int i = 0; i < value.length(); i++) {
+			if (Character.isISOControl(value.charAt(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

@@ -25,7 +25,7 @@ public class InternalProfileController {
 	@GetMapping("/{profileId}")
 	public Result<InternalProfileDetailResponse> getProfileDetail(@PathVariable("profileId") Long profileId) {
 		ProfileDetailResponse detail = profileFacade.getProfileDetail(profileId);
-		profileTemplateContractValidator.validateProfileContract(detail.getUploadMode(), detail.getCommandTemplate());
+		profileTemplateContractValidator.validateProfileContract(detail.getUploadMode(), detail.getCommandTemplate(), detail.getParamsSchemaJson());
 		var fileRules = profileFacade.getFileRules(profileId);
 		for (FileRuleResponse fileRule : fileRules) {
 			profileTemplateContractValidator.validateRuleJson(fileRule.getRuleJson());

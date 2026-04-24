@@ -45,6 +45,9 @@ import java.util.zip.ZipInputStream;
 public class TaskValidationManager {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final Pattern COMMAND_PLACEHOLDER_PATTERN = Pattern.compile("\\$\\{([A-Za-z][A-Za-z0-9_]*)}");
+    private static final Pattern WINDOWS_ABSOLUTE_PATH = Pattern.compile("^[A-Za-z]:[\\\\/].*");
+    private static final Set<String> ALLOWED_FILE_TYPES = Set.of("ZIP", "FILE", "DIR", "DIRECTORY");
     private static final Set<String> RULE_METADATA_KEYS = Set.of(
             "allowSuffix",
             "minCount",
@@ -55,6 +58,30 @@ public class TaskValidationManager {
             "deriveParam",
             "deriveParams"
     );
+    private static final Set<String> ALLOWED_RULE_SCOPE_SELECTOR_KEYS = Set.of(
+            "solverId", "solverIds",
+            "profileId", "profileIds",
+            "taskType", "taskTypes",
+            "solverCode", "solverCodes",
+            "solverExecMode", "solverExecModes",
+            "solverExecPath", "solverExecPaths"
+    );
+    private static final Set<String> ALLOWED_DERIVE_SOURCES = Set.of(
+            "literal",
+            "fileNameRegex",
+            "relativePathRegex",
+            "fileContentRegex"
+    );
+    private static final Set<String> ALLOWED_DERIVE_KEYS = Set.of(
+            "name", "source", "value", "pattern", "group", "required",
+            "trim", "stripQuotes", "sanitizeRegex", "preprocess"
+    );
+    private static final Set<String> ALLOWED_PREPROCESS_KEYS = Set.of("pattern", "replacement");
+    private static final Set<String> RESERVED_COMMAND_VARIABLES = Set.of(
+            "taskId", "taskNo", "solverId", "solverCode", "solverExecMode", "solverExecPath",
+            "profileId", "taskType", "taskDir", "inputDir", "outputDir", "logDir"
+    );
+    private static final String PARAM_SCHEMA_INVALID = "PARAM_SCHEMA_INVALID";
 
     private final TaskRepository taskRepository;
     private final TaskFileRepository taskFileRepository;
@@ -115,6 +142,8 @@ public class TaskValidationManager {
         Long profileSolverId = solverClient.getProfileSolverId(task.getProfileId());
         String profileTaskType = solverClient.getProfileTaskType(task.getProfileId());
         String paramsSchema = solverClient.getProfileParamsSchema(task.getProfileId());
+        SolverClient.ProfileExecutionMeta executionMeta = solverClient.getProfileExecutionMeta(task.getProfileId());
+        String commandTemplate = executionMeta == null ? null : executionMeta.getCommandTemplate();
         SolverClient.SolverMeta solverMeta = solverClient.getSolverMeta(task.getSolverId());
         String solverCode = solverMeta == null ? null : solverMeta.getSolverCode();
         List<FileRuleDTO> rules = solverClient.getFileRules(task.getProfileId());
@@ -133,7 +162,7 @@ public class TaskValidationManager {
                 throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
             }
             List<RuleDefinition> ruleDefinitions = buildRuleDefinitions(rules, issues);
-            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverMeta, taskParams, paramsSchema, issues);
+            validationOutcome = validateArchiveAndRules(task, files, ruleDefinitions, solverMeta, taskParams, paramsSchema, commandTemplate, issues);
             if (!issues.isEmpty()) {
                 throw new BizException(ErrorCodeConstants.TASK_VALIDATION_FAILED, "task validation failed", buildInvalidResponse(task, issues));
             }
@@ -152,6 +181,7 @@ public class TaskValidationManager {
                                                       SolverClient.SolverMeta solverMeta,
                                                       Map<String, Object> taskParams,
                                                       String paramsSchema,
+                                                      String commandTemplate,
                                                       List<TaskValidateResponse.ValidationIssue> issues) {
         String archiveFileKey = resolveArchiveFileKey(ruleDefinitions);
         TaskFile archive = files.stream()
@@ -202,6 +232,7 @@ public class TaskValidationManager {
             effectiveParams.putAll(derivationOutcome.derivedParams());
         }
         issues.addAll(taskParamSchemaValidator.validateComplete(paramsSchema, effectiveParams));
+        validateCommandTemplateParams(commandTemplate, effectiveParams, issues);
         return new ValidationOutcome(derivationOutcome.derivedParams());
     }
 
@@ -236,7 +267,7 @@ public class TaskValidationManager {
                 .findFirst()
                 .map(values -> values.stream()
                         .filter(Objects::nonNull)
-                        .map(value -> value.toLowerCase(Locale.ROOT))
+                        .map(this::normalizeSuffix)
                         .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new)))
                 .orElseGet(() -> new LinkedHashSet<>(List.of("zip")));
     }
@@ -644,6 +675,15 @@ public class TaskValidationManager {
                               List<ExtractedEntry> entries,
                               Map<String, Object> ruleJson,
                               List<TaskValidateResponse.ValidationIssue> issues) {
+        if (!validateFileType(rule, issues)) {
+            return;
+        }
+        if (!validateRulePathContract(rule, issues)) {
+            return;
+        }
+        if (!validateRuleCountContract(rule, ruleJson, issues)) {
+            return;
+        }
         List<ExtractedEntry> patternMatched = matchEntries(rule, entries);
         List<ExtractedEntry> typedMatched = applyTypeFilter(patternMatched, rule.getFileType());
         List<ExtractedEntry> namedMatched = applyNameFilter(typedMatched, rule.getFileNamePattern());
@@ -673,6 +713,63 @@ public class TaskValidationManager {
             return;
         }
         checkSuffixConstraint(rule, namedMatched, ruleJson, issues);
+    }
+
+    private boolean validateFileType(FileRuleDTO rule, List<TaskValidateResponse.ValidationIssue> issues) {
+        if (rule == null || isBlank(rule.getFileType())) {
+            issues.add(issue(rule == null ? null : rule.getFileKey(), rule == null ? null : rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "fileType is required"));
+            return false;
+        }
+        String normalized = rule.getFileType().trim().toUpperCase(Locale.ROOT);
+        if (!ALLOWED_FILE_TYPES.contains(normalized)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "Unsupported fileType: " + rule.getFileType()));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean validateRulePathContract(FileRuleDTO rule, List<TaskValidateResponse.ValidationIssue> issues) {
+        if (rule == null) {
+            issues.add(issue(null, null, "TEMPLATE_RULE_CONFLICT", "file rule is required"));
+            return false;
+        }
+        String pathPattern = trimToNull(rule.getPathPattern());
+        if (pathPattern == null) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "pathPattern is required"));
+            return false;
+        }
+        if (isUnsafeRelativePathPattern(pathPattern)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "pathPattern must be a relative path under taskDir and cannot contain .."));
+            return false;
+        }
+        String normalizedPathPattern = normalizeRelativePath(pathPattern);
+        if (normalizedPathPattern.isBlank()) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "pathPattern is required"));
+            return false;
+        }
+
+        String fileNamePattern = trimToNull(rule.getFileNamePattern());
+        if (fileNamePattern == null) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "fileNamePattern is required"));
+            return false;
+        }
+        if (isUnsafeFileNamePattern(fileNamePattern)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "fileNamePattern must be a file-name glob, not a path"));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean validateRuleCountContract(FileRuleDTO rule, Map<String, Object> ruleJson, List<TaskValidateResponse.ValidationIssue> issues) {
+        if (rule == null || ruleJson == null || rule.getRequiredFlag() == null || rule.getRequiredFlag() != 1) {
+            return true;
+        }
+        Integer max = firstInteger(ruleJson, "maxCount", "max");
+        if (max != null && max == 0) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "required rule cannot have maxCount 0"));
+            return false;
+        }
+        return true;
     }
 
     private List<ExtractedEntry> matchEntries(FileRuleDTO rule, List<ExtractedEntry> entries) {
@@ -784,10 +881,257 @@ public class TaskValidationManager {
             return Map.of();
         }
         try {
-            return OBJECT_MAPPER.readValue(rule.getRuleJson(), MAP_TYPE);
+            Map<String, Object> ruleJson = OBJECT_MAPPER.readValue(rule.getRuleJson(), MAP_TYPE);
+            if (!validateRuleJsonScopeSelectors(rule, ruleJson, issues)) {
+                return null;
+            }
+            if (!validateRuleJsonMetadataContract(rule, ruleJson, issues)) {
+                return null;
+            }
+            return ruleJson;
         } catch (Exception ex) {
             issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "Rule JSON is invalid"));
             return null;
+        }
+    }
+
+    private boolean validateRuleJsonScopeSelectors(FileRuleDTO rule,
+                                                   Map<String, Object> ruleJson,
+                                                   List<TaskValidateResponse.ValidationIssue> issues) {
+        if (ruleJson == null || ruleJson.isEmpty()) {
+            return true;
+        }
+        for (String key : ruleJson.keySet()) {
+            if (key == null || RULE_METADATA_KEYS.contains(key) || ALLOWED_RULE_SCOPE_SELECTOR_KEYS.contains(key)) {
+                continue;
+            }
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "Unsupported ruleJson scope selector: " + key));
+            return false;
+        }
+        return true;
+    }
+
+    private boolean validateRuleJsonMetadataContract(FileRuleDTO rule,
+                                                     Map<String, Object> ruleJson,
+                                                     List<TaskValidateResponse.ValidationIssue> issues) {
+        if (ruleJson == null || ruleJson.isEmpty()) {
+            return true;
+        }
+        if (!validateAllowSuffixContract(rule, ruleJson.get("allowSuffix"), issues)) {
+            return false;
+        }
+        Integer minCount = null;
+        if (ruleJson.containsKey("minCount")) {
+            minCount = readRuleInteger(rule, ruleJson, "minCount", true, issues);
+            if (minCount == null && ruleJson.get("minCount") != null) {
+                return false;
+            }
+        } else if (ruleJson.containsKey("min")) {
+            minCount = readRuleInteger(rule, ruleJson, "min", true, issues);
+            if (minCount == null && ruleJson.get("min") != null) {
+                return false;
+            }
+        }
+        Integer maxCount = null;
+        if (ruleJson.containsKey("maxCount")) {
+            maxCount = readRuleInteger(rule, ruleJson, "maxCount", true, issues);
+            if (maxCount == null && ruleJson.get("maxCount") != null) {
+                return false;
+            }
+        } else if (ruleJson.containsKey("max")) {
+            maxCount = readRuleInteger(rule, ruleJson, "max", true, issues);
+            if (maxCount == null && ruleJson.get("max") != null) {
+                return false;
+            }
+        }
+        if (minCount != null && maxCount != null && maxCount < minCount) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson maxCount cannot be smaller than minCount"));
+            return false;
+        }
+        if (!validateMaxSizeMbContract(rule, ruleJson, issues)) {
+            return false;
+        }
+        return validateDeriveContract(rule, ruleJson, issues);
+    }
+
+    private boolean validateAllowSuffixContract(FileRuleDTO rule, Object value, List<TaskValidateResponse.ValidationIssue> issues) {
+        if (value == null) {
+            return true;
+        }
+        if (!(value instanceof List<?> rows)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson allowSuffix must be an array"));
+            return false;
+        }
+        for (Object row : rows) {
+            if (row == null || String.valueOf(row).isBlank()) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson allowSuffix cannot contain blank values"));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validateMaxSizeMbContract(FileRuleDTO rule,
+                                              Map<String, Object> ruleJson,
+                                              List<TaskValidateResponse.ValidationIssue> issues) {
+        if (!ruleJson.containsKey("maxSizeMb")) {
+            return true;
+        }
+        return readRuleInteger(rule, ruleJson, "maxSizeMb", false, issues) != null;
+    }
+
+    private Integer readRuleInteger(FileRuleDTO rule,
+                                    Map<String, Object> ruleJson,
+                                    String key,
+                                    boolean allowZero,
+                                    List<TaskValidateResponse.ValidationIssue> issues) {
+        if (ruleJson == null || !ruleJson.containsKey(key) || ruleJson.get(key) == null) {
+            return null;
+        }
+        Object value = ruleJson.get(key);
+        Integer parsed;
+        if (value instanceof Number number) {
+            parsed = number.intValue();
+        } else {
+            try {
+                parsed = Integer.parseInt(String.valueOf(value));
+            } catch (NumberFormatException ex) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson " + key + " must be an integer"));
+                return null;
+            }
+        }
+        if (parsed < 0 || (!allowZero && parsed == 0)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson " + key + (allowZero ? " must be >= 0" : " must be > 0")));
+            return null;
+        }
+        return parsed;
+    }
+
+    private boolean validateDeriveContract(FileRuleDTO rule,
+                                           Map<String, Object> ruleJson,
+                                           List<TaskValidateResponse.ValidationIssue> issues) {
+        boolean hasSingle = ruleJson.containsKey("deriveParam") && ruleJson.get("deriveParam") != null;
+        boolean hasList = ruleJson.containsKey("deriveParams") && ruleJson.get("deriveParams") != null;
+        if (hasSingle && hasList) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson cannot contain both deriveParam and deriveParams"));
+            return false;
+        }
+        if (hasSingle) {
+            return validateDeriveParamContract(rule, ruleJson.get("deriveParam"), false, issues);
+        }
+        if (!hasList) {
+            return true;
+        }
+        Object rawList = ruleJson.get("deriveParams");
+        if (!(rawList instanceof List<?> rows)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParams must be an array"));
+            return false;
+        }
+        for (Object row : rows) {
+            if (!validateDeriveParamContract(rule, row, true, issues)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validateDeriveParamContract(FileRuleDTO rule,
+                                                Object value,
+                                                boolean fromList,
+                                                List<TaskValidateResponse.ValidationIssue> issues) {
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson " + (fromList ? "deriveParams item" : "deriveParam") + " must be an object"));
+            return false;
+        }
+        Map<String, Object> deriveMap = stringKeyMap(rawMap);
+        for (String key : deriveMap.keySet()) {
+            if (!ALLOWED_DERIVE_KEYS.contains(key)) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam unsupported key: " + key));
+                return false;
+            }
+        }
+        String name = trimToNull(deriveMap.get("name"));
+        if (name == null) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.name is required"));
+            return false;
+        }
+        String source = trimToNull(deriveMap.get("source"));
+        if (source == null) {
+            source = "fileContentRegex";
+        }
+        if (!ALLOWED_DERIVE_SOURCES.contains(source)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.source is unsupported"));
+            return false;
+        }
+        if ("literal".equals(source)) {
+            if (deriveMap.get("value") == null) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.value is required"));
+                return false;
+            }
+        } else if (!validateOptionalRegexContract(rule, deriveMap.get("pattern"), "deriveParam.pattern", true, issues)) {
+            return false;
+        }
+        if (deriveMap.containsKey("group") && readRuleInteger(rule, deriveMap, "group", true, issues) == null) {
+            return false;
+        }
+        if (!validateOptionalRegexContract(rule, deriveMap.get("sanitizeRegex"), "deriveParam.sanitizeRegex", false, issues)) {
+            return false;
+        }
+        return validatePreprocessContract(rule, deriveMap.get("preprocess"), issues);
+    }
+
+    private boolean validatePreprocessContract(FileRuleDTO rule,
+                                               Object value,
+                                               List<TaskValidateResponse.ValidationIssue> issues) {
+        if (value == null) {
+            return true;
+        }
+        if (!(value instanceof List<?> rows)) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.preprocess must be an array"));
+            return false;
+        }
+        for (Object row : rows) {
+            if (!(row instanceof Map<?, ?> rawMap)) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.preprocess item must be an object"));
+                return false;
+            }
+            Map<String, Object> preprocess = stringKeyMap(rawMap);
+            for (String key : preprocess.keySet()) {
+                if (!ALLOWED_PREPROCESS_KEYS.contains(key)) {
+                    issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.preprocess unsupported key: " + key));
+                    return false;
+                }
+            }
+            if (!validateOptionalRegexContract(rule, preprocess.get("pattern"), "deriveParam.preprocess.pattern", true, issues)) {
+                return false;
+            }
+            if (preprocess.containsKey("replacement") && preprocess.get("replacement") == null) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson deriveParam.preprocess.replacement cannot be null"));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validateOptionalRegexContract(FileRuleDTO rule,
+                                                  Object value,
+                                                  String fieldName,
+                                                  boolean required,
+                                                  List<TaskValidateResponse.ValidationIssue> issues) {
+        String pattern = trimToNull(value);
+        if (pattern == null) {
+            if (required) {
+                issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson " + fieldName + " is required"));
+                return false;
+            }
+            return true;
+        }
+        try {
+            Pattern.compile(pattern);
+            return true;
+        } catch (Exception ex) {
+            issues.add(issue(rule.getFileKey(), rule.getPathPattern(), "TEMPLATE_RULE_CONFLICT", "ruleJson " + fieldName + " is invalid"));
+            return false;
         }
     }
 
@@ -818,13 +1162,13 @@ public class TaskValidationManager {
         }
         Set<String> allowSuffix = suffixRows.stream()
                 .filter(Objects::nonNull)
-                .map(value -> String.valueOf(value).toLowerCase(Locale.ROOT))
+                .map(this::normalizeSuffix)
                 .collect(java.util.stream.Collectors.toSet());
         for (ExtractedEntry entry : entries) {
             if (entry.directory()) {
                 continue;
             }
-            if (!allowSuffix.contains(entry.suffix().toLowerCase(Locale.ROOT))) {
+            if (!allowSuffix.contains(normalizeSuffix(entry.suffix()))) {
                 issues.add(issue(rule.getFileKey(), entry.relativePath(), "INVALID_SUFFIX", "File suffix is not allowed"));
                 return;
             }
@@ -847,6 +1191,54 @@ public class TaskValidationManager {
             }
         }
         return null;
+    }
+
+    private void validateCommandTemplateParams(String commandTemplate,
+                                               Map<String, Object> effectiveParams,
+                                               List<TaskValidateResponse.ValidationIssue> issues) {
+        if (commandTemplate == null || commandTemplate.isBlank()) {
+            return;
+        }
+        Set<String> placeholders = collectCommandTemplatePlaceholders(commandTemplate);
+        if (placeholders.isEmpty()) {
+            return;
+        }
+        Map<String, Object> params = effectiveParams == null ? Map.of() : effectiveParams;
+        for (String placeholder : placeholders) {
+            if (RESERVED_COMMAND_VARIABLES.contains(placeholder)) {
+                continue;
+            }
+            if (!params.containsKey(placeholder) || isEmptyCommandParam(params.get(placeholder))) {
+                issues.add(issue(
+                        "params",
+                        "$." + placeholder,
+                        PARAM_SCHEMA_INVALID,
+                        "Parameter required by commandTemplate is missing: " + placeholder
+                ));
+            }
+        }
+    }
+
+    private Set<String> collectCommandTemplatePlaceholders(String commandTemplate) {
+        Set<String> placeholders = new LinkedHashSet<>();
+        Matcher matcher = COMMAND_PLACEHOLDER_PATTERN.matcher(commandTemplate);
+        while (matcher.find()) {
+            String placeholder = matcher.group(1);
+            if (placeholder != null && !placeholder.isBlank()) {
+                placeholders.add(placeholder);
+            }
+        }
+        return placeholders;
+    }
+
+    private boolean isEmptyCommandParam(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof String text) {
+            return text.isBlank();
+        }
+        return false;
     }
 
     private void mergeDerivedParams(Task task, ValidationOutcome validationOutcome) {
@@ -977,9 +1369,51 @@ public class TaskValidationManager {
         return normalized;
     }
 
+    private boolean isUnsafeRelativePathPattern(String value) {
+        if (value == null) {
+            return true;
+        }
+        String text = value.trim();
+        return text.startsWith("/")
+                || text.startsWith("\\")
+                || WINDOWS_ABSOLUTE_PATH.matcher(text).matches()
+                || hasParentTraversal(text);
+    }
+
+    private boolean isUnsafeFileNamePattern(String value) {
+        if (value == null) {
+            return true;
+        }
+        String text = value.trim();
+        return text.contains("/")
+                || text.contains("\\")
+                || isUnsafeRelativePathPattern(text);
+    }
+
+    private boolean hasParentTraversal(String value) {
+        String normalized = value.replace('\\', '/').trim();
+        for (String segment : normalized.split("/")) {
+            if ("..".equals(segment)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private String extractSuffix(String fileName) {
         int idx = fileName.lastIndexOf('.');
         return idx < 0 ? "" : fileName.substring(idx + 1);
+    }
+
+    private String normalizeSuffix(Object suffix) {
+        if (suffix == null) {
+            return "";
+        }
+        String normalized = String.valueOf(suffix).trim().toLowerCase(Locale.ROOT);
+        while (normalized.startsWith(".")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized;
     }
 
     private void cleanupDirectory(Path dir) throws IOException {

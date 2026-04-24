@@ -125,6 +125,13 @@ public class ScheduleAppService {
 					"profile is disabled: " + (profileMeta.getProfileName() == null ? task.getProfileId() : profileMeta.getProfileName())
 			);
 		}
+		if (!task.getSolverId().equals(profileMeta.getSolverId())) {
+			throw new BizException(ErrorCodeConstants.TASK_PROFILE_MISMATCH, "solver and profile do not match");
+		}
+		if (profileMeta.getTaskType() != null && !profileMeta.getTaskType().isBlank()
+				&& task.getTaskType() != null && !profileMeta.getTaskType().equals(task.getTaskType())) {
+			throw new BizException(ErrorCodeConstants.TASK_TYPE_MISMATCH, "task type and profile do not match");
+		}
 	}
 
 	public void confirmScheduleSuccess(Long taskId, Long nodeId, String scheduleMessage) {

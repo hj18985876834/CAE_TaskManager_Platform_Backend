@@ -1,11 +1,13 @@
 package com.example.cae.task.interfaces.internal;
 
+import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.dto.TaskStatusAckDTO;
 import com.example.cae.common.response.Result;
 import com.example.cae.task.application.manager.TaskDispatchManager;
+import com.example.cae.task.application.service.NodeAgentAuthService;
 import com.example.cae.task.interfaces.request.InternalTaskFailRequest;
 import com.example.cae.task.interfaces.request.NodeOfflineTasksRequest;
 import com.example.cae.task.interfaces.request.TaskNodeMarkRequest;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,9 +28,12 @@ import java.util.List;
 @RequestMapping("/internal/tasks")
 public class InternalTaskDispatchController {
 	private final TaskDispatchManager taskDispatchManager;
+	private final NodeAgentAuthService nodeAgentAuthService;
 
-	public InternalTaskDispatchController(TaskDispatchManager taskDispatchManager) {
+	public InternalTaskDispatchController(TaskDispatchManager taskDispatchManager,
+									  NodeAgentAuthService nodeAgentAuthService) {
 		this.taskDispatchManager = taskDispatchManager;
+		this.nodeAgentAuthService = nodeAgentAuthService;
 	}
 
 	@GetMapping("/queued")
@@ -48,7 +54,12 @@ public class InternalTaskDispatchController {
 	}
 
 	@PostMapping("/{taskId}/dispatch-failed")
-	public Result<TaskStatusAckDTO> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId, @Valid @RequestBody InternalTaskFailRequest request) {
+	public Result<TaskStatusAckDTO> markFailed(@PathVariable("taskId") @Positive(message = "taskId必须大于0") Long taskId,
+										  @Valid @RequestBody InternalTaskFailRequest request,
+										  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = false) String nodeToken) {
+		if (nodeToken != null && !nodeToken.isBlank()) {
+			nodeAgentAuthService.validateTaskNodeToken(taskId, request.getNodeId(), nodeToken);
+		}
 		return Result.success(taskDispatchManager.markFailed(taskId, request.getNodeId(), request.getFailType(), request.getReason(), request.getRecoverable()));
 	}
 

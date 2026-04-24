@@ -42,9 +42,11 @@ public class TaskScheduleJob {
 			try {
 				nodeId = taskScheduleManager.schedule(task);
 				TaskScheduleClaimDTO scheduleClaim = markTaskScheduledWithRetry(task.getTaskId(), nodeId);
-				taskMarkedScheduled = isScheduleClaimAccepted(scheduleClaim, nodeId);
+				taskMarkedScheduled = shouldContinueDispatchAfterScheduleClaim(scheduleClaim, nodeId);
 				if (!taskMarkedScheduled) {
-					taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
+					if (shouldReleaseReservationAfterRejectedClaim(scheduleClaim, nodeId)) {
+						taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
+					}
 					continue;
 				}
 				nodeAgentClient.notifyDispatch(nodeId, task);
@@ -169,24 +171,32 @@ public class TaskScheduleJob {
 		return false;
 	}
 
-	private boolean isScheduleClaimAccepted(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
+	private boolean shouldContinueDispatchAfterScheduleClaim(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
 		if (scheduleClaim == null) {
 			return false;
 		}
 		if (Boolean.TRUE.equals(scheduleClaim.getClaimed())) {
 			return true;
 		}
-		if (expectedNodeId == null || !expectedNodeId.equals(scheduleClaim.getNodeId())) {
+		return isSameNodeClaim(scheduleClaim, expectedNodeId)
+				&& TaskStatusEnum.SCHEDULED.name().equals(scheduleClaim.getStatus());
+	}
+
+	private boolean shouldReleaseReservationAfterRejectedClaim(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
+		if (scheduleClaim == null || expectedNodeId == null) {
+			return true;
+		}
+		if (isSameNodeClaim(scheduleClaim, expectedNodeId)
+				&& TaskStatusEnum.DISPATCHED.name().equals(scheduleClaim.getStatus())) {
 			return false;
 		}
-		String status = scheduleClaim.getStatus();
-		return TaskStatusEnum.SCHEDULED.name().equals(status)
-				|| TaskStatusEnum.DISPATCHED.name().equals(status)
-				|| TaskStatusEnum.RUNNING.name().equals(status)
-				|| TaskStatusEnum.SUCCESS.name().equals(status)
-				|| TaskStatusEnum.FAILED.name().equals(status)
-				|| TaskStatusEnum.CANCELED.name().equals(status)
-				|| TaskStatusEnum.TIMEOUT.name().equals(status);
+		return true;
+	}
+
+	private boolean isSameNodeClaim(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
+		return scheduleClaim != null
+				&& expectedNodeId != null
+				&& expectedNodeId.equals(scheduleClaim.getNodeId());
 	}
 
 	private void sleepBeforeRetry(String action, Long taskId, Long nodeId, int attempt, Exception ex) {

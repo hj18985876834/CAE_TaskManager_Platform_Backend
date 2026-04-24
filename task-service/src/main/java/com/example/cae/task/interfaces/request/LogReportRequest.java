@@ -1,7 +1,6 @@
 package com.example.cae.task.interfaces.request;
 
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
@@ -12,7 +11,7 @@ public class LogReportRequest {
 	@NotNull(message = "seqNo不能为空")
 	@Min(value = 0, message = "seqNo不能小于0")
 	private Integer seqNo;
-	@NotBlank(message = "logContent不能为空")
+	@NotNull(message = "logContent cannot be null")
 	private String logContent;
 
 	public Long getNodeId() {

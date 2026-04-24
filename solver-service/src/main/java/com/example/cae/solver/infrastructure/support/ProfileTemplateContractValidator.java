@@ -30,12 +30,29 @@ public class ProfileTemplateContractValidator {
 			"deriveParam",
 			"deriveParams"
 	);
+	private static final Set<String> ALLOWED_SCOPE_SELECTOR_KEYS = Set.of(
+			"solverId", "solverIds",
+			"profileId", "profileIds",
+			"taskType", "taskTypes",
+			"solverCode", "solverCodes",
+			"solverExecMode", "solverExecModes",
+			"solverExecPath", "solverExecPaths"
+	);
+	private static final Set<String> RESERVED_TEMPLATE_VARIABLES = Set.of(
+			"taskId", "taskNo", "solverId", "solverCode", "solverExecMode", "solverExecPath",
+			"profileId", "taskType", "taskDir", "inputDir", "outputDir", "logDir"
+	);
 	private static final Set<String> ALLOWED_DERIVE_SOURCES = Set.of(
 			"literal",
 			"fileNameRegex",
 			"relativePathRegex",
 			"fileContentRegex"
 	);
+	private static final Set<String> ALLOWED_DERIVE_KEYS = Set.of(
+			"name", "source", "value", "pattern", "group", "required",
+			"trim", "stripQuotes", "sanitizeRegex", "preprocess"
+	);
+	private static final Set<String> ALLOWED_PREPROCESS_KEYS = Set.of("pattern", "replacement");
 	private static final List<String> FORBIDDEN_COMMAND_SNIPPETS = List.of("\r", "\n", "&&", "||", ";", "|", ">", "<", "$(", "`");
 	private static final List<String> FORBIDDEN_COMMAND_PREFIXES = List.of(
 			"sh ",
@@ -49,15 +66,20 @@ public class ProfileTemplateContractValidator {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	public void validateProfileContract(String uploadMode, String commandTemplate) {
+		validateProfileContract(uploadMode, commandTemplate, null);
+	}
+
+	public void validateProfileContract(String uploadMode, String commandTemplate, String paramsSchemaText) {
 		normalizeUploadMode(uploadMode);
-		validateCommandTemplate(commandTemplate);
+		validateParamsSchema(paramsSchemaText);
+		validateCommandTemplate(commandTemplate, paramsSchemaText);
 	}
 
 	public void validateStoredProfileContract(SolverTaskProfile profile) {
 		if (profile == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "profile is required");
 		}
-		validateProfileContract(profile.getUploadMode(), profile.getCommandTemplate());
+		validateProfileContract(profile.getUploadMode(), profile.getCommandTemplate(), profile.getParamsSchemaJson());
 	}
 
 	public String normalizeUploadMode(String uploadMode) {
@@ -69,11 +91,95 @@ public class ProfileTemplateContractValidator {
 	}
 
 	public String normalizeCommandTemplate(String commandTemplate) {
-		validateCommandTemplate(commandTemplate);
-		return commandTemplate.trim();
+		return validateCommandTemplateSyntax(commandTemplate);
+	}
+
+	private void validateParamsSchema(String paramsSchemaText) {
+		if (paramsSchemaText == null || paramsSchemaText.isBlank()) {
+			return;
+		}
+		Object parsed;
+		try {
+			parsed = OBJECT_MAPPER.readValue(paramsSchemaText, Object.class);
+		} catch (Exception ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema must be a valid JSON object");
+		}
+		if (!(parsed instanceof Map<?, ?> rawMap)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema must be a JSON object");
+		}
+		validateParamsSchemaNode(toStringKeyMap(rawMap), "$");
+	}
+
+	private void validateParamsSchemaNode(Map<String, Object> schema, String path) {
+		Object properties = schema.get("properties");
+		if (properties != null) {
+			if (!(properties instanceof Map<?, ?> rawProperties)) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + path + ".properties must be an object");
+			}
+			for (Map.Entry<?, ?> entry : rawProperties.entrySet()) {
+				if (entry.getKey() == null || String.valueOf(entry.getKey()).isBlank()) {
+					throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema property name cannot be blank");
+				}
+				if (!(entry.getValue() instanceof Map<?, ?> propertySchema)) {
+					throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema property schema must be an object: " + entry.getKey());
+				}
+				validateParamsSchemaNode(toStringKeyMap(propertySchema), path + ".properties." + entry.getKey());
+			}
+		}
+
+		Object required = schema.get("required");
+		if (required != null && !(required instanceof List<?>)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + path + ".required must be an array");
+		}
+		if (required instanceof List<?> rows) {
+			for (Object row : rows) {
+				if (row == null || String.valueOf(row).isBlank()) {
+					throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema required item cannot be blank");
+				}
+			}
+		}
+
+		Object pattern = schema.get("pattern");
+		if (pattern != null) {
+			validateParamsSchemaRegex(pattern, path + ".pattern");
+		}
+		Object items = schema.get("items");
+		if (items != null) {
+			if (!(items instanceof Map<?, ?> itemSchema)) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + path + ".items must be an object");
+			}
+			validateParamsSchemaNode(toStringKeyMap(itemSchema), path + ".items");
+		}
+		Object additionalProperties = schema.get("additionalProperties");
+		if (additionalProperties instanceof Map<?, ?> additionalSchema) {
+			validateParamsSchemaNode(toStringKeyMap(additionalSchema), path + ".additionalProperties");
+		} else if (additionalProperties != null && !(additionalProperties instanceof Boolean)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + path + ".additionalProperties must be boolean or object");
+		}
+	}
+
+	private void validateParamsSchemaRegex(Object value, String fieldName) {
+		String pattern = trimToNull(value);
+		if (pattern == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + fieldName + " cannot be blank");
+		}
+		try {
+			Pattern.compile(pattern);
+		} catch (Exception ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema " + fieldName + " is invalid");
+		}
 	}
 
 	public void validateCommandTemplate(String commandTemplate) {
+		validateCommandTemplate(commandTemplate, null);
+	}
+
+	public void validateCommandTemplate(String commandTemplate, String paramsSchemaText) {
+		String normalized = validateCommandTemplateSyntax(commandTemplate);
+		validateCommandPlaceholders(normalized, paramsSchemaText);
+	}
+
+	private String validateCommandTemplateSyntax(String commandTemplate) {
 		String normalized = commandTemplate == null ? null : commandTemplate.trim();
 		if (normalized == null || normalized.isEmpty()) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "commandTemplate is required");
@@ -104,6 +210,80 @@ public class ProfileTemplateContractValidator {
 				);
 			}
 		}
+		return normalized;
+	}
+
+	private void validateCommandPlaceholders(String commandTemplate, String paramsSchemaText) {
+		Set<String> placeholders = collectPlaceholders(commandTemplate);
+		if (placeholders.isEmpty()) {
+			return;
+		}
+		Set<String> customPlaceholders = new LinkedHashSet<>();
+		for (String placeholder : placeholders) {
+			if (!RESERVED_TEMPLATE_VARIABLES.contains(placeholder)) {
+				customPlaceholders.add(placeholder);
+			}
+		}
+		if (customPlaceholders.isEmpty()) {
+			return;
+		}
+		Set<String> paramNames = readParamsSchemaProperties(paramsSchemaText, true);
+		customPlaceholders.removeAll(paramNames);
+		if (!customPlaceholders.isEmpty()) {
+			throw new BizException(
+					ErrorCodeConstants.BAD_REQUEST,
+					"commandTemplate contains unknown variables: " + String.join(", ", customPlaceholders)
+			);
+		}
+	}
+
+	private Set<String> readParamsSchemaProperties(String paramsSchemaText, boolean requiredForTemplateParams) {
+		if (paramsSchemaText == null || paramsSchemaText.isBlank()) {
+			return Set.of();
+		}
+		Map<String, Object> schemaMap;
+		try {
+			schemaMap = OBJECT_MAPPER.readValue(paramsSchemaText, MAP_TYPE);
+		} catch (Exception ex) {
+			if (requiredForTemplateParams) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "paramsSchema must be a valid JSON object when commandTemplate uses task params");
+			}
+			return Set.of();
+		}
+		if (schemaMap == null) {
+			return Set.of();
+		}
+		Object properties = schemaMap.get("properties");
+		if (!(properties instanceof Map<?, ?> rawProperties)) {
+			return Set.of();
+		}
+		Set<String> names = new LinkedHashSet<>();
+		for (Object key : rawProperties.keySet()) {
+			if (key != null && !String.valueOf(key).isBlank()) {
+				names.add(String.valueOf(key));
+			}
+		}
+		return names;
+	}
+
+	public void validateFileRuleContract(Integer requiredFlag, String ruleJson) {
+		validateRuleJson(ruleJson);
+		if (requiredFlag == null || requiredFlag != 1 || ruleJson == null || ruleJson.isBlank()) {
+			return;
+		}
+		Map<String, Object> ruleMap;
+		try {
+			ruleMap = OBJECT_MAPPER.readValue(ruleJson, MAP_TYPE);
+		} catch (Exception ex) {
+			return;
+		}
+		Integer maxCount = parseFirstNonNegativeInteger(ruleMap, "maxCount", "max");
+		if (maxCount != null && maxCount == 0) {
+			throw new BizException(
+					ErrorCodeConstants.BAD_REQUEST,
+					"ruleJson maxCount cannot be 0 when requiredFlag is 1"
+			);
+		}
 	}
 
 	public void validateRuleJson(String ruleJson) {
@@ -133,9 +313,12 @@ public class ProfileTemplateContractValidator {
 				case "max" -> parseNonNegativeInteger(value, "max", true);
 				case "maxSizeMb" -> parseNonNegativeInteger(value, "maxSizeMb", false);
 				case "deriveParam" -> validateDeriveParam(value, false);
-				case "deriveParams" -> validateDeriveParams(value);
+			case "deriveParams" -> validateDeriveParams(value);
 				default -> validateScopeSelector(key, value);
 			}
+		}
+		if (ruleMap.containsKey("deriveParam") && ruleMap.containsKey("deriveParams")) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson cannot contain both deriveParam and deriveParams");
 		}
 		Integer minCount = parseFirstNonNegativeInteger(ruleMap, "minCount", "min");
 		Integer maxCount = parseFirstNonNegativeInteger(ruleMap, "maxCount", "max");
@@ -159,6 +342,9 @@ public class ProfileTemplateContractValidator {
 	}
 
 	private void validateScopeSelector(String key, Object value) {
+		if (!ALLOWED_SCOPE_SELECTOR_KEYS.contains(key)) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson unsupported scope selector: " + key);
+		}
 		List<String> values = readStringList(value);
 		if (values.isEmpty()) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson " + key + " must be a non-empty string or array");
@@ -185,6 +371,11 @@ public class ProfileTemplateContractValidator {
 			);
 		}
 		Map<String, Object> deriveMap = toStringKeyMap(rawMap);
+		for (String key : deriveMap.keySet()) {
+			if (!ALLOWED_DERIVE_KEYS.contains(key)) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam unsupported key: " + key);
+			}
+		}
 		String name = trimToNull(deriveMap.get("name"));
 		if (name == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.name is required");
@@ -200,8 +391,12 @@ public class ProfileTemplateContractValidator {
 			if (deriveMap.get("value") == null) {
 				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.value is required");
 			}
-		} else if (trimToNull(deriveMap.get("pattern")) == null) {
-			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.pattern is required");
+		} else {
+			String pattern = trimToNull(deriveMap.get("pattern"));
+			if (pattern == null) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.pattern is required");
+			}
+			validateOptionalRegex(pattern, "deriveParam.pattern");
 		}
 		parseOptionalInteger(deriveMap.get("group"), "deriveParam.group", true);
 		validateOptionalRegex(deriveMap.get("sanitizeRegex"), "deriveParam.sanitizeRegex");
@@ -220,6 +415,11 @@ public class ProfileTemplateContractValidator {
 				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.preprocess item must be an object");
 			}
 			Map<String, Object> preprocess = toStringKeyMap(rawMap);
+			for (String key : preprocess.keySet()) {
+				if (!ALLOWED_PREPROCESS_KEYS.contains(key)) {
+					throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.preprocess unsupported key: " + key);
+				}
+			}
 			String pattern = trimToNull(preprocess.get("pattern"));
 			if (pattern == null) {
 				throw new BizException(ErrorCodeConstants.BAD_REQUEST, "ruleJson deriveParam.preprocess.pattern is required");

@@ -23,7 +23,7 @@ public class ProcessLogReader {
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, processLogCharset))) {
 			String line;
 			while ((line = reader.readLine()) != null) {
-				lineConsumer.accept(line);
+				lineConsumer.accept(line + "\n");
 			}
 		} catch (IOException ex) {
 			throw new RuntimeException("read process log failed", ex);
@@ -41,4 +41,3 @@ public class ProcessLogReader {
 		}
 	}
 }
-

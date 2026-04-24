@@ -29,8 +29,8 @@ public class TaskReportAppService {
 		taskReportClient.reportResultSummary(taskId, result);
 	}
 
-	public void reportResultFile(Long taskId, File resultFile) {
-		taskReportClient.reportResultFile(taskId, resultFile);
+	public void reportResultFile(Long taskId, File resultFile, String fileName) {
+		taskReportClient.reportResultFile(taskId, resultFile, fileName);
 	}
 
 	public void markFinished(Long taskId) {

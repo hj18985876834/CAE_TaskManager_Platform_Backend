@@ -138,7 +138,7 @@ CREATE TABLE solver_profile_file_rule (
     file_key VARCHAR(50) NOT NULL COMMENT '文件标识，如 main_inp / case_zip',
     path_pattern VARCHAR(255) DEFAULT NULL COMMENT '解压后相对路径规则，如 system/**',
     file_name_pattern VARCHAR(100) DEFAULT NULL COMMENT '文件名或匹配规则',
-    file_type VARCHAR(30) NOT NULL COMMENT 'FILE / DIR / ZIP',
+    file_type VARCHAR(30) NOT NULL COMMENT 'ZIP / FILE / DIR / DIRECTORY',
     required_flag TINYINT NOT NULL DEFAULT 1 COMMENT '是否必需',
     sort_order INT NOT NULL DEFAULT 0 COMMENT '排序',
     rule_json TEXT DEFAULT NULL COMMENT '扩展约束JSON（数量/后缀/大小等简单约束）',

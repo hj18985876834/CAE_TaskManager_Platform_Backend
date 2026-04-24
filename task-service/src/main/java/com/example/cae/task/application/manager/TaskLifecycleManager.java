@@ -182,6 +182,7 @@ public class TaskLifecycleManager {
 	public TaskSubmitResponse submitTask(Long taskId, Long userId) {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskCanSubmit(task);
+		validateTaskDefinition(task.getSolverId(), task.getProfileId(), task.getTaskType());
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), "task submitted", OperatorTypeEnum.USER.name(), userId);
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(taskId);
@@ -352,7 +353,9 @@ public class TaskLifecycleManager {
 		}
 		String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
 		String suffix = extractSuffix(originalName).toLowerCase(Locale.ROOT);
-		boolean suffixAllowed = constraint.allowSuffix().stream().map(v -> v.toLowerCase(Locale.ROOT)).anyMatch(v -> v.equals(suffix));
+		boolean suffixAllowed = constraint.allowSuffix().stream()
+				.map(this::normalizeSuffix)
+				.anyMatch(v -> v.equals(suffix));
 		if (!suffixAllowed) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "only zip archive is supported");
 		}
@@ -461,6 +464,17 @@ public class TaskLifecycleManager {
 	private String extractSuffix(String fileName) {
 		int idx = fileName.lastIndexOf('.');
 		return idx < 0 ? "" : fileName.substring(idx + 1);
+	}
+
+	private String normalizeSuffix(String suffix) {
+		if (suffix == null) {
+			return "";
+		}
+		String normalized = suffix.trim().toLowerCase(Locale.ROOT);
+		while (normalized.startsWith(".")) {
+			normalized = normalized.substring(1);
+		}
+		return normalized;
 	}
 
 	private TaskStatusAckDTO buildTaskStatusAck(Task task) {

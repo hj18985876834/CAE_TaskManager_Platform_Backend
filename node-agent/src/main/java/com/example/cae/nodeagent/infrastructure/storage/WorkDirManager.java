@@ -20,7 +20,9 @@ public class WorkDirManager {
 	}
 
 	public void prepareTaskDirs(ExecutionContext context) {
-		Path root = resolveTaskRoot(context);
+		Path executionDir = resolveValidatedExecutionDir(context);
+		validateValidatedExecutionDir(context, executionDir);
+		Path root = resolveTaskRoot(context, executionDir);
 		Path workDir = root.resolve("workdir");
 		Path inputDir = root.resolve("input");
 		Path outputDir = root.resolve("output");
@@ -28,7 +30,7 @@ public class WorkDirManager {
 		Path metaDir = root.resolve("meta");
 
 		context.setWorkDir(normalize(workDir));
-		context.setTaskDir(normalize(resolveTaskExecutionDir(context, workDir)));
+		context.setTaskDir(normalize(executionDir == null ? workDir : executionDir));
 		context.setInputDir(normalize(inputDir));
 		context.setOutputDir(normalize(outputDir));
 		context.setLogDir(normalize(logDir));
@@ -48,8 +50,7 @@ public class WorkDirManager {
 		// reserved for future cleanup policy
 	}
 
-	private Path resolveTaskRoot(ExecutionContext context) {
-		Path executionDir = resolveValidatedExecutionDir(context);
+	private Path resolveTaskRoot(ExecutionContext context, Path executionDir) {
 		if (executionDir != null) {
 			Path current = executionDir;
 			while (current != null) {
@@ -66,22 +67,39 @@ public class WorkDirManager {
 		return Path.of(nodeAgentConfig.getWorkRoot(), String.valueOf(context.getTaskId())).normalize();
 	}
 
-	private Path resolveTaskExecutionDir(ExecutionContext context, Path defaultWorkDir) {
-		Path executionDir = resolveValidatedExecutionDir(context);
-		return executionDir == null ? defaultWorkDir : executionDir;
-	}
-
 	private Path resolveValidatedExecutionDir(ExecutionContext context) {
 		if (context == null || context.getInputFiles() == null) {
 			return null;
 		}
+		Path validatedExecutionDir = null;
 		for (InputFileMeta inputFile : context.getInputFiles()) {
 			if (inputFile == null || inputFile.getUnpackDir() == null || inputFile.getUnpackDir().isBlank()) {
 				continue;
 			}
-			return Path.of(pathMappingSupport.toLinuxPath(inputFile.getUnpackDir())).normalize();
+			Path candidate = Path.of(pathMappingSupport.toLinuxPath(inputFile.getUnpackDir())).normalize();
+			if (validatedExecutionDir == null) {
+				validatedExecutionDir = candidate;
+			} else if (!validatedExecutionDir.equals(candidate)) {
+				throw new IllegalStateException("multiple unpackDir values found for taskId=" + context.getTaskId());
+			}
 		}
-		return null;
+		return validatedExecutionDir;
+	}
+
+	private void validateValidatedExecutionDir(ExecutionContext context, Path executionDir) {
+		if (executionDir == null) {
+			return;
+		}
+		if (!Files.exists(executionDir)) {
+			throw new IllegalStateException("validated unpackDir not found before directory preparation, taskId="
+					+ (context == null ? null : context.getTaskId())
+					+ ", mappedPath=" + executionDir);
+		}
+		if (!Files.isDirectory(executionDir)) {
+			throw new IllegalStateException("validated unpackDir is not a directory before directory preparation, taskId="
+					+ (context == null ? null : context.getTaskId())
+					+ ", mappedPath=" + executionDir);
+		}
 	}
 
 	private String normalize(Path path) {

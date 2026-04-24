@@ -36,9 +36,14 @@ public class NodeHeartbeatChecker {
 			if (!isNodeHeartbeatStale(node, threshold)) {
 				continue;
 			}
-			nodeAppService.markNodeOffline(node.getNodeCode());
-			triggerOfflineCompensation(node, "node heartbeat timeout, scheduler marked node offline: " + node.getNodeCode());
-			processedNodeIds.add(node.getId());
+			try {
+				nodeAppService.markNodeOffline(node.getNodeCode());
+				triggerOfflineCompensation(node, "node heartbeat timeout, scheduler marked node offline: " + node.getNodeCode());
+				processedNodeIds.add(node.getId());
+			} catch (Exception ex) {
+				log.warn("failed to process stale online node, nodeId={}, nodeCode={}",
+						node == null ? null : node.getId(), node == null ? null : node.getNodeCode(), ex);
+			}
 		}
 	}
 
@@ -51,8 +56,13 @@ public class NodeHeartbeatChecker {
 			if (!isNodeHeartbeatStale(node, threshold)) {
 				continue;
 			}
-			triggerOfflineCompensation(node, "node remains offline, retry compensation: " + node.getNodeCode());
-			processedNodeIds.add(node.getId());
+			try {
+				triggerOfflineCompensation(node, "node remains offline, retry compensation: " + node.getNodeCode());
+				processedNodeIds.add(node.getId());
+			} catch (Exception ex) {
+				log.warn("failed to retry offline node compensation, nodeId={}, nodeCode={}",
+						node.getId(), node.getNodeCode(), ex);
+			}
 		}
 	}
 

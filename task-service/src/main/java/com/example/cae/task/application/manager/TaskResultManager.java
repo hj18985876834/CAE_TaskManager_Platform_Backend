@@ -2,7 +2,9 @@ package com.example.cae.task.application.manager;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskStatusAckDTO;
+import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.OperatorTypeEnum;
+import com.example.cae.common.enums.ResultFileTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.utils.JsonUtil;
@@ -29,6 +31,11 @@ import java.util.Set;
 
 @Service
 public class TaskResultManager {
+	private static final Set<String> RESULT_REPORT_ALLOWED_STATUSES = Set.of(
+			TaskStatusEnum.RUNNING.name(),
+			TaskStatusEnum.SUCCESS.name(),
+			TaskStatusEnum.TIMEOUT.name()
+	);
 	private final TaskRepository taskRepository;
 	private final TaskLogRepository taskLogRepository;
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
@@ -78,7 +85,7 @@ public class TaskResultManager {
 		Path resultPath = validateResultFilePath(taskId, request);
 		TaskResultFile file = new TaskResultFile();
 		file.setTaskId(taskId);
-		file.setFileType(request.getFileType().trim().toUpperCase());
+		file.setFileType(normalizeResultFileType(request.getFileType()));
 		file.setFileName(request.getFileName().trim());
 		file.setStoragePath(taskStoragePathSupport.toStoredResultPath(resultPath.toString()));
 		file.setFileSize(readActualFileSize(resultPath));
@@ -128,7 +135,22 @@ public class TaskResultManager {
 		return task.isFinished();
 	}
 
+
+	private String normalizeResultFileType(String fileType) {
+		String normalized = fileType == null || fileType.isBlank()
+				? null
+				: fileType.trim().toUpperCase();
+		if (normalized == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result fileType is required");
+		}
+		try {
+			return ResultFileTypeEnum.valueOf(normalized).name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported result fileType: " + fileType);
+		}
+	}
 	private String normalizeAllowedFinalStatus(String finalStatus) {
+
 		String target = finalStatus == null || finalStatus.isBlank()
 				? TaskStatusEnum.SUCCESS.name()
 				: finalStatus.trim().toUpperCase();
@@ -145,11 +167,16 @@ public class TaskResultManager {
 		if (normalized == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "failType is required");
 		}
-		if (TaskStatusEnum.TIMEOUT.name().equals(normalized)) {
-			throw new BizException(ErrorCodeConstants.BAD_REQUEST,
-					"failType TIMEOUT is not supported by mark-failed, use mark-finished with finalStatus=TIMEOUT");
+		try {
+			FailTypeEnum failTypeEnum = FailTypeEnum.valueOf(normalized);
+			if (FailTypeEnum.TIMEOUT == failTypeEnum) {
+				throw new BizException(ErrorCodeConstants.BAD_REQUEST,
+						"failType TIMEOUT is not supported by mark-failed, use mark-finished with finalStatus=TIMEOUT");
+			}
+			return failTypeEnum.name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported failType: " + failType);
 		}
-		return normalized;
 	}
 
 	private void ensureLogReportAllowed(Long taskId) {
@@ -167,7 +194,7 @@ public class TaskResultManager {
 
 	private void ensureResultSummaryAllowed(Long taskId) {
 		Task task = loadTask(taskId);
-		if (task.isFinished() || TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
@@ -176,7 +203,7 @@ public class TaskResultManager {
 
 	private void ensureResultFileAllowed(Long taskId) {
 		Task task = loadTask(taskId);
-		if (task.isFinished() || TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
@@ -207,9 +234,6 @@ public class TaskResultManager {
 		}
 		if (!Files.exists(resultPath) || !Files.isRegularFile(resultPath)) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result file does not exist");
-		}
-		if (resultPath.getFileName() == null || !fileName.equals(resultPath.getFileName().toString())) {
-			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result fileName does not match storagePath");
 		}
 		return resultPath;
 	}

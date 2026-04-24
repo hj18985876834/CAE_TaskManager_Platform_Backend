@@ -50,6 +50,7 @@ public class SolverClientStub implements SolverClient {
 		meta.setProfileId(toLong(map.get("profileId")));
 		meta.setSolverId(toLong(map.get("solverId")));
 		meta.setProfileCode(toString(map.get("profileCode")));
+		meta.setTaskType(toString(map.get("taskType")));
 		meta.setProfileName(toString(map.get("profileName")));
 		meta.setEnabled(toInteger(map.get("enabled")));
 		if (meta.getProfileId() == null

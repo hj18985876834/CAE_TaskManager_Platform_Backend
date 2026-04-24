@@ -52,6 +52,7 @@ public interface SolverClient {
 		private Long profileId;
 		private Long solverId;
 		private String profileCode;
+		private String taskType;
 		private String profileName;
 		private Integer enabled;
 
@@ -77,6 +78,14 @@ public interface SolverClient {
 
 		public void setProfileCode(String profileCode) {
 			this.profileCode = profileCode;
+		}
+
+		public String getTaskType() {
+			return taskType;
+		}
+
+		public void setTaskType(String taskType) {
+			this.taskType = taskType;
 		}
 
 		public String getProfileName() {

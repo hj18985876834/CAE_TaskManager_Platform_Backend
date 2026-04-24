@@ -11,7 +11,7 @@ public interface TaskReportClient {
 
 	void reportResultSummary(Long taskId, ExecutionResult result);
 
-	void reportResultFile(Long taskId, File file);
+	void reportResultFile(Long taskId, File file, String fileName);
 
 	void markFinished(Long taskId);
 

@@ -1,7 +1,7 @@
 -- =========================================================
 -- ZIP_ONLY schema upgrade patch
 -- Target: MySQL 8.0+
--- Scope: solver_db, task_db
+-- Scope: solver_db, task_db, scheduler_db
 -- Note: This patch is designed to be rerunnable.
 -- =========================================================
 
@@ -140,5 +140,98 @@ DEALLOCATE PREPARE stmt;
 UPDATE task_file
 SET archive_flag = CASE WHEN UPPER(file_role) = 'ARCHIVE' THEN 1 ELSE 0 END
 WHERE archive_flag IS NULL OR archive_flag NOT IN (0, 1);
+
+
+-- Keep latest task_file metadata before adding idempotency key.
+DELETE old_file
+FROM task_file old_file
+JOIN task_file new_file
+  ON old_file.task_id = new_file.task_id
+ AND old_file.file_role = new_file.file_role
+ AND old_file.file_key = new_file.file_key
+ AND old_file.id < new_file.id;
+
+-- task_file idempotency key: one effective file per task + role + key.
+SET @sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = 'task_db'
+              AND TABLE_NAME = 'task_file'
+              AND INDEX_NAME = 'uk_task_file_role_key'
+        ),
+        'SELECT 1',
+        'ALTER TABLE task_file ADD UNIQUE KEY uk_task_file_role_key (task_id, file_role, file_key)'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Keep latest task_result_file metadata before adding idempotency key.
+DELETE old_file
+FROM task_result_file old_file
+JOIN task_result_file new_file
+  ON old_file.task_id = new_file.task_id
+ AND old_file.file_type = new_file.file_type
+ AND old_file.file_name = new_file.file_name
+ AND old_file.id < new_file.id;
+
+-- task_result_file idempotency key: repeated node reports update same logical result file.
+SET @sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = 'task_db'
+              AND TABLE_NAME = 'task_result_file'
+              AND INDEX_NAME = 'uk_task_file_type_name'
+        ),
+        'SELECT 1',
+        'ALTER TABLE task_result_file ADD UNIQUE KEY uk_task_file_type_name (task_id, file_type, file_name)'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ---------------------------------------------------------
+-- 3) scheduler_db upgrades
+-- ---------------------------------------------------------
+USE scheduler_db;
+
+-- compute_node.reserved_count
+SET @sql = (
+    SELECT IF(
+        EXISTS (
+            SELECT 1
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = 'scheduler_db'
+              AND TABLE_NAME = 'compute_node'
+              AND COLUMN_NAME = 'reserved_count'
+        ),
+        'SELECT 1',
+        'ALTER TABLE compute_node ADD COLUMN reserved_count INT NOT NULL DEFAULT 0 COMMENT ''调度预占任务数'' AFTER running_count'
+    )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- node_reservation: idempotency truth for node capacity reservation.
+CREATE TABLE IF NOT EXISTS node_reservation (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    node_id BIGINT NOT NULL COMMENT '节点ID',
+    task_id BIGINT NOT NULL COMMENT '任务ID',
+    status VARCHAR(20) NOT NULL COMMENT 'RESERVED / RELEASED',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    released_at DATETIME DEFAULT NULL COMMENT '释放时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_node_task (node_id, task_id),
+    KEY idx_node_status (node_id, status),
+    KEY idx_task_id (task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='节点预占记录表';
 
 SET FOREIGN_KEY_CHECKS = 1;

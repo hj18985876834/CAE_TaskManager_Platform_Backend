@@ -37,8 +37,8 @@ public class FileRuleAppService {
 	public FileRuleCreateResponse createFileRule(Long profileId, CreateFileRuleRequest request) {
 		profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
 		profileRuleValidator.validateCreateRule(request);
-		profileTemplateContractValidator.validateRuleJson(request.getRuleJson());
 		SolverProfileFileRule rule = FileRuleAssembler.toRule(profileId, request);
+		profileTemplateContractValidator.validateFileRuleContract(rule.getRequiredFlag(), rule.getRuleJson());
 		profileRuleDomainService.checkRuleConflict(profileId, rule);
 		fileRuleRepository.save(rule);
 		return FileRuleAssembler.toCreateResponse(rule);
@@ -46,8 +46,8 @@ public class FileRuleAppService {
 
 	public void updateFileRule(Long ruleId, UpdateFileRuleRequest request) {
 		profileRuleValidator.validateUpdateRule(request);
-		profileTemplateContractValidator.validateRuleJson(request.getRuleJson());
 		SolverProfileFileRule rule = fileRuleRepository.findById(ruleId).orElseThrow(() -> new BizException(ErrorCodeConstants.FILE_RULE_NOT_FOUND, "rule not found"));
+		profileTemplateContractValidator.validateFileRuleContract(request.getRequiredFlag(), request.getRuleJson());
 		rule.setPathPattern(request.getPathPattern());
 		rule.setFileNamePattern(request.getFileNamePattern());
 		rule.setFileType(request.getFileType());

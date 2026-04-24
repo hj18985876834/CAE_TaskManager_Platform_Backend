@@ -67,7 +67,8 @@ public class ProfileAppService {
 		if (!solver.isEnabled()) {
 			throw new BizException(ErrorCodeConstants.SOLVER_DISABLED, "solver is disabled");
 		}
-		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate());
+		String paramsSchema = resolveParamsSchema(request.getParamsSchema(), request.getParamsSchemaJson());
+		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate(), paramsSchema);
 		profileRuleDomainService.checkProfileCodeUnique(request.getSolverId(), request.getProfileCode());
 		SolverTaskProfile profile = ProfileAssembler.toProfile(request);
 		profile.setUploadMode(profileTemplateContractValidator.normalizeUploadMode(request.getUploadMode()));
@@ -83,7 +84,8 @@ public class ProfileAppService {
 
 	public void updateProfile(Long profileId, UpdateProfileRequest request) {
 		SolverTaskProfile profile = profileRepository.findById(profileId).orElseThrow(() -> new BizException(ErrorCodeConstants.PROFILE_NOT_FOUND, "profile not found"));
-		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate());
+		String paramsSchema = resolveParamsSchema(request.getParamsSchema(), request.getParamsSchemaJson());
+		profileTemplateContractValidator.validateProfileContract(request.getUploadMode(), request.getCommandTemplate(), paramsSchema);
 		profile.setTaskType(request.getTaskType());
 		profile.setProfileName(request.getProfileName());
 		profile.setUploadMode(profileTemplateContractValidator.normalizeUploadMode(request.getUploadMode()));
@@ -127,5 +129,12 @@ public class ProfileAppService {
 		}
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private String resolveParamsSchema(String paramsSchema, String paramsSchemaJson) {
+		if (paramsSchema != null && !paramsSchema.isBlank()) {
+			return paramsSchema;
+		}
+		return paramsSchemaJson;
 	}
 }

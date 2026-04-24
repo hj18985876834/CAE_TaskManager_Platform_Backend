@@ -68,7 +68,7 @@ public class UploadSpecBuilder {
 		if (allowSuffix instanceof List<?> suffixRows && !suffixRows.isEmpty()) {
 			archiveRule.setAllowSuffix(suffixRows.stream()
 					.filter(java.util.Objects::nonNull)
-					.map(String::valueOf)
+					.map(this::normalizeSuffix)
 					.toList());
 		} else {
 			archiveRule.setAllowSuffix(java.util.List.of("zip"));
@@ -96,6 +96,17 @@ public class UploadSpecBuilder {
 			return true;
 		}
 		return rule.getFileType() != null && "ZIP".equalsIgnoreCase(rule.getFileType());
+	}
+
+	private String normalizeSuffix(Object suffix) {
+		if (suffix == null) {
+			return "";
+		}
+		String normalized = String.valueOf(suffix).trim().toLowerCase(java.util.Locale.ROOT);
+		while (normalized.startsWith(".")) {
+			normalized = normalized.substring(1);
+		}
+		return normalized;
 	}
 
 	private Map<String, Object> parseRuleJson(String ruleJson) {

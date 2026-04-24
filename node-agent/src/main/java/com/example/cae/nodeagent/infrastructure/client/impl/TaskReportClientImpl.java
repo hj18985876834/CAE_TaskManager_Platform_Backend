@@ -3,6 +3,7 @@ package com.example.cae.nodeagent.infrastructure.client.impl;
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.constant.HeaderConstants;
 import com.example.cae.common.dto.TaskStatusAckDTO;
+import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.response.Result;
 import com.example.cae.nodeagent.config.NodeAgentConfig;
@@ -68,12 +69,12 @@ public class TaskReportClientImpl implements TaskReportClient {
 	}
 
 	@Override
-	public void reportResultFile(Long taskId, File file) {
+	public void reportResultFile(Long taskId, File file, String fileName) {
 		String url = taskBaseUrl() + "/internal/tasks/" + taskId + "/result-file-report";
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("fileType", getFileType(file));
-		body.put("fileName", file == null ? null : file.getName());
+		body.put("fileName", fileName == null ? null : fileName);
 		body.put("storagePath", file == null ? null : pathMappingSupport.toWindowsPath(file.getAbsolutePath()));
 		body.put("fileSize", file == null ? null : file.length());
 		validateVoidResult(postForVoidResult(url, body), "report result file");
@@ -90,7 +91,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		Map<String, Object> body = new HashMap<>();
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("finalStatus", finalStatus);
-		validateStatusAck(postForStatusAck(url, body, "mark finished"), taskId, finalStatus, "mark finished");
+		validateTerminalStatusAck(postForStatusAck(url, body, "mark finished"), taskId, finalStatus, "mark finished");
 	}
 
 	@Override
@@ -103,7 +104,7 @@ public class TaskReportClientImpl implements TaskReportClient {
 		body.put("nodeId", nodeAgentConfig.getNodeId());
 		body.put("failType", failType);
 		body.put("failMessage", failMessage);
-		validateStatusAck(postForStatusAck(url, body, "mark failed"), taskId, "FAILED", "mark failed");
+		validateTerminalStatusAck(postForStatusAck(url, body, "mark failed"), taskId, "FAILED", "mark failed");
 	}
 
 	private String taskBaseUrl() {
@@ -169,6 +170,26 @@ public class TaskReportClientImpl implements TaskReportClient {
 
 	private void validateStatusAck(Result<TaskStatusAckDTO> result, Long taskId, String expectedStatus, String action) {
 		validateVoidResult(result, action);
+		TaskStatusAckDTO ack = extractStatusAck(result, taskId, action);
+		if (expectedStatus != null && !expectedStatus.equalsIgnoreCase(ack.getStatus())) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					action + " response status mismatch: " + ack.getStatus());
+		}
+	}
+
+	private void validateTerminalStatusAck(Result<TaskStatusAckDTO> result, Long taskId, String expectedStatus, String action) {
+		validateVoidResult(result, action);
+		TaskStatusAckDTO ack = extractStatusAck(result, taskId, action);
+		if (expectedStatus != null && expectedStatus.equalsIgnoreCase(ack.getStatus())) {
+			return;
+		}
+		if (!isTerminalStatus(ack.getStatus())) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+					action + " response status mismatch: " + ack.getStatus());
+		}
+	}
+
+	private TaskStatusAckDTO extractStatusAck(Result<TaskStatusAckDTO> result, Long taskId, String action) {
 		TaskStatusAckDTO ack = result.getData();
 		if (ack == null || ack.getTaskId() == null || ack.getStatus() == null || ack.getStatus().isBlank()) {
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response data is invalid");
@@ -176,9 +197,14 @@ public class TaskReportClientImpl implements TaskReportClient {
 		if (!ack.getTaskId().equals(taskId)) {
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, action + " response taskId mismatch");
 		}
-		if (expectedStatus != null && !expectedStatus.equalsIgnoreCase(ack.getStatus())) {
-			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
-					action + " response status mismatch: " + ack.getStatus());
+		return ack;
+	}
+
+	private boolean isTerminalStatus(String status) {
+		try {
+			return TaskStatusEnum.valueOf(status).isFinished();
+		} catch (Exception ex) {
+			return false;
 		}
 	}
 }

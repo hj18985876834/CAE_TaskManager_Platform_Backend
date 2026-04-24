@@ -143,14 +143,15 @@ public class TaskDispatchManager {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch failure: " + task.getStatus());
 		}
 		ensureTaskBoundToNode(task, nodeId);
-		task.setFailType(failType);
-		task.setFailMessage(reason);
-		taskStatusDomainService.transfer(task,
-				Boolean.TRUE.equals(recoverable) ? TaskStatusEnum.QUEUED.name() : TaskStatusEnum.FAILED.name(),
-				reason,
-				OperatorTypeEnum.SYSTEM.name(),
-				null);
+		String normalizedFailType = normalizeDispatchFailType(failType);
+		String targetStatus = Boolean.TRUE.equals(recoverable) ? TaskStatusEnum.QUEUED.name() : TaskStatusEnum.FAILED.name();
+		if (TaskStatusEnum.FAILED.name().equals(targetStatus)) {
+			task.setFailType(normalizedFailType);
+			task.setFailMessage(reason);
+		}
+		taskStatusDomainService.transfer(task, targetStatus, reason, OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
+		releaseReservationStrictly(nodeId, task.getId());
 		return buildTaskStatusAck(task);
 	}
 
@@ -186,6 +187,20 @@ public class TaskDispatchManager {
 		response.setStatus(task == null ? null : task.getStatus());
 		return response;
 	}
+	private String normalizeDispatchFailType(String failType) {
+		String normalized = failType == null || failType.isBlank()
+				? null
+				: failType.trim().toUpperCase();
+		if (normalized == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "failType is required");
+		}
+		try {
+			return FailTypeEnum.valueOf(normalized).name();
+		} catch (IllegalArgumentException ex) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported failType: " + failType);
+		}
+	}
+
 
 	public int markNodeOfflineTasksFailed(Long nodeId, String reason) {
 		if (nodeId == null) {
@@ -288,10 +303,30 @@ public class TaskDispatchManager {
 	}
 
 	private List<TaskFileDTO> loadInputFiles(Long taskId) {
-		return taskFileRepository.listByTaskId(taskId).stream()
+		List<TaskFileDTO> inputFiles = taskFileRepository.listByTaskId(taskId).stream()
 				.filter(file -> file.isInputFile() || file.isArchiveFile())
 				.map(this::toTaskFileDTO)
 				.toList();
+		validateDispatchInputFiles(taskId, inputFiles);
+		return inputFiles;
+	}
+
+	private void validateDispatchInputFiles(Long taskId, List<TaskFileDTO> inputFiles) {
+		if (inputFiles == null || inputFiles.isEmpty()) {
+			throw new BizException(ErrorCodeConstants.CONFLICT, "queued task has no input archive, taskId=" + taskId);
+		}
+		List<TaskFileDTO> archiveFiles = inputFiles.stream()
+				.filter(file -> file != null && (Integer.valueOf(1).equals(file.getArchiveFlag())
+						|| "input_archive".equalsIgnoreCase(file.getFileKey())))
+				.toList();
+		if (archiveFiles.isEmpty()) {
+			throw new BizException(ErrorCodeConstants.CONFLICT, "queued task has no input archive, taskId=" + taskId);
+		}
+		for (TaskFileDTO archiveFile : archiveFiles) {
+			if (archiveFile.getUnpackDir() == null || archiveFile.getUnpackDir().isBlank()) {
+				throw new BizException(ErrorCodeConstants.CONFLICT, "queued task archive is not validated, taskId=" + taskId);
+			}
+		}
 	}
 
 	private TaskFileDTO toTaskFileDTO(TaskFile file) {

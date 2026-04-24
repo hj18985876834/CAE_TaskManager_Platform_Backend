@@ -39,11 +39,14 @@ public class TaskDispatchManager {
 		if (request == null || request.getTaskId() == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
 		}
+		if (taskRuntimeRegistry.isRunning(request.getTaskId())) {
+			return;
+		}
 		if (taskRuntimeRegistry.runningCount() >= maxConcurrency()) {
 			throw new BizException(ErrorCodeConstants.CONFLICT, "node is busy");
 		}
 		if (!taskRuntimeRegistry.register(request.getTaskId())) {
-			throw new BizException(ErrorCodeConstants.CONFLICT, "task already running");
+			return;
 		}
 		ExecutionContext context = executionContextAssembler.fromDispatchRequest(request);
 		try {

@@ -13,6 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.nio.file.Path;
+import java.util.HexFormat;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -26,6 +30,8 @@ public class TaskReportManager {
 	private static final long TERMINAL_REPORT_RETRY_INTERVAL_MS = 200L;
 	private static final int DISPATCH_FAILURE_REPORT_MAX_ATTEMPTS = 10;
 	private static final long DISPATCH_FAILURE_REPORT_RETRY_INTERVAL_MS = 200L;
+	private static final int MAX_RESULT_FILE_NAME_LENGTH = 255;
+	private static final int RESULT_FILE_HASH_LENGTH = 16;
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
 	private final ConcurrentMap<Long, AtomicInteger> logSeqMap = new ConcurrentHashMap<>();
@@ -74,11 +80,65 @@ public class TaskReportManager {
 			taskReportAppService.reportResultSummary(context.getTaskId(), result);
 			if (result.getResultFiles() != null) {
 				for (File file : result.getResultFiles()) {
-					taskReportAppService.reportResultFile(context.getTaskId(), file);
+					taskReportAppService.reportResultFile(context.getTaskId(), file, buildResultFileName(context, file));
 				}
 			}
 			taskReportAppService.markFinished(context.getTaskId());
 		});
+	}
+
+	private String buildResultFileName(ExecutionContext context, File file) {
+		if (file == null) {
+			return null;
+		}
+		String fallbackName = file.getName();
+		if (context == null || context.getOutputDir() == null || context.getOutputDir().isBlank()) {
+			return fallbackName;
+		}
+		try {
+			Path outputDir = Path.of(context.getOutputDir()).toAbsolutePath().normalize();
+			Path filePath = file.toPath().toAbsolutePath().normalize();
+			if (!filePath.startsWith(outputDir)) {
+				return fallbackName;
+			}
+			String relativeName = outputDir.relativize(filePath).toString().replace('\\', '/');
+			return sanitizeResultFileName(relativeName);
+		} catch (Exception ex) {
+			return fallbackName;
+		}
+	}
+
+	private String sanitizeResultFileName(String relativeName) {
+		if (relativeName == null || relativeName.isBlank()) {
+			return relativeName;
+		}
+		String sanitized = relativeName.replace("/", "__").replace("\\", "__");
+		sanitized = replaceControlCharacters(sanitized);
+		if (sanitized.length() <= MAX_RESULT_FILE_NAME_LENGTH) {
+			return sanitized;
+		}
+		String hash = shortHash(relativeName);
+		int prefixLength = MAX_RESULT_FILE_NAME_LENGTH - hash.length() - 2;
+		return sanitized.substring(0, Math.max(1, prefixLength)) + "__" + hash;
+	}
+
+	private String replaceControlCharacters(String value) {
+		StringBuilder builder = new StringBuilder(value.length());
+		for (int i = 0; i < value.length(); i++) {
+			char current = value.charAt(i);
+			builder.append(Character.isISOControl(current) ? '_' : current);
+		}
+		return builder.toString();
+	}
+
+	private String shortHash(String value) {
+		try {
+			MessageDigest digest = MessageDigest.getInstance("SHA-256");
+			byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+			return HexFormat.of().formatHex(bytes).substring(0, RESULT_FILE_HASH_LENGTH);
+		} catch (Exception ex) {
+			return Integer.toHexString(value.hashCode());
+		}
 	}
 
 	public void reportFail(ExecutionContext context, Exception ex) {
@@ -126,10 +186,23 @@ public class TaskReportManager {
 	}
 
 	public void reportPostSuccessCallbackFailure(ExecutionContext context, Exception ex) {
+		Long taskId = context == null ? null : context.getTaskId();
+		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
+				? "post-success callback reporting failed"
+				: ex.getMessage();
 		log.error("task finished successfully but callback reporting did not complete, taskId={}, message={}",
-				context == null ? null : context.getTaskId(),
-				ex == null ? null : ex.getMessage(),
+				taskId,
+				message,
 				ex);
+		try {
+			retryTerminalReport(taskId, "mark callback failed",
+					() -> taskReportAppService.markFailed(taskId, FailTypeEnum.RUNTIME_ERROR.name(), message));
+		} catch (Exception reportEx) {
+			log.error("failed to report post-success callback failure, taskId={}, message={}",
+					taskId,
+					reportEx.getMessage(),
+					reportEx);
+		}
 	}
 
 	public void completeTask(Long taskId) {
