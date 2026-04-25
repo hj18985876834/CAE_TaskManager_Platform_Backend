@@ -30,6 +30,8 @@ public class TaskReportManager {
 	private static final long TERMINAL_REPORT_RETRY_INTERVAL_MS = 200L;
 	private static final int DISPATCH_FAILURE_REPORT_MAX_ATTEMPTS = 10;
 	private static final long DISPATCH_FAILURE_REPORT_RETRY_INTERVAL_MS = 200L;
+	private static final int LOG_REPORT_MAX_ATTEMPTS = 3;
+	private static final long LOG_REPORT_RETRY_INTERVAL_MS = 100L;
 	private static final int MAX_RESULT_FILE_NAME_LENGTH = 255;
 	private static final int RESULT_FILE_HASH_LENGTH = 16;
 	private final TaskReportAppService taskReportAppService;
@@ -68,7 +70,14 @@ public class TaskReportManager {
 		int actualSeqNo = seqNo == null
 				? logSeqMap.computeIfAbsent(taskId, key -> new AtomicInteger(1)).getAndIncrement()
 				: seqNo;
-		taskReportAppService.reportLog(taskId, actualSeqNo, line);
+		try {
+			retryLogReport(taskId, actualSeqNo, line);
+		} catch (Exception ex) {
+			log.warn("drop process log chunk after report failure, taskId={}, seqNo={}, reason={}",
+					taskId,
+					actualSeqNo,
+					ex.getMessage());
+		}
 	}
 
 	public void reportSuccess(ExecutionContext context, ExecutionResult result, long startMillis) {
@@ -265,6 +274,25 @@ public class TaskReportManager {
 		}
 	}
 
+	private void retryLogReport(Long taskId, Integer seqNo, String line) {
+		Exception lastException = null;
+		for (int attempt = 1; attempt <= LOG_REPORT_MAX_ATTEMPTS; attempt++) {
+			try {
+				taskReportAppService.reportLog(taskId, seqNo, line);
+				return;
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryLogReport(ex) || attempt == LOG_REPORT_MAX_ATTEMPTS) {
+					throw propagateRunningReportException(ex);
+				}
+				sleepBeforeRetry(taskId, attempt, ex, LOG_REPORT_RETRY_INTERVAL_MS, "log report");
+			}
+		}
+		if (lastException != null) {
+			throw propagateRunningReportException(lastException);
+		}
+	}
+
 	private RuntimeException propagateRunningReportException(Exception ex) {
 		if (ex instanceof RuntimeException runtimeException) {
 			return runtimeException;
@@ -295,6 +323,17 @@ public class TaskReportManager {
 			return false;
 		}
 		return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY;
+	}
+
+	private boolean shouldRetryLogReport(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (!(ex instanceof BizException bizException) || bizException.getCode() == null) {
+			return false;
+		}
+		return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
+				|| bizException.getCode() == ErrorCodeConstants.CONFLICT;
 	}
 
 	private void sleepBeforeRetry(Long taskId, int attempt, Exception ex, long intervalMs, String action) {

@@ -217,7 +217,7 @@ public class TaskResultManager {
 
 	private Path validateResultFilePath(Long taskId, ResultFileReportRequest request) {
 		String fileName = request.getFileName() == null ? "" : request.getFileName().trim();
-		if (fileName.isBlank() || fileName.contains("/") || fileName.contains("\\")) {
+		if (fileName.isBlank() || fileName.contains("/") || fileName.contains("\\") || containsControlCharacter(fileName)) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result fileName must be a plain file name");
 		}
 		Path resultDir = Path.of(taskPathResolver.resolveResultDir(taskId)).toAbsolutePath().normalize();
@@ -244,6 +244,15 @@ public class TaskResultManager {
 		} catch (Exception ex) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "result file cannot be accessed");
 		}
+	}
+
+	private boolean containsControlCharacter(String value) {
+		for (int i = 0; i < value.length(); i++) {
+			if (Character.isISOControl(value.charAt(i))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private TaskStatusAckDTO buildTaskStatusAck(Task task) {
