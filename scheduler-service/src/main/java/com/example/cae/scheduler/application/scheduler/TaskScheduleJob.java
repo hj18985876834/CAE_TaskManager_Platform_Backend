@@ -19,6 +19,7 @@ import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class TaskScheduleJob {
@@ -236,7 +237,14 @@ public class TaskScheduleJob {
 				return taskClient.markTaskDispatched(taskId, nodeId);
 			} catch (Exception ex) {
 				lastException = ex;
-				if (!shouldRetryTaskStateConfirm(ex) || attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+				if (!shouldRetryTaskStateConfirm(ex)) {
+					throw ex;
+				}
+				if (attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+					TaskDispatchAckDTO recoveredAck = recoverDispatchAckAfterConfirmFailure(taskId, nodeId, ex);
+					if (recoveredAck != null) {
+						return recoveredAck;
+					}
 					throw ex;
 				}
 				sleepBeforeRetry("mark-dispatched", taskId, nodeId, attempt, ex);
@@ -246,6 +254,44 @@ public class TaskScheduleJob {
 			throw runtimeException;
 		}
 		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark dispatched failed");
+	}
+
+	private TaskDispatchAckDTO recoverDispatchAckAfterConfirmFailure(Long taskId, Long nodeId, Exception confirmException) {
+		if (taskId == null || nodeId == null) {
+			return null;
+		}
+		try {
+			Map<Long, TaskBasicDTO> taskBasics = taskClient.getTaskBasics(List.of(taskId));
+			TaskBasicDTO taskBasic = taskBasics.get(taskId);
+			if (taskBasic == null || taskBasic.getStatus() == null || taskBasic.getStatus().isBlank()) {
+				return null;
+			}
+			String status = taskBasic.getStatus().trim().toUpperCase();
+			if (!nodeId.equals(taskBasic.getNodeId())) {
+				return null;
+			}
+			if (!Set.of(
+					TaskStatusEnum.DISPATCHED.name(),
+					TaskStatusEnum.RUNNING.name(),
+					TaskStatusEnum.SUCCESS.name(),
+					TaskStatusEnum.FAILED.name(),
+					TaskStatusEnum.CANCELED.name(),
+					TaskStatusEnum.TIMEOUT.name()).contains(status)) {
+				return null;
+			}
+			TaskDispatchAckDTO recovered = new TaskDispatchAckDTO();
+			recovered.setTaskId(taskId);
+			recovered.setNodeId(nodeId);
+			recovered.setStatus(status);
+			return recovered;
+		} catch (Exception recoverEx) {
+			log.warn("failed to recover mark-dispatched outcome, taskId={}, nodeId={}, confirmReason={}",
+					taskId,
+					nodeId,
+					confirmException == null ? null : confirmException.getMessage(),
+					recoverEx);
+			return null;
+		}
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {
