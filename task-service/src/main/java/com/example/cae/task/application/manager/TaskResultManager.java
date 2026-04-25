@@ -16,6 +16,7 @@ import com.example.cae.task.domain.repository.TaskLogRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
+import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
@@ -35,6 +36,7 @@ import java.util.Set;
 @Service
 public class TaskResultManager {
 	private static final Logger log = LoggerFactory.getLogger(TaskResultManager.class);
+	private static final int MAX_HISTORY_REASON_LENGTH = 255;
 	private static final Set<String> RESULT_REPORT_ALLOWED_STATUSES = Set.of(
 			TaskStatusEnum.RUNNING.name(),
 			TaskStatusEnum.SUCCESS.name(),
@@ -44,6 +46,7 @@ public class TaskResultManager {
 	private final TaskLogRepository taskLogRepository;
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
 	private final TaskResultFileRepository taskResultFileRepository;
+	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final SchedulerClient schedulerClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
@@ -53,6 +56,7 @@ public class TaskResultManager {
 							 TaskLogRepository taskLogRepository,
 							 TaskResultSummaryRepository taskResultSummaryRepository,
 							 TaskResultFileRepository taskResultFileRepository,
+							 TaskStatusHistoryRepository taskStatusHistoryRepository,
 							 TaskStatusDomainService taskStatusDomainService,
 							 SchedulerClient schedulerClient,
 							 TaskStoragePathSupport taskStoragePathSupport,
@@ -61,6 +65,7 @@ public class TaskResultManager {
 		this.taskLogRepository = taskLogRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
+		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.schedulerClient = schedulerClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
@@ -106,6 +111,7 @@ public class TaskResultManager {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = normalizeAllowedFinalStatus(finalStatus);
 		if (shouldIgnoreTerminalReport(task, target)) {
+			recordIgnoredTerminalCallback(task, "mark-finished", target, null);
 			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
@@ -124,6 +130,7 @@ public class TaskResultManager {
 		String normalizedFailType = normalizeAllowedFailType(failType);
 		String targetStatus = TaskStatusEnum.FAILED.name();
 		if (shouldIgnoreTerminalReport(task, targetStatus)) {
+			recordIgnoredTerminalCallback(task, "mark-failed", targetStatus, normalizedFailType);
 			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
@@ -206,6 +213,39 @@ public class TaskResultManager {
 		} catch (Exception ex) {
 			log.warn("callback error terminal state committed but result metadata cleanup failed, taskId={}", taskId, ex);
 		}
+	}
+
+	private void recordIgnoredTerminalCallback(Task task, String action, String requestedStatus, String requestedFailType) {
+		if (task == null || task.getId() == null || task.getStatus() == null || !task.isFinished()) {
+			return;
+		}
+		String requested = requestedStatus == null || requestedStatus.isBlank() ? "UNKNOWN" : requestedStatus.trim().toUpperCase();
+		String effectiveAction = action == null || action.isBlank() ? "terminal-callback" : action.trim();
+		String reason = buildIgnoredTerminalCallbackReason(effectiveAction, requested, requestedFailType, task.getStatus());
+		com.example.cae.task.domain.model.TaskStatusHistory history = new com.example.cae.task.domain.model.TaskStatusHistory();
+		history.setTaskId(task.getId());
+		history.setFromStatus(task.getStatus());
+		history.setToStatus(task.getStatus());
+		history.setChangeReason(reason);
+		history.setOperatorType(OperatorTypeEnum.NODE.name());
+		history.setOperatorId(null);
+		taskStatusHistoryRepository.save(history);
+	}
+
+	private String buildIgnoredTerminalCallbackReason(String action, String requestedStatus, String requestedFailType, String currentStatus) {
+		StringBuilder builder = new StringBuilder("ignored late ");
+		builder.append(action);
+		builder.append(", requested=");
+		builder.append(requestedStatus);
+		if (requestedFailType != null && !requestedFailType.isBlank()) {
+			builder.append('(').append(requestedFailType.trim().toUpperCase()).append(')');
+		}
+		builder.append(", current=");
+		builder.append(currentStatus == null ? "UNKNOWN" : currentStatus);
+		String reason = builder.toString();
+		return reason.length() <= MAX_HISTORY_REASON_LENGTH
+				? reason
+				: reason.substring(0, MAX_HISTORY_REASON_LENGTH);
 	}
 
 	private void ensureLogReportAllowed(Long taskId) {
