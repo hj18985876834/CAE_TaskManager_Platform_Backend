@@ -38,6 +38,10 @@ import java.util.stream.Collectors;
 public class ScheduleAppService {
 	private static final Set<String> DISPATCH_FAILURE_RELEASE_TARGETS = Set.of("QUEUED", "FAILED");
 	private static final int SCHEDULE_MESSAGE_MAX_LENGTH = 255;
+	private static final String NO_ONLINE_NODE_MESSAGE = "no online node";
+	private static final String NO_ENABLED_CAPABILITY_MESSAGE = "no enabled node solver capability";
+	private static final String NO_DISPATCHABLE_NODE_MESSAGE = "no dispatchable node with capacity";
+	private static final String CAPACITY_CONFLICT_MESSAGE = "candidate nodes are full or reservation conflicted";
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
@@ -82,8 +86,7 @@ public class ScheduleAppService {
 
 		List<ComputeNode> orderedCandidates = scheduleStrategy.orderNodes(task, availableNodes);
 		if (orderedCandidates.isEmpty()) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE,
-					buildNoAvailableNodeMessage(task, onlineNodes, solverCapabilities, availableNodes));
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, CAPACITY_CONFLICT_MESSAGE);
 		}
 
 		BizException lastCapacityFailure = null;
@@ -103,9 +106,9 @@ public class ScheduleAppService {
 		}
 
 		if (lastCapacityFailure != null) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "candidate nodes are full or reservation conflicted");
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, CAPACITY_CONFLICT_MESSAGE);
 		}
-		throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "schedule strategy returned no reservable candidate");
+		throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, CAPACITY_CONFLICT_MESSAGE);
 	}
 
 	private String buildNoAvailableNodeMessage(TaskDTO task,
@@ -113,19 +116,19 @@ public class ScheduleAppService {
 											 List<NodeSolverCapability> solverCapabilities,
 											 List<ComputeNode> availableNodes) {
 		if (onlineNodes == null || onlineNodes.isEmpty()) {
-			return "no online node";
+			return NO_ONLINE_NODE_MESSAGE;
 		}
 		boolean hasEnabledCapability = solverCapabilities != null && solverCapabilities.stream()
 				.anyMatch(capability -> capability != null
 						&& capability.isEnabled()
 						&& Objects.equals(capability.getSolverId(), task.getSolverId()));
 		if (!hasEnabledCapability) {
-			return "no enabled node solver capability for solverId=" + task.getSolverId();
+			return NO_ENABLED_CAPABILITY_MESSAGE;
 		}
 		if (availableNodes == null || availableNodes.isEmpty()) {
-			return "no dispatchable node with capacity for solverId=" + task.getSolverId();
+			return NO_DISPATCHABLE_NODE_MESSAGE;
 		}
-		return "schedule strategy returned no candidate for taskId=" + task.getTaskId();
+		return CAPACITY_CONFLICT_MESSAGE;
 	}
 
 	private void validateSolverAndProfile(TaskDTO task) {

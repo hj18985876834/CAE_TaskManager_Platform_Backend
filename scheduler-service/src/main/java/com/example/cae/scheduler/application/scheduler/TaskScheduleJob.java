@@ -126,12 +126,13 @@ public class TaskScheduleJob {
 	}
 
 	private void handleDispatchFailureQuietly(Long taskId, Long nodeId, Exception ex) {
+		String failureReason = buildDispatchFailureReason(ex);
 		try {
 			taskScheduleManager.handleDispatchFailure(
 					taskId,
 					nodeId,
 					FailTypeEnum.DISPATCH_ERROR.name(),
-					ex == null || ex.getMessage() == null || ex.getMessage().isBlank() ? "task dispatch failed" : ex.getMessage(),
+					failureReason,
 					isRecoverableDispatchError(ex)
 			);
 		} catch (Exception callbackEx) {
@@ -166,6 +167,25 @@ public class TaskScheduleJob {
 			return "task dispatched, already running";
 		}
 		return "task dispatched";
+	}
+
+	private String buildDispatchFailureReason(Exception ex) {
+		if (ex instanceof BizException bizException && bizException.getCode() != null) {
+			if (bizException.getCode() == ErrorCodeConstants.NODE_AGENT_REJECTED) {
+				return "node-agent rejected dispatch request";
+			}
+			if (bizException.getCode() == ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE
+					|| bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY) {
+				return "node-agent dispatch request failed";
+			}
+		}
+		if (ex instanceof RestClientException) {
+			return "node-agent dispatch request failed";
+		}
+		if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
+			return "task dispatch failed";
+		}
+		return ex.getMessage();
 	}
 
 	private boolean isRecoverableDispatchError(Exception ex) {
