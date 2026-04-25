@@ -240,6 +240,7 @@ public class TaskDispatchManager {
 			lockedTask.setFailMessage(effectiveReason);
 			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 			taskRepository.update(lockedTask);
+			releaseReservationQuietly(nodeId, lockedTask.getId());
 			return Boolean.TRUE;
 		}
 		if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {

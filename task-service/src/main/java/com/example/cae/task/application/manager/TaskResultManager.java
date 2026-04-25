@@ -17,10 +17,13 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import com.example.cae.task.interfaces.request.ResultFileReportRequest;
 import com.example.cae.task.interfaces.request.ResultSummaryReportRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +34,7 @@ import java.util.Set;
 
 @Service
 public class TaskResultManager {
+	private static final Logger log = LoggerFactory.getLogger(TaskResultManager.class);
 	private static final Set<String> RESULT_REPORT_ALLOWED_STATUSES = Set.of(
 			TaskStatusEnum.RUNNING.name(),
 			TaskStatusEnum.SUCCESS.name(),
@@ -41,6 +45,7 @@ public class TaskResultManager {
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
 	private final TaskResultFileRepository taskResultFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
+	private final SchedulerClient schedulerClient;
 	private final TaskStoragePathSupport taskStoragePathSupport;
 	private final TaskPathResolver taskPathResolver;
 
@@ -49,6 +54,7 @@ public class TaskResultManager {
 							 TaskResultSummaryRepository taskResultSummaryRepository,
 							 TaskResultFileRepository taskResultFileRepository,
 							 TaskStatusDomainService taskStatusDomainService,
+							 SchedulerClient schedulerClient,
 							 TaskStoragePathSupport taskStoragePathSupport,
 							 TaskPathResolver taskPathResolver) {
 		this.taskRepository = taskRepository;
@@ -56,6 +62,7 @@ public class TaskResultManager {
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
+		this.schedulerClient = schedulerClient;
 		this.taskStoragePathSupport = taskStoragePathSupport;
 		this.taskPathResolver = taskPathResolver;
 	}
@@ -97,6 +104,7 @@ public class TaskResultManager {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = normalizeAllowedFinalStatus(finalStatus);
 		if (shouldIgnoreTerminalReport(task, target)) {
+			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
 		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
@@ -104,6 +112,7 @@ public class TaskResultManager {
 		}
 		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+		releaseReservationQuietly(task);
 		return buildTaskStatusAck(task);
 	}
 
@@ -113,6 +122,7 @@ public class TaskResultManager {
 		String normalizedFailType = normalizeAllowedFailType(failType);
 		String targetStatus = TaskStatusEnum.FAILED.name();
 		if (shouldIgnoreTerminalReport(task, targetStatus)) {
+			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
 		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
@@ -122,6 +132,7 @@ public class TaskResultManager {
 		task.setFailMessage(failMessage);
 		taskStatusDomainService.transfer(task, targetStatus, failMessage, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+		releaseReservationQuietly(task);
 		return buildTaskStatusAck(task);
 	}
 
@@ -213,6 +224,41 @@ public class TaskResultManager {
 	private Task loadTask(Long taskId) {
 		return taskRepository.findById(taskId)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
+	}
+
+	private void releaseReservationQuietly(Task task) {
+		if (task == null || task.getNodeId() == null || task.getId() == null) {
+			return;
+		}
+		try {
+			schedulerClient.releaseNodeReservation(task.getNodeId(), task.getId());
+		} catch (Exception ex) {
+			log.warn("terminal state updated but residual reservation release failed, nodeId={}, taskId={}",
+					task.getNodeId(), task.getId(), ex);
+			recordReservationReleaseFailure(task, ex);
+		}
+	}
+
+	private void recordReservationReleaseFailure(Task task, Exception ex) {
+		try {
+			schedulerClient.recordScheduleFailure(
+					task.getId(),
+					task.getNodeId(),
+					buildReservationReleaseFailureMessage(ex)
+			);
+		} catch (Exception recordEx) {
+			log.warn("failed to record terminal reservation cleanup failure, nodeId={}, taskId={}",
+					task == null ? null : task.getNodeId(),
+					task == null ? null : task.getId(),
+					recordEx);
+		}
+	}
+
+	private String buildReservationReleaseFailureMessage(Exception ex) {
+		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
+				? "reservation release failed after terminal state transition"
+				: ex.getMessage();
+		return "reservation release failed after terminal state transition: " + message;
 	}
 
 	private Path validateResultFilePath(Long taskId, ResultFileReportRequest request) {
