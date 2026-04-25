@@ -10,6 +10,7 @@ import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.application.assembler.ScheduleAssembler;
 import com.example.cae.scheduler.domain.enums.ScheduleStatusEnum;
 import com.example.cae.scheduler.domain.model.ComputeNode;
+import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.model.ScheduleRecord;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
@@ -29,12 +30,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class ScheduleAppService {
 	private static final Set<String> DISPATCH_FAILURE_RELEASE_TARGETS = Set.of("QUEUED", "FAILED");
+	private static final int SCHEDULE_MESSAGE_MAX_LENGTH = 255;
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
@@ -70,15 +73,17 @@ public class ScheduleAppService {
 		validateSolverAndProfile(task);
 
 		List<ComputeNode> onlineNodes = computeNodeRepository.listByStatus("ONLINE");
+		List<NodeSolverCapability> solverCapabilities = nodeSolverCapabilityRepository.listBySolverId(task.getSolverId());
 		List<ComputeNode> availableNodes = scheduleDomainService.filterAvailableNodes(
 				onlineNodes,
 				task.getSolverId(),
-				nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())
+				solverCapabilities
 		);
 
 		List<ComputeNode> orderedCandidates = scheduleStrategy.orderNodes(task, availableNodes);
 		if (orderedCandidates.isEmpty()) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE,
+					buildNoAvailableNodeMessage(task, onlineNodes, solverCapabilities, availableNodes));
 		}
 
 		BizException lastCapacityFailure = null;
@@ -98,9 +103,29 @@ public class ScheduleAppService {
 		}
 
 		if (lastCapacityFailure != null) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "candidate nodes are full or reservation conflicted");
 		}
-		throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node");
+		throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "schedule strategy returned no reservable candidate");
+	}
+
+	private String buildNoAvailableNodeMessage(TaskDTO task,
+											 List<ComputeNode> onlineNodes,
+											 List<NodeSolverCapability> solverCapabilities,
+											 List<ComputeNode> availableNodes) {
+		if (onlineNodes == null || onlineNodes.isEmpty()) {
+			return "no online node";
+		}
+		boolean hasEnabledCapability = solverCapabilities != null && solverCapabilities.stream()
+				.anyMatch(capability -> capability != null
+						&& capability.isEnabled()
+						&& Objects.equals(capability.getSolverId(), task.getSolverId()));
+		if (!hasEnabledCapability) {
+			return "no enabled node solver capability for solverId=" + task.getSolverId();
+		}
+		if (availableNodes == null || availableNodes.isEmpty()) {
+			return "no dispatchable node with capacity for solverId=" + task.getSolverId();
+		}
+		return "schedule strategy returned no candidate for taskId=" + task.getTaskId();
 	}
 
 	private void validateSolverAndProfile(TaskDTO task) {
@@ -140,7 +165,7 @@ public class ScheduleAppService {
 				nodeId,
 				"FCFS_MIN_LOAD",
 				"SUCCESS",
-				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch success" : scheduleMessage
+				normalizeScheduleMessage(scheduleMessage, "dispatch success")
 		);
 		scheduleRecordRepository.save(success);
 	}
@@ -151,7 +176,7 @@ public class ScheduleAppService {
 				nodeId,
 				"FCFS_MIN_LOAD",
 				"FAILED",
-				scheduleMessage == null || scheduleMessage.isBlank() ? "dispatch failed" : scheduleMessage
+				normalizeScheduleMessage(scheduleMessage, "dispatch failed")
 		);
 		scheduleRecordRepository.save(failure);
 	}
@@ -204,9 +229,19 @@ public class ScheduleAppService {
 				request.getNodeId(),
 				strategyName,
 				normalizeScheduleStatus(request.getScheduleStatus()),
-				request.getScheduleMessage()
+				normalizeScheduleMessage(request.getScheduleMessage(), null)
 		);
 		scheduleRecordRepository.save(record);
+	}
+
+	private String normalizeScheduleMessage(String scheduleMessage, String defaultMessage) {
+		String message = scheduleMessage == null || scheduleMessage.isBlank() ? defaultMessage : scheduleMessage.trim();
+		if (message == null) {
+			return null;
+		}
+		return message.length() <= SCHEDULE_MESSAGE_MAX_LENGTH
+				? message
+				: message.substring(0, SCHEDULE_MESSAGE_MAX_LENGTH);
 	}
 
 	public List<ScheduleRecordResponse> listByTaskId(Long taskId) {

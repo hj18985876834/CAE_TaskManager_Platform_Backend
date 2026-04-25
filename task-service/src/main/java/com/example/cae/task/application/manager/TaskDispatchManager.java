@@ -154,7 +154,6 @@ public class TaskDispatchManager {
 		}
 		taskStatusDomainService.transfer(task, targetStatus, reason, OperatorTypeEnum.SYSTEM.name(), null);
 		taskRepository.update(task);
-		releaseReservationStrictly(nodeId, task.getId());
 		return buildTaskStatusAck(task);
 	}
 
@@ -360,18 +359,6 @@ public class TaskDispatchManager {
 					"queued task paramsJson is invalid: " + ex.getMessage());
 		}
 		throw new BizException(ErrorCodeConstants.CONFLICT, "queued task paramsJson is invalid");
-	}
-
-	private void releaseReservationStrictly(Long nodeId, Long taskId) {
-		if (nodeId == null || taskId == null) {
-			return;
-		}
-		try {
-			schedulerClient.releaseNodeReservation(nodeId, taskId);
-		} catch (Exception ex) {
-			recordReservationReleaseFailure(nodeId, taskId, ex);
-			throw ex;
-		}
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {
