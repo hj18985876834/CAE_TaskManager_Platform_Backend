@@ -213,6 +213,7 @@ public class ScheduleAppService {
 				.map(ScheduleAssembler::toResponse)
 				.toList();
 		enrichScheduleRecordResponses(records);
+		validateScheduleRecordResponses(records);
 		return PageResult.of(page.getTotal(), pageNum, pageSize, records);
 	}
 
@@ -252,6 +253,7 @@ public class ScheduleAppService {
 				.map(ScheduleAssembler::toResponse)
 				.toList();
 		enrichScheduleRecordResponses(records);
+		validateScheduleRecordResponses(records);
 		return records;
 	}
 
@@ -290,7 +292,40 @@ public class ScheduleAppService {
 		if (taskIds.isEmpty()) {
 			return Map.of();
 		}
-		return taskClient.getTaskBasics(taskIds);
+		Map<Long, TaskBasicDTO> taskBasics = taskClient.getTaskBasics(taskIds);
+		for (Long taskId : taskIds) {
+			TaskBasicDTO taskBasic = taskBasics.get(taskId);
+			if (taskBasic == null || taskBasic.getTaskNo() == null || taskBasic.getTaskNo().isBlank()) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
+						"schedule record task basic is missing or invalid: " + taskId);
+			}
+		}
+		return taskBasics;
+	}
+
+	private void validateScheduleRecordResponses(List<ScheduleRecordResponse> records) {
+		if (records == null || records.isEmpty()) {
+			return;
+		}
+		for (ScheduleRecordResponse response : records) {
+			if (response == null
+					|| response.getScheduleId() == null
+					|| response.getTaskId() == null
+					|| response.getTaskNo() == null
+					|| response.getTaskNo().isBlank()
+					|| response.getStrategyName() == null
+					|| response.getStrategyName().isBlank()
+					|| response.getScheduleStatus() == null
+					|| response.getScheduleStatus().isBlank()
+					|| response.getScheduleMessage() == null
+					|| response.getCreatedAt() == null) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "schedule record response is incomplete");
+			}
+			if (response.getNodeId() != null
+					&& (response.getNodeName() == null || response.getNodeName().isBlank())) {
+				throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "schedule record nodeName is invalid");
+			}
+		}
 	}
 
 	private String normalizeScheduleStatus(String scheduleStatus) {
