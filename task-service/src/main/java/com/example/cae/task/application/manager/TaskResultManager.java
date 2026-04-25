@@ -132,6 +132,7 @@ public class TaskResultManager {
 		task.setFailMessage(failMessage);
 		taskStatusDomainService.transfer(task, targetStatus, failMessage, OperatorTypeEnum.NODE.name(), null);
 		taskRepository.update(task);
+		cleanupResultArtifactsIfNeeded(taskId, normalizedFailType);
 		releaseReservationQuietly(task);
 		return buildTaskStatusAck(task);
 	}
@@ -188,6 +189,17 @@ public class TaskResultManager {
 		} catch (IllegalArgumentException ex) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported failType: " + failType);
 		}
+	}
+
+	private void cleanupResultArtifactsIfNeeded(Long taskId, String failType) {
+		if (taskId == null || failType == null) {
+			return;
+		}
+		if (!FailTypeEnum.CALLBACK_ERROR.name().equalsIgnoreCase(failType)) {
+			return;
+		}
+		taskResultSummaryRepository.deleteByTaskId(taskId);
+		taskResultFileRepository.deleteByTaskId(taskId);
 	}
 
 	private void ensureLogReportAllowed(Long taskId) {

@@ -6,6 +6,7 @@ public enum FailTypeEnum {
     NODE_OFFLINE,
     EXECUTOR_START_ERROR,
     RUNTIME_ERROR,
+    CALLBACK_ERROR,
     TIMEOUT,
     MANUAL_CANCEL
 }

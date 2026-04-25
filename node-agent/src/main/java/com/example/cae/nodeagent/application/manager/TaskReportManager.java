@@ -227,7 +227,7 @@ public class TaskReportManager {
 				ex);
 		try {
 			retryTerminalReport(taskId, "mark callback failed",
-					() -> taskReportAppService.markFailed(taskId, FailTypeEnum.RUNTIME_ERROR.name(), message));
+					() -> taskReportAppService.markFailed(taskId, FailTypeEnum.CALLBACK_ERROR.name(), message));
 		} catch (Exception reportEx) {
 			log.error("failed to report post-success callback failure, taskId={}, message={}",
 					taskId,

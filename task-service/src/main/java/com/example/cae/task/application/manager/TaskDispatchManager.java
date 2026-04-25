@@ -243,12 +243,14 @@ public class TaskDispatchManager {
 			lockedTask.setFailMessage(effectiveReason);
 			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 			taskRepository.update(lockedTask);
+			recordOfflineCompensationScheduleQuietly(nodeId, lockedTask.getId(), effectiveReason);
 			releaseReservationQuietly(nodeId, lockedTask.getId());
 			return Boolean.TRUE;
 		}
 		if (Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(lockedTask.getStatus())) {
 			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 			taskRepository.update(lockedTask);
+			recordOfflineCompensationScheduleQuietly(nodeId, lockedTask.getId(), effectiveReason);
 			releaseReservationQuietly(nodeId, lockedTask.getId());
 			return Boolean.TRUE;
 		}
@@ -390,5 +392,17 @@ public class TaskDispatchManager {
 				? "reservation release failed after task state transition"
 				: ex.getMessage();
 		return "reservation release failed after task state transition: " + message;
+	}
+
+	private void recordOfflineCompensationScheduleQuietly(Long nodeId, Long taskId, String reason) {
+		if (nodeId == null || taskId == null) {
+			return;
+		}
+		try {
+			schedulerClient.recordScheduleFailure(taskId, nodeId, reason);
+		} catch (Exception ex) {
+			log.warn("failed to record offline compensation schedule audit, nodeId={}, taskId={}",
+					nodeId, taskId, ex);
+		}
 	}
 }
