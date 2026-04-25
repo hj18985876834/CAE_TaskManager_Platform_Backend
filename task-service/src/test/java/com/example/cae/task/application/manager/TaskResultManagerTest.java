@@ -8,7 +8,10 @@ import com.example.cae.task.domain.repository.TaskLogRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
+import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.infrastructure.client.SchedulerClient;
+import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,9 +38,15 @@ class TaskResultManagerTest {
 	@Mock
 	private TaskResultFileRepository taskResultFileRepository;
 	@Mock
+	private TaskStatusHistoryRepository taskStatusHistoryRepository;
+	@Mock
 	private TaskStatusDomainService taskStatusDomainService;
 	@Mock
+	private SchedulerClient schedulerClient;
+	@Mock
 	private TaskStoragePathSupport taskStoragePathSupport;
+	@Mock
+	private TaskPathResolver taskPathResolver;
 
 	private TaskResultManager taskResultManager;
 
@@ -48,8 +57,12 @@ class TaskResultManagerTest {
 				taskLogRepository,
 				taskResultSummaryRepository,
 				taskResultFileRepository,
+				taskStatusHistoryRepository,
 				taskStatusDomainService,
+				schedulerClient,
 				taskStoragePathSupport
+				,
+				taskPathResolver
 		);
 	}
 

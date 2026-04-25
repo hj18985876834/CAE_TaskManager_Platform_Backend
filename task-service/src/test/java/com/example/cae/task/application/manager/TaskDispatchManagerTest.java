@@ -1,9 +1,13 @@
 package com.example.cae.task.application.manager;
 
 import com.example.cae.common.enums.TaskStatusEnum;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
+import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
+import com.example.cae.task.domain.repository.TaskResultFileRepository;
+import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.rule.TaskStatusRule;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
@@ -16,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -25,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,11 +45,17 @@ class TaskDispatchManagerTest {
 	@Mock
 	private TaskStatusHistoryRepository taskStatusHistoryRepository;
 	@Mock
+	private TaskResultSummaryRepository taskResultSummaryRepository;
+	@Mock
+	private TaskResultFileRepository taskResultFileRepository;
+	@Mock
 	private SchedulerClient schedulerClient;
 	@Mock
 	private SolverClient solverClient;
 	@Mock
 	private TaskStoragePathSupport taskStoragePathSupport;
+	@Mock
+	private PlatformTransactionManager transactionManager;
 
 	private TaskDispatchManager taskDispatchManager;
 
@@ -56,10 +68,14 @@ class TaskDispatchManagerTest {
 		taskDispatchManager = new TaskDispatchManager(
 				taskRepository,
 				taskFileRepository,
+				taskResultSummaryRepository,
+				taskResultFileRepository,
+				taskStatusHistoryRepository,
 				taskStatusDomainService,
 				schedulerClient,
 				solverClient,
-				taskStoragePathSupport
+				taskStoragePathSupport,
+				transactionManager
 		);
 	}
 
@@ -68,9 +84,11 @@ class TaskDispatchManagerTest {
 		Task task = buildTask(TaskStatusEnum.QUEUED.name());
 		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
 
-		boolean marked = taskDispatchManager.markScheduled(1001L, 21L);
+		TaskScheduleClaimDTO claim = taskDispatchManager.markScheduled(1001L, 21L);
 
-		assertTrue(marked);
+		assertTrue(Boolean.TRUE.equals(claim.getClaimed()));
+		assertEquals(TaskStatusEnum.SCHEDULED.name(), claim.getStatus());
+		assertEquals(21L, claim.getNodeId());
 		ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
 		verify(taskRepository).update(captor.capture());
 		assertEquals(TaskStatusEnum.SCHEDULED.name(), captor.getValue().getStatus());
@@ -83,9 +101,11 @@ class TaskDispatchManagerTest {
 		Task task = buildTask(TaskStatusEnum.RUNNING.name());
 		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
 
-		boolean marked = taskDispatchManager.markScheduled(1001L, 21L);
+		TaskScheduleClaimDTO claim = taskDispatchManager.markScheduled(1001L, 21L);
 
-		assertFalse(marked);
+		assertFalse(Boolean.TRUE.equals(claim.getClaimed()));
+		assertEquals(TaskStatusEnum.RUNNING.name(), claim.getStatus());
+		assertEquals(21L, claim.getNodeId());
 		verify(taskRepository, never()).update(org.mockito.ArgumentMatchers.any());
 		verifyNoInteractions(taskStatusHistoryRepository);
 	}
@@ -96,8 +116,10 @@ class TaskDispatchManagerTest {
 		task.setNodeId(21L);
 		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
 
-		taskDispatchManager.markDispatched(1001L, 21L);
+		TaskDispatchAckDTO ack = taskDispatchManager.markDispatched(1001L, 21L);
 
+		assertEquals(TaskStatusEnum.DISPATCHED.name(), ack.getStatus());
+		assertEquals(21L, ack.getNodeId());
 		ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
 		verify(taskRepository).update(captor.capture());
 		assertEquals(TaskStatusEnum.DISPATCHED.name(), captor.getValue().getStatus());
@@ -115,7 +137,7 @@ class TaskDispatchManagerTest {
 		task.setFailMessage("old message");
 		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
 
-		taskDispatchManager.markFailed(1001L, "DISPATCH_ERROR", "temporary dispatch failure", true);
+		taskDispatchManager.markFailed(1001L, 21L, "DISPATCH_ERROR", "temporary dispatch failure", true);
 
 		ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
 		verify(taskRepository).update(captor.capture());
@@ -127,7 +149,7 @@ class TaskDispatchManagerTest {
 		assertNull(updated.getFailType());
 		assertNull(updated.getFailMessage());
 		assertNotNull(updated.getSubmitTime());
-		verify(schedulerClient).releaseNodeReservation(21L);
+		verifyNoInteractions(schedulerClient);
 	}
 
 	@Test
@@ -136,7 +158,7 @@ class TaskDispatchManagerTest {
 		task.setNodeId(21L);
 		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
 
-		taskDispatchManager.markFailed(1001L, "DISPATCH_ERROR", "bad dispatch payload", false);
+		taskDispatchManager.markFailed(1001L, 21L, "DISPATCH_ERROR", "bad dispatch payload", false);
 
 		ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
 		verify(taskRepository).update(captor.capture());
@@ -146,7 +168,21 @@ class TaskDispatchManagerTest {
 		assertEquals("DISPATCH_ERROR", updated.getFailType());
 		assertEquals("bad dispatch payload", updated.getFailMessage());
 		assertNotNull(updated.getEndTime());
-		verify(schedulerClient).releaseNodeReservation(21L);
+		verifyNoInteractions(schedulerClient);
+	}
+
+	@Test
+	void dispatchFailedShouldRejectWhenTaskAlreadyRunning() {
+		Task task = buildTask(TaskStatusEnum.RUNNING.name());
+		task.setNodeId(21L);
+		when(taskRepository.findByIdForUpdate(1001L)).thenReturn(Optional.of(task));
+
+		assertThrows(
+				com.example.cae.common.exception.BizException.class,
+				() -> taskDispatchManager.markFailed(1001L, 21L, "DISPATCH_ERROR", "late failure", true)
+		);
+
+		verify(taskStatusHistoryRepository).save(org.mockito.ArgumentMatchers.any());
 	}
 
 	private Task buildTask(String status) {

@@ -128,7 +128,7 @@ class ScheduleAppServiceTest {
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
 		when(scheduleDomainService.filterAvailableNodes(anyList(), eq(task.getSolverId()), anyList())).thenReturn(List.of(selected));
-		when(scheduleStrategy.selectNode(eq(task), anyList())).thenReturn(selected);
+		when(scheduleStrategy.orderNodes(eq(task), anyList())).thenReturn(List.of(selected));
 		when(nodeCapacityManager.reserve(eq(selected.getId()), eq(task.getTaskId()))).thenReturn(reservation);
 
 		Long nodeId = scheduleAppService.scheduleTask(task);
@@ -146,7 +146,7 @@ class ScheduleAppServiceTest {
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
 		when(scheduleDomainService.filterAvailableNodes(anyList(), eq(task.getSolverId()), anyList())).thenReturn(List.of(selected));
-		when(scheduleStrategy.selectNode(eq(task), anyList())).thenReturn(selected);
+		when(scheduleStrategy.orderNodes(eq(task), anyList())).thenReturn(List.of(selected));
 		when(nodeCapacityManager.reserve(eq(selected.getId()), eq(task.getTaskId())))
 				.thenThrow(new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node"));
 

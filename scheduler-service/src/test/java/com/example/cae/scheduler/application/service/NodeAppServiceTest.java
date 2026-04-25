@@ -132,8 +132,12 @@ class NodeAppServiceTest {
 		ComputeNode node = buildNode();
 		NodeSolverCapability existingCapability = buildCapability();
 		existingCapability.setEnabled(0);
+		SolverClient.SolverMeta solverMeta = new SolverClient.SolverMeta();
+		solverMeta.setSolverId(200L);
+		solverMeta.setSolverName("CalculiX");
 		when(computeNodeRepository.findByNodeCode("node-01")).thenReturn(Optional.of(node));
 		when(nodeSolverCapabilityRepository.listByNodeId(1L)).thenReturn(List.of(existingCapability));
+		when(solverClient.getSolverMeta(200L)).thenReturn(solverMeta);
 
 		NodeAgentRegisterRequest request = new NodeAgentRegisterRequest();
 		request.setNodeCode("node-01");
