@@ -63,7 +63,7 @@ public class NodeAgentClientStub implements NodeAgentClient {
 				new ParameterizedTypeReference<Result<NodeAgentActionAck>>() {
 				}
 		).getBody();
-		validateResult(result, "dispatch task");
+		validateDispatchResult(result);
 		NodeAgentActionAck ack = result == null ? null : result.getData();
 		if (ack == null || ack.getAccepted() == null) {
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent dispatch response is empty");
@@ -72,6 +72,23 @@ public class NodeAgentClientStub implements NodeAgentClient {
 			String message = ack.getMessage();
 			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message == null ? "node-agent rejected task" : message);
 		}
+	}
+
+	private void validateDispatchResult(Result<?> result) {
+		if (result == null) {
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent dispatch response is empty");
+		}
+		Integer code = result.getCode();
+		if (code == null || code == 0) {
+			return;
+		}
+		String message = result.getMessage() == null || result.getMessage().isBlank()
+				? "node-agent dispatch failed"
+				: result.getMessage();
+		if (code == ErrorCodeConstants.CONFLICT) {
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, message);
+		}
+		throw new BizException(code, message);
 	}
 
 	@Override
