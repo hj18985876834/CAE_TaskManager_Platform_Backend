@@ -51,6 +51,11 @@ public class CommandTemplateExecutor extends AbstractSolverExecutor {
 	}
 
 	@Override
+	public void preflight(ExecutionContext context) {
+		commandBuilder.buildCommand(context);
+	}
+
+	@Override
 	protected ExecutionResult doExecute(ExecutionContext context) {
 		long start = System.currentTimeMillis();
 		List<String> command = commandBuilder.buildCommand(context);

@@ -43,10 +43,11 @@ public class TaskExecuteManager {
 			}
 			prepareWorkDir(context);
 			prepareInputFiles(context);
+			SolverExecutor executor = selectExecutor(context);
+			executor.preflight(context);
 			taskReportManager.reportRunning(context);
 			taskRuntimeRegistry.markRunningReported(context.getTaskId());
 			runningReported = true;
-			SolverExecutor executor = selectExecutor(context);
 			ExecutionResult result = executor.execute(context);
 			solverSucceeded = Boolean.TRUE.equals(result.getSuccess());
 			if (solverSucceeded) {
