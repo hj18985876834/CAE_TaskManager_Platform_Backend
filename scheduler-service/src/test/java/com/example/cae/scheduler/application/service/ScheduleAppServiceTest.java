@@ -10,8 +10,10 @@ import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepositor
 import com.example.cae.scheduler.domain.repository.ScheduleRecordRepository;
 import com.example.cae.scheduler.domain.service.ScheduleDomainService;
 import com.example.cae.scheduler.domain.strategy.ScheduleStrategy;
-import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
+import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
+import com.example.cae.scheduler.infrastructure.client.TaskClient;
+import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,9 +44,11 @@ class ScheduleAppServiceTest {
 	@Mock
 	private ScheduleStrategy scheduleStrategy;
 	@Mock
-	private NodeAgentClient nodeAgentClient;
+	private TaskClient taskClient;
 	@Mock
 	private SolverClient solverClient;
+	@Mock
+	private NodeCapacityManager nodeCapacityManager;
 
 	private ScheduleAppService scheduleAppService;
 
@@ -56,8 +60,9 @@ class ScheduleAppServiceTest {
 				scheduleRecordRepository,
 				scheduleDomainService,
 				scheduleStrategy,
-				nodeAgentClient,
-				solverClient
+				solverClient,
+				taskClient,
+				nodeCapacityManager
 		);
 	}
 
@@ -110,36 +115,38 @@ class ScheduleAppServiceTest {
 	@Test
 	void scheduleTaskShouldReserveSelectedNodeSlot() {
 		TaskDTO task = buildTask();
-		ComputeNode selected = buildNode(4, 1);
-		ComputeNode locked = buildNode(4, 1);
+		ComputeNode selected = buildNode(31L, 4, 1);
 		NodeSolverCapability capability = buildCapability(task.getSolverId(), selected.getId());
+		NodeReservationActionResponse reservation = new NodeReservationActionResponse();
+		reservation.setNodeId(selected.getId());
+		reservation.setTaskId(task.getTaskId());
+		reservation.setReservationStatus("RESERVED");
+		reservation.setReservedCount(1);
 		stubEnabledSolverAndProfile(task);
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
 		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
 		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
-		when(computeNodeRepository.findByIdForUpdate(selected.getId())).thenReturn(Optional.of(locked));
+		when(nodeCapacityManager.reserve(selected.getId(), task.getTaskId())).thenReturn(reservation);
 
 		Long nodeId = scheduleAppService.scheduleTask(task);
 
 		assertEquals(selected.getId(), nodeId);
-		ArgumentCaptor<ComputeNode> captor = ArgumentCaptor.forClass(ComputeNode.class);
-		verify(computeNodeRepository).update(captor.capture());
-		assertEquals(1, captor.getValue().getReservedCount());
+		verify(nodeCapacityManager).reserve(selected.getId(), task.getTaskId());
 	}
 
 	@Test
 	void scheduleTaskShouldRejectWhenLockedNodeHasNoCapacity() {
 		TaskDTO task = buildTask();
-		ComputeNode selected = buildNode(1, 0);
-		ComputeNode locked = buildNode(1, 1);
+		ComputeNode selected = buildNode(31L, 1, 0);
 		NodeSolverCapability capability = buildCapability(task.getSolverId(), selected.getId());
 		stubEnabledSolverAndProfile(task);
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
 		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
 		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
-		when(computeNodeRepository.findByIdForUpdate(selected.getId())).thenReturn(Optional.of(locked));
+		when(nodeCapacityManager.reserve(selected.getId(), task.getTaskId()))
+				.thenThrow(new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node"));
 
 		BizException exception = assertThrows(BizException.class, () -> scheduleAppService.scheduleTask(task));
 
@@ -165,9 +172,9 @@ class ScheduleAppServiceTest {
 		when(solverClient.getProfileMeta(task.getProfileId())).thenReturn(profileMeta);
 	}
 
-	private ComputeNode buildNode(int maxConcurrency, int totalLoad) {
+	private ComputeNode buildNode(Long nodeId, int maxConcurrency, int totalLoad) {
 		ComputeNode node = new ComputeNode();
-		node.setId(31L);
+		node.setId(nodeId);
 		node.setNodeCode("node-31");
 		node.setStatus("ONLINE");
 		node.setEnabled(1);

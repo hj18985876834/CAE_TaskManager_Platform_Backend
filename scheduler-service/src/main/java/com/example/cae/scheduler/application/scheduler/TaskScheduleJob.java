@@ -83,13 +83,48 @@ public class TaskScheduleJob {
 		}
 		if (taskMarkedScheduled && task != null && task.getTaskId() != null) {
 			if (nodeAccepted) {
-				recordScheduleFailureQuietly(task.getTaskId(), nodeId, buildAcceptedDispatchConfirmFailureMessage(ex));
+				if (shouldRecordAcceptedDispatchConfirmFailure(task.getTaskId(), nodeId, ex)) {
+					recordScheduleFailureQuietly(task.getTaskId(), nodeId, buildAcceptedDispatchConfirmFailureMessage(ex));
+				}
 				return;
 			}
 			handleDispatchFailureQuietly(task.getTaskId(), nodeId, ex);
 			return;
 		}
 		recordScheduleFailureQuietly(task == null ? null : task.getTaskId(), nodeId, ex);
+	}
+
+	private boolean shouldRecordAcceptedDispatchConfirmFailure(Long taskId, Long nodeId, Exception confirmException) {
+		if (taskId == null || nodeId == null) {
+			return true;
+		}
+		try {
+			Map<Long, TaskBasicDTO> taskBasics = taskClient.getTaskBasics(List.of(taskId));
+			TaskBasicDTO taskBasic = taskBasics.get(taskId);
+			if (taskBasic == null || taskBasic.getStatus() == null || taskBasic.getStatus().isBlank()) {
+				return true;
+			}
+			String status = taskBasic.getStatus().trim().toUpperCase();
+			if (nodeId.equals(taskBasic.getNodeId())
+					&& (TaskStatusEnum.SCHEDULED.name().equals(status)
+					|| TaskStatusEnum.DISPATCHED.name().equals(status))) {
+				return true;
+			}
+			log.info("skip accepted dispatch confirm failure audit because central task state already settled, taskId={}, nodeId={}, currentNodeId={}, status={}, confirmReason={}",
+					taskId,
+					nodeId,
+					taskBasic.getNodeId(),
+					status,
+					confirmException == null ? null : confirmException.getMessage());
+			return false;
+		} catch (Exception recoverEx) {
+			log.warn("failed to inspect central task state before recording accepted dispatch confirm failure, taskId={}, nodeId={}, confirmReason={}",
+					taskId,
+					nodeId,
+					confirmException == null ? null : confirmException.getMessage(),
+					recoverEx);
+			return true;
+		}
 	}
 
 	private TaskScheduleClaimDTO markTaskScheduledWithRetry(Long taskId, Long nodeId) {

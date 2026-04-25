@@ -5,6 +5,7 @@ import com.example.cae.scheduler.domain.model.NodeSolverCapability;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeSolverCapabilityRepository;
 import com.example.cae.scheduler.domain.service.NodeDomainService;
+import com.example.cae.scheduler.application.manager.NodeCapacityManager;
 import com.example.cae.scheduler.infrastructure.client.SolverClient;
 import com.example.cae.scheduler.interfaces.request.NodeAgentRegisterRequest;
 import com.example.cae.scheduler.interfaces.request.NodeHeartbeatRequest;
@@ -37,6 +38,8 @@ class NodeAppServiceTest {
 	private NodeDomainService nodeDomainService;
 	@Mock
 	private SolverClient solverClient;
+	@Mock
+	private NodeCapacityManager nodeCapacityManager;
 
 	private NodeAppService nodeAppService;
 
@@ -46,7 +49,8 @@ class NodeAppServiceTest {
 				computeNodeRepository,
 				nodeSolverCapabilityRepository,
 				nodeDomainService,
-				solverClient
+				solverClient,
+				nodeCapacityManager
 		);
 	}
 
@@ -96,7 +100,7 @@ class NodeAppServiceTest {
 		request.setMemoryUsage(java.math.BigDecimal.valueOf(35.2));
 		request.setRunningCount(1);
 
-		nodeAppService.heartbeat(request);
+		nodeAppService.heartbeat(request, null);
 
 		ArgumentCaptor<ComputeNode> captor = ArgumentCaptor.forClass(ComputeNode.class);
 		verify(computeNodeRepository).update(captor.capture());
@@ -118,7 +122,7 @@ class NodeAppServiceTest {
 		verify(computeNodeRepository).update(captor.capture());
 		assertEquals("OFFLINE", captor.getValue().getStatus());
 		assertEquals(0, captor.getValue().getRunningCount());
-		assertEquals(0, captor.getValue().getReservedCount());
+		assertEquals(2, captor.getValue().getReservedCount());
 		assertTrue(java.math.BigDecimal.ZERO.compareTo(captor.getValue().getCpuUsage()) == 0);
 		assertTrue(java.math.BigDecimal.ZERO.compareTo(captor.getValue().getMemoryUsage()) == 0);
 	}
@@ -144,7 +148,7 @@ class NodeAppServiceTest {
 		nodeAppService.registerNodeFromAgent(request);
 
 		ArgumentCaptor<List<NodeSolverCapability>> captor = ArgumentCaptor.forClass(List.class);
-		verify(nodeSolverCapabilityRepository, times(2)).replaceNodeCapabilitiesWithDetails(org.mockito.ArgumentMatchers.eq(1L), captor.capture());
+		verify(nodeSolverCapabilityRepository, times(1)).replaceNodeCapabilitiesWithDetails(org.mockito.ArgumentMatchers.eq(1L), captor.capture());
 		List<NodeSolverCapability> finalCapabilities = captor.getAllValues().get(captor.getAllValues().size() - 1);
 		assertEquals(1, finalCapabilities.size());
 		assertEquals(0, finalCapabilities.get(0).getEnabled());
