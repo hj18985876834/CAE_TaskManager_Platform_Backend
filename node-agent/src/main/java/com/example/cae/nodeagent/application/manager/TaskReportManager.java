@@ -166,15 +166,27 @@ public class TaskReportManager {
 				? "node-agent prepare task failed"
 				: ex.getMessage();
 		if (isRecoverablePreRunFailure(ex)) {
-			retryDispatchFailureReport(
-					taskId,
-					() -> taskReportAppService.dispatchFailed(
-							taskId,
-							FailTypeEnum.DISPATCH_ERROR.name(),
-							message,
-							true
-					)
-			);
+			try {
+				retryDispatchFailureReport(
+						taskId,
+						() -> taskReportAppService.dispatchFailed(
+								taskId,
+								FailTypeEnum.DISPATCH_ERROR.name(),
+								message,
+								true
+						)
+				);
+			} catch (Exception dispatchReportEx) {
+				if (!shouldFallbackToRunningFailureReport(dispatchReportEx)) {
+					throw dispatchReportEx;
+				}
+				retryTerminalReport(taskId, "mark ambiguous pre-run failure",
+						() -> taskReportAppService.markFailed(
+								taskId,
+								FailTypeEnum.RUNTIME_ERROR.name(),
+								buildAmbiguousPreRunFailureMessage(message, dispatchReportEx)
+						));
+			}
 			return;
 		}
 		retryDispatchFailureReport(
@@ -234,6 +246,25 @@ public class TaskReportManager {
 
 	private boolean isRecoverablePreRunFailure(Exception ex) {
 		return shouldRetryRunningReport(ex);
+	}
+
+	private boolean shouldFallbackToRunningFailureReport(Exception ex) {
+		if (!(ex instanceof BizException bizException) || bizException.getCode() == null) {
+			return false;
+		}
+		return bizException.getCode() == ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL
+				|| bizException.getCode() == ErrorCodeConstants.TASK_STATUS_MISMATCH
+				|| bizException.getCode() == ErrorCodeConstants.CONFLICT;
+	}
+
+	private String buildAmbiguousPreRunFailureMessage(String originalMessage, Exception dispatchReportEx) {
+		String dispatchMessage = dispatchReportEx == null || dispatchReportEx.getMessage() == null || dispatchReportEx.getMessage().isBlank()
+				? "dispatch-failed callback rejected"
+				: dispatchReportEx.getMessage();
+		String message = originalMessage == null || originalMessage.isBlank()
+				? "running report failed before solver start"
+				: originalMessage;
+		return "running report outcome ambiguous before solver start; " + message + "; " + dispatchMessage;
 	}
 
 	private void retryTerminalReport(Long taskId, String action, Runnable runnable) {
