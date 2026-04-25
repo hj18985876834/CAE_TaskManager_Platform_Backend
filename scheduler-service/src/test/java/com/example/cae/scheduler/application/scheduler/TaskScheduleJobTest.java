@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -56,6 +57,55 @@ class TaskScheduleJobTest {
 		verify(taskScheduleManager).releaseNodeReservation(21L, 1001L);
 		verify(nodeAgentClient, never()).notifyDispatch(21L, task);
 		verify(taskScheduleManager, never()).confirmScheduleSuccess(eq(1001L), eq(21L), org.mockito.ArgumentMatchers.anyString());
+	}
+
+	@Test
+	void runShouldRecordFormalRejectedClaimMessageWhenTaskClaimedByAnotherScheduler() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(false, 22L, "SCHEDULED"));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).releaseNodeReservation(21L, 1001L);
+		verify(taskScheduleManager).recordScheduleFailure(
+				1001L,
+				21L,
+				ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED_ALREADY_CLAIMED_BY_ANOTHER_SCHEDULER);
+	}
+
+	@Test
+	void runShouldFallbackToGenericRejectedClaimMessageForUnexpectedStatus() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(false, null, "QUEUED"));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).releaseNodeReservation(21L, 1001L);
+		verify(taskScheduleManager).recordScheduleFailure(
+				1001L,
+				21L,
+				ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED);
+	}
+
+	@Test
+	void runShouldNotRecordRejectedClaimFailureForSameNodeDispatchedIdempotentPath() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(false, 21L, "DISPATCHED"));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager, never()).releaseNodeReservation(21L, 1001L);
+		verify(taskScheduleManager, never()).recordScheduleFailure(eq(1001L), eq(21L), anyString());
+		verify(nodeAgentClient, never()).notifyDispatch(21L, task);
 	}
 
 	@Test

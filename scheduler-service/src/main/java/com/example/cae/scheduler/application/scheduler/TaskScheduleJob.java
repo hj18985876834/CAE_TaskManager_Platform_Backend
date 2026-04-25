@@ -421,7 +421,7 @@ public class TaskScheduleJob {
 
 	private String buildRejectedScheduleClaimMessage(Long requestedNodeId, TaskScheduleClaimDTO scheduleClaim) {
 		if (scheduleClaim == null || scheduleClaim.getStatus() == null || scheduleClaim.getStatus().isBlank()) {
-			return "schedule claim rejected";
+			return ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED;
 		}
 		String status = scheduleClaim.getStatus().trim().toUpperCase();
 		boolean sameNode = isSameNodeClaim(scheduleClaim, requestedNodeId);
@@ -431,21 +431,21 @@ public class TaskScheduleJob {
 		if (TaskStatusEnum.SCHEDULED.name().equals(status)) {
 			return sameNode
 					? null
-					: "schedule claim rejected, task already claimed by another scheduler";
+					: ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED_ALREADY_CLAIMED_BY_ANOTHER_SCHEDULER;
 		}
 		if (TaskStatusEnum.DISPATCHED.name().equals(status)) {
-			return "schedule claim rejected, task already dispatched by another scheduler";
+			return ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED_ALREADY_DISPATCHED_BY_ANOTHER_SCHEDULER;
 		}
 		if (TaskStatusEnum.RUNNING.name().equals(status)) {
-			return "schedule claim rejected, task already running";
+			return ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED_ALREADY_RUNNING;
 		}
 		if (TaskStatusEnum.SUCCESS.name().equals(status)
 				|| TaskStatusEnum.FAILED.name().equals(status)
 				|| TaskStatusEnum.CANCELED.name().equals(status)
 				|| TaskStatusEnum.TIMEOUT.name().equals(status)) {
-			return "schedule claim rejected, task already finished";
+			return ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED_ALREADY_FINISHED;
 		}
-		return "schedule claim rejected, current task status=" + status;
+		return ScheduleAuditMessageConstants.SCHEDULE_CLAIM_REJECTED;
 	}
 
 	private String buildDispatchFailureReason(Exception ex) {
