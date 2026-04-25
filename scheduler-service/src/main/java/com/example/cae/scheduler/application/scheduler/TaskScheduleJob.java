@@ -39,6 +39,7 @@ public class TaskScheduleJob {
 		for (TaskDTO task : pendingTasks) {
 			Long nodeId = null;
 			boolean taskMarkedScheduled = false;
+			boolean nodeAccepted = false;
 			try {
 				nodeId = taskScheduleManager.schedule(task);
 				TaskScheduleClaimDTO scheduleClaim = markTaskScheduledWithRetry(task.getTaskId(), nodeId);
@@ -50,10 +51,11 @@ public class TaskScheduleJob {
 					continue;
 				}
 				nodeAgentClient.notifyDispatch(nodeId, task);
+				nodeAccepted = true;
 				TaskDispatchAckDTO dispatchAck = markTaskDispatchedWithRetry(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
 			} catch (Exception ex) {
-				handleScheduleException(task, nodeId, taskMarkedScheduled, ex);
+				handleScheduleException(task, nodeId, taskMarkedScheduled, nodeAccepted, ex);
 			}
 		}
 	}
@@ -61,11 +63,16 @@ public class TaskScheduleJob {
 	private void handleScheduleException(TaskDTO task,
 										 Long nodeId,
 										 boolean taskMarkedScheduled,
+										 boolean nodeAccepted,
 										 Exception ex) {
 		if (nodeId != null && !taskMarkedScheduled) {
 			releaseReservationQuietly(nodeId, task == null ? null : task.getTaskId());
 		}
 		if (taskMarkedScheduled && task != null && task.getTaskId() != null) {
+			if (nodeAccepted) {
+				recordScheduleFailureQuietly(task.getTaskId(), nodeId, ex);
+				return;
+			}
 			handleDispatchFailureQuietly(task.getTaskId(), nodeId, ex);
 			return;
 		}
