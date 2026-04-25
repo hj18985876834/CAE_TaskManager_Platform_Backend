@@ -15,6 +15,8 @@ import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
+import com.example.cae.task.domain.repository.TaskResultFileRepository;
+import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
@@ -42,6 +44,8 @@ public class TaskDispatchManager {
 
 	private final TaskRepository taskRepository;
 	private final TaskFileRepository taskFileRepository;
+	private final TaskResultSummaryRepository taskResultSummaryRepository;
+	private final TaskResultFileRepository taskResultFileRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final SchedulerClient schedulerClient;
 	private final SolverClient solverClient;
@@ -50,6 +54,8 @@ public class TaskDispatchManager {
 
 	public TaskDispatchManager(TaskRepository taskRepository,
 						   TaskFileRepository taskFileRepository,
+						   TaskResultSummaryRepository taskResultSummaryRepository,
+						   TaskResultFileRepository taskResultFileRepository,
 						   TaskStatusDomainService taskStatusDomainService,
 						   SchedulerClient schedulerClient,
 						   SolverClient solverClient,
@@ -57,6 +63,8 @@ public class TaskDispatchManager {
 						   PlatformTransactionManager transactionManager) {
 		this.taskRepository = taskRepository;
 		this.taskFileRepository = taskFileRepository;
+		this.taskResultSummaryRepository = taskResultSummaryRepository;
+		this.taskResultFileRepository = taskResultFileRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.schedulerClient = schedulerClient;
 		this.solverClient = solverClient;
@@ -243,6 +251,7 @@ public class TaskDispatchManager {
 			lockedTask.setFailMessage(effectiveReason);
 			taskStatusDomainService.transfer(lockedTask, TaskStatusEnum.FAILED.name(), effectiveReason, OperatorTypeEnum.SYSTEM.name(), null);
 			taskRepository.update(lockedTask);
+			cleanupResultArtifactsQuietly(lockedTask.getId(), FailTypeEnum.NODE_OFFLINE.name());
 			recordOfflineCompensationScheduleQuietly(nodeId, lockedTask.getId(), effectiveReason);
 			releaseReservationQuietly(nodeId, lockedTask.getId());
 			return Boolean.TRUE;
@@ -403,6 +412,21 @@ public class TaskDispatchManager {
 		} catch (Exception ex) {
 			log.warn("failed to record offline compensation schedule audit, nodeId={}, taskId={}",
 					nodeId, taskId, ex);
+		}
+	}
+
+	private void cleanupResultArtifactsQuietly(Long taskId, String failType) {
+		if (taskId == null || failType == null) {
+			return;
+		}
+		if (!FailTypeEnum.NODE_OFFLINE.name().equalsIgnoreCase(failType)) {
+			return;
+		}
+		try {
+			taskResultSummaryRepository.deleteByTaskId(taskId);
+			taskResultFileRepository.deleteByTaskId(taskId);
+		} catch (Exception ex) {
+			log.warn("node-offline terminal state committed but result metadata cleanup failed, taskId={}", taskId, ex);
 		}
 	}
 }
