@@ -42,6 +42,7 @@ public class ScheduleAppService {
 	private static final String NO_ENABLED_CAPABILITY_MESSAGE = "no enabled node solver capability";
 	private static final String NO_DISPATCHABLE_NODE_MESSAGE = "no dispatchable node with capacity";
 	private static final String CAPACITY_CONFLICT_MESSAGE = "candidate nodes are full or reservation conflicted";
+	private static final String DISPATCH_FAILED_REJECTED_RUNNING_MESSAGE = "dispatch-failed rejected, task already running";
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
@@ -189,7 +190,13 @@ public class ScheduleAppService {
 		if (taskId == null || nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId and nodeId are required");
 		}
-		TaskStatusAckDTO ack = taskClient.markTaskFailed(taskId, nodeId, failType, reason, recoverable);
+		TaskStatusAckDTO ack;
+		try {
+			ack = taskClient.markTaskFailed(taskId, nodeId, failType, reason, recoverable);
+		} catch (BizException ex) {
+			recordRejectedDispatchFailureIfNeeded(taskId, nodeId, ex);
+			throw ex;
+		}
 		if (ack != null && DISPATCH_FAILURE_RELEASE_TARGETS.contains(ack.getStatus())) {
 			releaseNodeReservation(nodeId, taskId);
 			recordScheduleFailure(taskId, nodeId, reason);
@@ -246,6 +253,27 @@ public class ScheduleAppService {
 		return message.length() <= SCHEDULE_MESSAGE_MAX_LENGTH
 				? message
 				: message.substring(0, SCHEDULE_MESSAGE_MAX_LENGTH);
+	}
+
+	private void recordRejectedDispatchFailureIfNeeded(Long taskId, Long nodeId, BizException ex) {
+		if (!isRejectedRunningDispatchFailure(ex) || taskId == null || nodeId == null) {
+			return;
+		}
+		recordScheduleFailure(taskId, nodeId, DISPATCH_FAILED_REJECTED_RUNNING_MESSAGE);
+	}
+
+	private boolean isRejectedRunningDispatchFailure(BizException ex) {
+		if (ex == null || ex.getCode() == null) {
+			return false;
+		}
+		if (ex.getCode() != ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL) {
+			return false;
+		}
+		String message = ex.getMessage();
+		if (message == null || message.isBlank()) {
+			return false;
+		}
+		return message.toLowerCase(Locale.ROOT).contains("dispatch-failed is not allowed after task entered running");
 	}
 
 	public List<ScheduleRecordResponse> listByTaskId(Long taskId) {
