@@ -119,7 +119,13 @@ public class TaskScheduleJob {
 				return;
 			} catch (Exception ex) {
 				lastException = ex;
-				if (!shouldRetryNodeDispatch(ex) || attempt == NODE_DISPATCH_MAX_ATTEMPTS) {
+				if (!shouldRetryNodeDispatch(ex)) {
+					throw ex;
+				}
+				if (attempt == NODE_DISPATCH_MAX_ATTEMPTS) {
+					if (recoverNodeAcceptedAfterDispatchFailure(nodeId, taskId, ex)) {
+						return;
+					}
 					throw ex;
 				}
 				sleepBeforeRetry("node-agent dispatch", taskId, nodeId, attempt, ex, NODE_DISPATCH_RETRY_INTERVAL_MS);
@@ -129,6 +135,22 @@ public class TaskScheduleJob {
 			throw runtimeException;
 		}
 		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent dispatch failed");
+	}
+
+	private boolean recoverNodeAcceptedAfterDispatchFailure(Long nodeId, Long taskId, Exception dispatchException) {
+		if (nodeId == null || taskId == null) {
+			return false;
+		}
+		try {
+			return nodeAgentClient.isTaskActive(nodeId, taskId);
+		} catch (Exception probeEx) {
+			log.warn("failed to probe node-agent dispatch outcome, taskId={}, nodeId={}, dispatchReason={}",
+					taskId,
+					nodeId,
+					dispatchException == null ? null : dispatchException.getMessage(),
+					probeEx);
+			return false;
+		}
 	}
 
 	private TaskScheduleClaimDTO recoverScheduleClaimAfterConfirmFailure(Long taskId, Long nodeId, Exception confirmException) {

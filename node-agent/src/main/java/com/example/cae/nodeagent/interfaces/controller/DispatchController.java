@@ -10,7 +10,10 @@ import com.example.cae.nodeagent.interfaces.request.CancelTaskRequest;
 import com.example.cae.nodeagent.interfaces.request.DispatchTaskRequest;
 import com.example.cae.nodeagent.interfaces.response.CancelTaskResponse;
 import com.example.cae.nodeagent.interfaces.response.DispatchTaskResponse;
+import com.example.cae.nodeagent.interfaces.response.TaskRuntimeStatusResponse;
 import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -45,6 +48,20 @@ public class DispatchController {
 		ensureValidNodeToken(nodeToken);
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_UNSUPPORTED,
 				"runtime cancel is not supported in first-version status contract");
+	}
+
+	@GetMapping("/tasks/{taskId}/runtime")
+	public Result<TaskRuntimeStatusResponse> runtimeStatus(@PathVariable Long taskId,
+													  @RequestHeader(value = HeaderConstants.X_NODE_TOKEN, required = true) String nodeToken) {
+		ensureValidNodeToken(nodeToken);
+		if (taskId == null || taskId <= 0) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "taskId is required");
+		}
+		TaskRuntimeStatusResponse response = new TaskRuntimeStatusResponse();
+		response.setTaskId(taskId);
+		response.setActive(taskDispatchManager.isTaskActive(taskId));
+		response.setRunningReported(taskDispatchManager.isRunningReported(taskId));
+		return Result.success(response);
 	}
 
 	private void ensureValidNodeToken(String nodeToken) {

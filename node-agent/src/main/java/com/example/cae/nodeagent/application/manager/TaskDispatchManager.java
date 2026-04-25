@@ -65,6 +65,14 @@ public class TaskDispatchManager {
 		return taskRuntimeRegistry.cancel(request.getTaskId(), request.getReason());
 	}
 
+	public boolean isTaskActive(Long taskId) {
+		return taskRuntimeRegistry.isRunning(taskId);
+	}
+
+	public boolean isRunningReported(Long taskId) {
+		return taskRuntimeRegistry.isRunningReported(taskId);
+	}
+
 	private int maxConcurrency() {
 		return nodeAgentConfig.getMaxConcurrency() == null || nodeAgentConfig.getMaxConcurrency() <= 0
 				? 1

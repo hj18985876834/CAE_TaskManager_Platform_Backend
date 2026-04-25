@@ -120,6 +120,30 @@ public class NodeAgentClientStub implements NodeAgentClient {
 		}
 	}
 
+	@Override
+	public boolean isTaskActive(Long nodeId, Long taskId) {
+		ComputeNode node = computeNodeRepository.findById(nodeId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found: " + nodeId));
+		String baseUrl = buildNodeAgentBaseUrl(node);
+		String url = baseUrl + "/internal/tasks/" + taskId + "/runtime";
+		Result<NodeAgentRuntimeStatus> result = restTemplate.exchange(
+				url,
+				HttpMethod.GET,
+				withNodeToken(null, node),
+				new ParameterizedTypeReference<Result<NodeAgentRuntimeStatus>>() {
+				}
+		).getBody();
+		validateResult(result, "runtime status");
+		NodeAgentRuntimeStatus status = result == null ? null : result.getData();
+		if (status == null || status.getTaskId() == null || status.getActive() == null) {
+			throw new BizException(ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE, "node-agent runtime status response is empty");
+		}
+		if (!status.getTaskId().equals(taskId)) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent runtime status response taskId mismatch");
+		}
+		return Boolean.TRUE.equals(status.getActive());
+	}
+
 	private String buildNodeAgentBaseUrl(ComputeNode node) {
 		if (node == null || node.getHost() == null || node.getHost().isBlank()) {
 			throw new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node host is empty");
@@ -197,6 +221,27 @@ public class NodeAgentClientStub implements NodeAgentClient {
 
 		public void setMessage(String message) {
 			this.message = message;
+		}
+	}
+
+	private static class NodeAgentRuntimeStatus {
+		private Long taskId;
+		private Boolean active;
+
+		public Long getTaskId() {
+			return taskId;
+		}
+
+		public void setTaskId(Long taskId) {
+			this.taskId = taskId;
+		}
+
+		public Boolean getActive() {
+			return active;
+		}
+
+		public void setActive(Boolean active) {
+			this.active = active;
 		}
 	}
 }

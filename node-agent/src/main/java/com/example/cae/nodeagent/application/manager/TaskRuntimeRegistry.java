@@ -26,6 +26,11 @@ public class TaskRuntimeRegistry {
 		return taskId != null && activeTasks.containsKey(taskId);
 	}
 
+	public boolean isRunningReported(Long taskId) {
+		TaskRuntime runtime = taskId == null ? null : activeTasks.get(taskId);
+		return runtime != null && runtime.isRunningReported();
+	}
+
 	public int activeCount() {
 		return activeTasks.size();
 	}
