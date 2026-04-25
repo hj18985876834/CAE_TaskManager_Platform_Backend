@@ -16,6 +16,7 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component
@@ -113,6 +114,23 @@ public class SchedulerClient {
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get node name response data is invalid");
 		}
 		return nodeName;
+	}
+
+	@SuppressWarnings("unchecked")
+	public boolean isNodeOffline(Long nodeId) {
+		if (nodeId == null) {
+			return false;
+		}
+		String url = schedulerServiceBaseUrl + "/api/nodes/" + nodeId;
+		Result<Object> result = restTemplate.getForObject(url, Result.class);
+		ensureSuccess(result, "get node status");
+		Map<String, Object> map = requireMapData(result, "get node status");
+		Long responseNodeId = toLong(map.get("nodeId"));
+		String status = toString(map.get("status"));
+		if (responseNodeId == null || !nodeId.equals(responseNodeId) || status == null || status.isBlank()) {
+			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "get node status response data is invalid");
+		}
+		return "OFFLINE".equals(status.trim().toUpperCase(Locale.ROOT));
 	}
 
 	public QueueNodeSnapshot getQueueNodeSnapshot(Long solverId) {

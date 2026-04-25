@@ -208,6 +208,9 @@ public class TaskDispatchManager {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
 		}
+		if (!schedulerClient.isNodeOffline(nodeId)) {
+			throw new BizException(ErrorCodeConstants.CONFLICT, "node is not offline");
+		}
 		String effectiveReason = reason == null || reason.isBlank()
 				? "node offline, task terminated by scheduler"
 				: reason;
