@@ -48,6 +48,7 @@ public class TaskScheduleJob {
 					if (shouldReleaseReservationAfterRejectedClaim(scheduleClaim, nodeId)) {
 						taskScheduleManager.releaseNodeReservation(nodeId, task.getTaskId());
 					}
+					recordRejectedScheduleClaimIfNeeded(task == null ? null : task.getTaskId(), nodeId, scheduleClaim);
 					continue;
 				}
 				nodeAgentClient.notifyDispatch(nodeId, task);
@@ -167,6 +168,43 @@ public class TaskScheduleJob {
 			return "task dispatched, already running";
 		}
 		return "task dispatched";
+	}
+
+	private void recordRejectedScheduleClaimIfNeeded(Long taskId, Long requestedNodeId, TaskScheduleClaimDTO scheduleClaim) {
+		String message = buildRejectedScheduleClaimMessage(requestedNodeId, scheduleClaim);
+		if (taskId == null || message == null) {
+			return;
+		}
+		recordScheduleFailureQuietly(taskId, requestedNodeId, message);
+	}
+
+	private String buildRejectedScheduleClaimMessage(Long requestedNodeId, TaskScheduleClaimDTO scheduleClaim) {
+		if (scheduleClaim == null || scheduleClaim.getStatus() == null || scheduleClaim.getStatus().isBlank()) {
+			return "schedule claim rejected";
+		}
+		String status = scheduleClaim.getStatus().trim().toUpperCase();
+		boolean sameNode = isSameNodeClaim(scheduleClaim, requestedNodeId);
+		if (sameNode && TaskStatusEnum.DISPATCHED.name().equals(status)) {
+			return null;
+		}
+		if (TaskStatusEnum.SCHEDULED.name().equals(status)) {
+			return sameNode
+					? null
+					: "schedule claim rejected, task already claimed by another scheduler";
+		}
+		if (TaskStatusEnum.DISPATCHED.name().equals(status)) {
+			return "schedule claim rejected, task already dispatched by another scheduler";
+		}
+		if (TaskStatusEnum.RUNNING.name().equals(status)) {
+			return "schedule claim rejected, task already running";
+		}
+		if (TaskStatusEnum.SUCCESS.name().equals(status)
+				|| TaskStatusEnum.FAILED.name().equals(status)
+				|| TaskStatusEnum.CANCELED.name().equals(status)
+				|| TaskStatusEnum.TIMEOUT.name().equals(status)) {
+			return "schedule claim rejected, task already finished";
+		}
+		return "schedule claim rejected, current task status=" + status;
 	}
 
 	private String buildDispatchFailureReason(Exception ex) {
