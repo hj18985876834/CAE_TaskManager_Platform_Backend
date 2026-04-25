@@ -124,6 +124,8 @@ public class TaskQueryAppService {
 					TaskBasicDTO dto = new TaskBasicDTO();
 					dto.setTaskId(task.getId());
 					dto.setTaskNo(task.getTaskNo());
+					dto.setStatus(task.getStatus());
+					dto.setNodeId(task.getNodeId());
 					return dto;
 				})
 				.toList();

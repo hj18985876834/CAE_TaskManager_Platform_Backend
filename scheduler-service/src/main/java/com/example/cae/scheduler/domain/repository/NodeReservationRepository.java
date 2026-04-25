@@ -2,6 +2,7 @@ package com.example.cae.scheduler.domain.repository;
 
 import com.example.cae.scheduler.domain.model.NodeReservation;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface NodeReservationRepository {
@@ -12,4 +13,6 @@ public interface NodeReservationRepository {
 	void update(NodeReservation reservation);
 
 	int countReservedByNodeId(Long nodeId);
+
+	List<NodeReservation> listReservedByNodeId(Long nodeId);
 }

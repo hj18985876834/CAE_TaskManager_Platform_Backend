@@ -6,6 +6,7 @@ import com.example.cae.scheduler.infrastructure.persistence.entity.NodeReservati
 import com.example.cae.scheduler.infrastructure.persistence.mapper.NodeReservationMapper;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -37,6 +38,13 @@ public class NodeReservationRepositoryImpl implements NodeReservationRepository 
 	@Override
 	public int countReservedByNodeId(Long nodeId) {
 		return nodeReservationMapper.countReservedByNodeId(nodeId);
+	}
+
+	@Override
+	public List<NodeReservation> listReservedByNodeId(Long nodeId) {
+		return nodeReservationMapper.selectReservedByNodeId(nodeId).stream()
+				.map(this::fromPO)
+				.toList();
 	}
 
 	private NodeReservation fromPO(NodeReservationPO po) {

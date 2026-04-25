@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
@@ -22,4 +24,7 @@ public interface NodeReservationMapper {
 
 	@Select("SELECT COUNT(1) FROM node_reservation WHERE node_id = #{nodeId} AND status = 'RESERVED'")
 	int countReservedByNodeId(@Param("nodeId") Long nodeId);
+
+	@Select("SELECT id, node_id AS nodeId, task_id AS taskId, status, created_at AS createdAt, updated_at AS updatedAt, released_at AS releasedAt FROM node_reservation WHERE node_id = #{nodeId} AND status = 'RESERVED' ORDER BY updated_at ASC, id ASC")
+	List<NodeReservationPO> selectReservedByNodeId(@Param("nodeId") Long nodeId);
 }
