@@ -156,6 +156,35 @@ class ScheduleAppServiceTest {
 	}
 
 	@Test
+	void handleDispatchFailureShouldRecordWatchdogReasonAfterSuccessfulRecovery() {
+		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
+		ack.setTaskId(1001L);
+		ack.setStatus("QUEUED");
+		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", "dispatch watchdog timeout, node-agent runtime missing", true))
+				.thenReturn(ack);
+		NodeReservationActionResponse release = new NodeReservationActionResponse();
+		release.setTaskId(1001L);
+		release.setNodeId(31L);
+		release.setReservationStatus("RELEASED");
+		release.setReservedCount(0);
+		when(nodeCapacityManager.release(31L, 1001L)).thenReturn(release);
+
+		scheduleAppService.handleDispatchFailure(
+				1001L,
+				31L,
+				"DISPATCH_ERROR",
+				"dispatch watchdog timeout, node-agent runtime missing",
+				true
+		);
+
+		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
+				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
+		verify(scheduleRecordRepository).save(captor.capture());
+		assertEquals("FAILED", captor.getValue().getScheduleStatus());
+		assertEquals("dispatch watchdog timeout, node-agent runtime missing", captor.getValue().getScheduleMessage());
+	}
+
+	@Test
 	void handleDispatchFailureShouldRecordReleaseFailureAuditBeforeThrowing() {
 		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
 		ack.setTaskId(1001L);

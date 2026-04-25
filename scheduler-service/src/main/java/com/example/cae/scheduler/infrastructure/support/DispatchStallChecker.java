@@ -4,6 +4,7 @@ import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureMessageConstants;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.model.NodeReservation;
@@ -22,7 +23,6 @@ import java.util.Map;
 @Component
 public class DispatchStallChecker {
 	private static final Logger log = LoggerFactory.getLogger(DispatchStallChecker.class);
-	private static final String STALLED_DISPATCH_REASON = "dispatch watchdog timeout, node-agent runtime missing";
 	private static final int NODE_HEARTBEAT_TIMEOUT_SECONDS = 30;
 
 	private final NodeAppService nodeAppService;
@@ -91,13 +91,13 @@ public class DispatchStallChecker {
 					taskId,
 					nodeId,
 					FailTypeEnum.DISPATCH_ERROR.name(),
-					STALLED_DISPATCH_REASON,
+					DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
 					true
 			);
 			log.info("recovered stalled dispatch by requeueing task, taskId={}, nodeId={}, reason={}",
 					taskId,
 					nodeId,
-					STALLED_DISPATCH_REASON);
+					DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING);
 		} catch (Exception ex) {
 			log.warn("failed to recover stalled dispatch, taskId={}, nodeId={}", taskId, nodeId, ex);
 		}

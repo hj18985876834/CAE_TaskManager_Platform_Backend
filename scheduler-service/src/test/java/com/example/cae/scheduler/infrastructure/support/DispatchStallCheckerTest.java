@@ -3,6 +3,7 @@ package com.example.cae.scheduler.infrastructure.support;
 import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureMessageConstants;
 import com.example.cae.scheduler.application.service.NodeAppService;
 import com.example.cae.scheduler.domain.model.ComputeNode;
 import com.example.cae.scheduler.domain.model.NodeReservation;
@@ -19,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,6 +70,14 @@ class DispatchStallCheckerTest {
 				FailTypeEnum.DISPATCH_ERROR.name(),
 				"dispatch watchdog timeout, node-agent runtime missing",
 				true
+		);
+	}
+
+	@Test
+	void watchdogReasonShouldStayOnFormalAuditContract() {
+		assertEquals(
+				"dispatch watchdog timeout, node-agent runtime missing",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING
 		);
 	}
 
