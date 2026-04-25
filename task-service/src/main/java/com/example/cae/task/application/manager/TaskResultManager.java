@@ -76,8 +76,9 @@ public class TaskResultManager {
 		taskLogRepository.save(chunk);
 	}
 
+	@Transactional
 	public void saveResultSummary(Long taskId, ResultSummaryReportRequest request) {
-		ensureResultSummaryAllowed(taskId);
+		ensureResultSummaryAllowed(loadTaskForResultWrite(taskId));
 		TaskResultSummary summary = new TaskResultSummary();
 		summary.setTaskId(taskId);
 		summary.setSuccessFlag(request.getSuccessFlag());
@@ -87,8 +88,9 @@ public class TaskResultManager {
 		taskResultSummaryRepository.saveOrUpdate(summary);
 	}
 
+	@Transactional
 	public void saveResultFile(Long taskId, ResultFileReportRequest request) {
-		ensureResultFileAllowed(taskId);
+		ensureResultFileAllowed(loadTaskForResultWrite(taskId));
 		Path resultPath = validateResultFilePath(taskId, request);
 		TaskResultFile file = new TaskResultFile();
 		file.setTaskId(taskId);
@@ -219,8 +221,7 @@ public class TaskResultManager {
 				"illegal status for log report: " + task.getStatus());
 	}
 
-	private void ensureResultSummaryAllowed(Long taskId) {
-		Task task = loadTask(taskId);
+	private void ensureResultSummaryAllowed(Task task) {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
@@ -228,13 +229,17 @@ public class TaskResultManager {
 				"illegal status for result summary report: " + task.getStatus());
 	}
 
-	private void ensureResultFileAllowed(Long taskId) {
-		Task task = loadTask(taskId);
+	private void ensureResultFileAllowed(Task task) {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 				"illegal status for result file report: " + task.getStatus());
+	}
+
+	private Task loadTaskForResultWrite(Long taskId) {
+		return taskRepository.findByIdForUpdate(taskId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 	}
 
 	private Task loadTask(Long taskId) {
