@@ -1,6 +1,7 @@
 package com.example.cae.scheduler.application.scheduler;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.dto.TaskBasicDTO;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class TaskScheduleJob {
@@ -87,7 +89,14 @@ public class TaskScheduleJob {
 				return taskClient.markTaskScheduled(taskId, nodeId);
 			} catch (Exception ex) {
 				lastException = ex;
-				if (!shouldRetryTaskStateConfirm(ex) || attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+				if (!shouldRetryTaskStateConfirm(ex)) {
+					throw ex;
+				}
+				if (attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
+					TaskScheduleClaimDTO recoveredClaim = recoverScheduleClaimAfterConfirmFailure(taskId, nodeId, ex);
+					if (recoveredClaim != null) {
+						return recoveredClaim;
+					}
 					throw ex;
 				}
 				sleepBeforeRetry("mark-scheduled", taskId, nodeId, attempt, ex);
@@ -97,6 +106,32 @@ public class TaskScheduleJob {
 			throw runtimeException;
 		}
 		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark scheduled failed");
+	}
+
+	private TaskScheduleClaimDTO recoverScheduleClaimAfterConfirmFailure(Long taskId, Long nodeId, Exception confirmException) {
+		if (taskId == null) {
+			return null;
+		}
+		try {
+			Map<Long, TaskBasicDTO> taskBasics = taskClient.getTaskBasics(List.of(taskId));
+			TaskBasicDTO taskBasic = taskBasics.get(taskId);
+			if (taskBasic == null || taskBasic.getStatus() == null || taskBasic.getStatus().isBlank()) {
+				return null;
+			}
+			TaskScheduleClaimDTO recovered = new TaskScheduleClaimDTO();
+			recovered.setClaimed(Boolean.FALSE);
+			recovered.setTaskId(taskId);
+			recovered.setNodeId(taskBasic.getNodeId());
+			recovered.setStatus(taskBasic.getStatus());
+			return recovered;
+		} catch (Exception recoverEx) {
+			log.warn("failed to recover mark-scheduled outcome, taskId={}, nodeId={}, confirmReason={}",
+					taskId,
+					nodeId,
+					confirmException == null ? null : confirmException.getMessage(),
+					recoverEx);
+			return null;
+		}
 	}
 
 	private TaskDispatchAckDTO markTaskDispatchedWithRetry(Long taskId, Long nodeId) {
