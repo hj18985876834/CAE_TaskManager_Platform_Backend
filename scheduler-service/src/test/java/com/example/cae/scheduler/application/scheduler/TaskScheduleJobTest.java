@@ -2,6 +2,7 @@ package com.example.cae.scheduler.application.scheduler;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
 import com.example.cae.common.dto.TaskBasicDTO;
+import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.exception.BizException;
@@ -144,8 +145,69 @@ class TaskScheduleJobTest {
 		verify(taskScheduleManager).recordScheduleFailure(
 				eq(1001L),
 				eq(21L),
-				contains("node accepted task, mark-dispatched confirm failed"));
+				eq(ScheduleAuditMessageConstants.NODE_ACCEPTED_MARK_DISPATCHED_CONFIRM_FAILED_PREFIX
+						+ "illegal status for dispatch confirm: SCHEDULED"));
 		verify(taskScheduleManager, never()).confirmScheduleSuccess(eq(1001L), eq(21L), org.mockito.ArgumentMatchers.anyString());
+	}
+
+	@Test
+	void runShouldRecordFormalAcceptedDispatchConfirmFailureMessageWithDefaultReason() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
+		when(taskClient.markTaskDispatched(1001L, 21L)).thenThrow(
+				new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, ""));
+		when(taskClient.getTaskBasics(List.of(1001L))).thenReturn(Map.of(1001L, taskBasic(1001L, 21L, "DISPATCHED")));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).recordScheduleFailure(
+				1001L,
+				21L,
+				ScheduleAuditMessageConstants.NODE_ACCEPTED_MARK_DISPATCHED_CONFIRM_FAILED_PREFIX
+						+ ScheduleAuditMessageConstants.MARK_DISPATCHED_CONFIRM_FAILED_DEFAULT_REASON);
+	}
+
+	@Test
+	void runShouldRecordFormalSuccessMessageWhenNodeAlreadyRunning() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		TaskDispatchAckDTO ack = new TaskDispatchAckDTO();
+		ack.setTaskId(1001L);
+		ack.setNodeId(21L);
+		ack.setStatus("RUNNING");
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
+		when(taskClient.markTaskDispatched(1001L, 21L)).thenReturn(ack);
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).confirmScheduleSuccess(
+				1001L,
+				21L,
+				ScheduleAuditMessageConstants.TASK_DISPATCHED_ALREADY_RUNNING);
+	}
+
+	@Test
+	void runShouldRecordFormalRecoveredSuccessMessageWhenAckRecoveredAsFailed() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
+		when(taskClient.markTaskDispatched(1001L, 21L)).thenThrow(
+				new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark-dispatched gateway timeout"));
+		when(taskClient.getTaskBasics(List.of(1001L))).thenReturn(Map.of(1001L, taskBasic(1001L, 21L, "FAILED")));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).confirmScheduleSuccess(
+				1001L,
+				21L,
+				ScheduleAuditMessageConstants.MARK_DISPATCHED_ACK_RECOVERED_ALREADY_FAILED);
 	}
 
 	@Test

@@ -372,43 +372,43 @@ public class TaskScheduleJob {
 
 	private String buildAcceptedDispatchConfirmFailureMessage(Exception ex) {
 		String reason = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
-				? "mark-dispatched confirm failed"
+				? ScheduleAuditMessageConstants.MARK_DISPATCHED_CONFIRM_FAILED_DEFAULT_REASON
 				: ex.getMessage();
-		return "node accepted task, mark-dispatched confirm failed; wait for node RUNNING or dispatch-failed callback: " + reason;
+		return ScheduleAuditMessageConstants.NODE_ACCEPTED_MARK_DISPATCHED_CONFIRM_FAILED_PREFIX + reason;
 	}
 
 	private String buildDispatchSuccessMessage(DispatchConfirmResult dispatchConfirm) {
 		TaskDispatchAckDTO dispatchAck = dispatchConfirm == null ? null : dispatchConfirm.ack();
 		boolean recovered = dispatchConfirm != null && dispatchConfirm.recovered();
 		if (dispatchAck == null || dispatchAck.getStatus() == null || dispatchAck.getStatus().isBlank()) {
-			return "task dispatched";
+			return ScheduleAuditMessageConstants.TASK_DISPATCHED;
 		}
 		String status = dispatchAck.getStatus().trim().toUpperCase();
 		if (!recovered) {
 			if (TaskStatusEnum.RUNNING.name().equals(status)) {
-				return "task dispatched, already running";
+				return ScheduleAuditMessageConstants.TASK_DISPATCHED_ALREADY_RUNNING;
 			}
-			return "task dispatched";
+			return ScheduleAuditMessageConstants.TASK_DISPATCHED;
 		}
 		if (TaskStatusEnum.RUNNING.name().equals(status)) {
-			return "mark-dispatched ACK recovered, task already running";
+			return ScheduleAuditMessageConstants.MARK_DISPATCHED_ACK_RECOVERED_ALREADY_RUNNING;
 		}
 		if (TaskStatusEnum.SUCCESS.name().equals(status) || TaskStatusEnum.TIMEOUT.name().equals(status)) {
-			return "mark-dispatched ACK recovered, task already finished";
+			return ScheduleAuditMessageConstants.MARK_DISPATCHED_ACK_RECOVERED_ALREADY_FINISHED;
 		}
 		if (TaskStatusEnum.FAILED.name().equals(status)) {
-			return "mark-dispatched ACK recovered, task already failed";
+			return ScheduleAuditMessageConstants.MARK_DISPATCHED_ACK_RECOVERED_ALREADY_FAILED;
 		}
 		if (TaskStatusEnum.CANCELED.name().equals(status)) {
-			return "mark-dispatched ACK recovered, task already canceled";
+			return ScheduleAuditMessageConstants.MARK_DISPATCHED_ACK_RECOVERED_ALREADY_CANCELED;
 		}
 		if (TaskStatusEnum.DISPATCHED.name().equals(status)) {
-			return "task dispatched";
+			return ScheduleAuditMessageConstants.TASK_DISPATCHED;
 		}
 		if ("RUNNING".equalsIgnoreCase(dispatchAck.getStatus())) {
-			return "task dispatched, already running";
+			return ScheduleAuditMessageConstants.TASK_DISPATCHED_ALREADY_RUNNING;
 		}
-		return "task dispatched";
+		return ScheduleAuditMessageConstants.TASK_DISPATCHED;
 	}
 
 	private void recordRejectedScheduleClaimIfNeeded(Long taskId, Long requestedNodeId, TaskScheduleClaimDTO scheduleClaim) {
