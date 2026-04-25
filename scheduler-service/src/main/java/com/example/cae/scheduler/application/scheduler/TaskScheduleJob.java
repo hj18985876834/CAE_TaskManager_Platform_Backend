@@ -25,6 +25,8 @@ public class TaskScheduleJob {
 	private static final Logger log = LoggerFactory.getLogger(TaskScheduleJob.class);
 	private static final int TASK_CONFIRM_MAX_ATTEMPTS = 5;
 	private static final long TASK_CONFIRM_RETRY_INTERVAL_MS = 100L;
+	private static final int NODE_DISPATCH_MAX_ATTEMPTS = 3;
+	private static final long NODE_DISPATCH_RETRY_INTERVAL_MS = 200L;
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -53,7 +55,7 @@ public class TaskScheduleJob {
 					recordRejectedScheduleClaimIfNeeded(task == null ? null : task.getTaskId(), nodeId, scheduleClaim);
 					continue;
 				}
-				nodeAgentClient.notifyDispatch(nodeId, task);
+				notifyDispatchWithRetry(nodeId, task);
 				nodeAccepted = true;
 				TaskDispatchAckDTO dispatchAck = markTaskDispatchedWithRetry(task.getTaskId(), nodeId);
 				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
@@ -106,6 +108,27 @@ public class TaskScheduleJob {
 			throw runtimeException;
 		}
 		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "mark scheduled failed");
+	}
+
+	private void notifyDispatchWithRetry(Long nodeId, TaskDTO task) {
+		Exception lastException = null;
+		Long taskId = task == null ? null : task.getTaskId();
+		for (int attempt = 1; attempt <= NODE_DISPATCH_MAX_ATTEMPTS; attempt++) {
+			try {
+				nodeAgentClient.notifyDispatch(nodeId, task);
+				return;
+			} catch (Exception ex) {
+				lastException = ex;
+				if (!shouldRetryNodeDispatch(ex) || attempt == NODE_DISPATCH_MAX_ATTEMPTS) {
+					throw ex;
+				}
+				sleepBeforeRetry("node-agent dispatch", taskId, nodeId, attempt, ex, NODE_DISPATCH_RETRY_INTERVAL_MS);
+			}
+		}
+		if (lastException instanceof RuntimeException runtimeException) {
+			throw runtimeException;
+		}
+		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent dispatch failed");
 	}
 
 	private TaskScheduleClaimDTO recoverScheduleClaimAfterConfirmFailure(Long taskId, Long nodeId, Exception confirmException) {
@@ -282,6 +305,17 @@ public class TaskScheduleJob {
 		return false;
 	}
 
+	private boolean shouldRetryNodeDispatch(Exception ex) {
+		if (ex instanceof RestClientException) {
+			return true;
+		}
+		if (ex instanceof BizException bizException && bizException.getCode() != null) {
+			return bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY
+					|| bizException.getCode() == ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE;
+		}
+		return false;
+	}
+
 	private boolean shouldContinueDispatchAfterScheduleClaim(TaskScheduleClaimDTO scheduleClaim, Long expectedNodeId) {
 		if (scheduleClaim == null) {
 			return false;
@@ -311,8 +345,12 @@ public class TaskScheduleJob {
 	}
 
 	private void sleepBeforeRetry(String action, Long taskId, Long nodeId, int attempt, Exception ex) {
+		sleepBeforeRetry(action, taskId, nodeId, attempt, ex, TASK_CONFIRM_RETRY_INTERVAL_MS);
+	}
+
+	private void sleepBeforeRetry(String action, Long taskId, Long nodeId, int attempt, Exception ex, long intervalMs) {
 		try {
-			Thread.sleep(TASK_CONFIRM_RETRY_INTERVAL_MS);
+			Thread.sleep(intervalMs);
 		} catch (InterruptedException interruptedException) {
 			Thread.currentThread().interrupt();
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY,
