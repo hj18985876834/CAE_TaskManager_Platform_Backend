@@ -198,8 +198,12 @@ public class TaskResultManager {
 		if (!FailTypeEnum.CALLBACK_ERROR.name().equalsIgnoreCase(failType)) {
 			return;
 		}
-		taskResultSummaryRepository.deleteByTaskId(taskId);
-		taskResultFileRepository.deleteByTaskId(taskId);
+		try {
+			taskResultSummaryRepository.deleteByTaskId(taskId);
+			taskResultFileRepository.deleteByTaskId(taskId);
+		} catch (Exception ex) {
+			log.warn("callback error terminal state committed but result metadata cleanup failed, taskId={}", taskId, ex);
+		}
 	}
 
 	private void ensureLogReportAllowed(Long taskId) {
