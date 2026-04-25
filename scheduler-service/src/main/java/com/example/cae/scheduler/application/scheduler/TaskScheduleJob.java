@@ -33,6 +33,8 @@ public class TaskScheduleJob {
 		ACCEPTED,
 		STOP_RETRY
 	}
+	private record DispatchConfirmResult(TaskDispatchAckDTO ack, boolean recovered) {
+	}
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -63,8 +65,8 @@ public class TaskScheduleJob {
 				}
 				notifyDispatchWithRetry(nodeId, task);
 				nodeAccepted = true;
-				TaskDispatchAckDTO dispatchAck = markTaskDispatchedWithRetry(task.getTaskId(), nodeId);
-				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchAck));
+				DispatchConfirmResult dispatchConfirm = markTaskDispatchedWithRetry(task.getTaskId(), nodeId);
+				taskScheduleManager.confirmScheduleSuccess(task.getTaskId(), nodeId, buildDispatchSuccessMessage(dispatchConfirm));
 			} catch (Exception ex) {
 				handleScheduleException(task, nodeId, taskMarkedScheduled, nodeAccepted, ex);
 			}
@@ -230,11 +232,11 @@ public class TaskScheduleJob {
 		}
 	}
 
-	private TaskDispatchAckDTO markTaskDispatchedWithRetry(Long taskId, Long nodeId) {
+	private DispatchConfirmResult markTaskDispatchedWithRetry(Long taskId, Long nodeId) {
 		Exception lastException = null;
 		for (int attempt = 1; attempt <= TASK_CONFIRM_MAX_ATTEMPTS; attempt++) {
 			try {
-				return taskClient.markTaskDispatched(taskId, nodeId);
+				return new DispatchConfirmResult(taskClient.markTaskDispatched(taskId, nodeId), false);
 			} catch (Exception ex) {
 				lastException = ex;
 				if (!shouldRetryTaskStateConfirm(ex)) {
@@ -243,7 +245,7 @@ public class TaskScheduleJob {
 				if (attempt == TASK_CONFIRM_MAX_ATTEMPTS) {
 					TaskDispatchAckDTO recoveredAck = recoverDispatchAckAfterConfirmFailure(taskId, nodeId, ex);
 					if (recoveredAck != null) {
-						return recoveredAck;
+						return new DispatchConfirmResult(recoveredAck, true);
 					}
 					throw ex;
 				}
@@ -336,8 +338,32 @@ public class TaskScheduleJob {
 		return "node accepted task, mark-dispatched confirm failed; wait for node RUNNING or dispatch-failed callback: " + reason;
 	}
 
-	private String buildDispatchSuccessMessage(TaskDispatchAckDTO dispatchAck) {
+	private String buildDispatchSuccessMessage(DispatchConfirmResult dispatchConfirm) {
+		TaskDispatchAckDTO dispatchAck = dispatchConfirm == null ? null : dispatchConfirm.ack();
+		boolean recovered = dispatchConfirm != null && dispatchConfirm.recovered();
 		if (dispatchAck == null || dispatchAck.getStatus() == null || dispatchAck.getStatus().isBlank()) {
+			return "task dispatched";
+		}
+		String status = dispatchAck.getStatus().trim().toUpperCase();
+		if (!recovered) {
+			if (TaskStatusEnum.RUNNING.name().equals(status)) {
+				return "task dispatched, already running";
+			}
+			return "task dispatched";
+		}
+		if (TaskStatusEnum.RUNNING.name().equals(status)) {
+			return "mark-dispatched ACK recovered, task already running";
+		}
+		if (TaskStatusEnum.SUCCESS.name().equals(status) || TaskStatusEnum.TIMEOUT.name().equals(status)) {
+			return "mark-dispatched ACK recovered, task already finished";
+		}
+		if (TaskStatusEnum.FAILED.name().equals(status)) {
+			return "mark-dispatched ACK recovered, task already failed";
+		}
+		if (TaskStatusEnum.CANCELED.name().equals(status)) {
+			return "mark-dispatched ACK recovered, task already canceled";
+		}
+		if (TaskStatusEnum.DISPATCHED.name().equals(status)) {
 			return "task dispatched";
 		}
 		if ("RUNNING".equalsIgnoreCase(dispatchAck.getStatus())) {
