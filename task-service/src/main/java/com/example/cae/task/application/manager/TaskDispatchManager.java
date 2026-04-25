@@ -17,6 +17,7 @@ import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
+import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
@@ -36,6 +37,7 @@ import java.util.Set;
 @Service
 public class TaskDispatchManager {
 	private static final Logger log = LoggerFactory.getLogger(TaskDispatchManager.class);
+	private static final int MAX_HISTORY_REASON_LENGTH = 255;
 	private static final Set<String> NODE_OFFLINE_AFFECTED_STATUSES = Set.of(
 			TaskStatusEnum.SCHEDULED.name(),
 			TaskStatusEnum.DISPATCHED.name(),
@@ -46,6 +48,7 @@ public class TaskDispatchManager {
 	private final TaskFileRepository taskFileRepository;
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
 	private final TaskResultFileRepository taskResultFileRepository;
+	private final TaskStatusHistoryRepository taskStatusHistoryRepository;
 	private final TaskStatusDomainService taskStatusDomainService;
 	private final SchedulerClient schedulerClient;
 	private final SolverClient solverClient;
@@ -56,6 +59,7 @@ public class TaskDispatchManager {
 						   TaskFileRepository taskFileRepository,
 						   TaskResultSummaryRepository taskResultSummaryRepository,
 						   TaskResultFileRepository taskResultFileRepository,
+						   TaskStatusHistoryRepository taskStatusHistoryRepository,
 						   TaskStatusDomainService taskStatusDomainService,
 						   SchedulerClient schedulerClient,
 						   SolverClient solverClient,
@@ -65,6 +69,7 @@ public class TaskDispatchManager {
 		this.taskFileRepository = taskFileRepository;
 		this.taskResultSummaryRepository = taskResultSummaryRepository;
 		this.taskResultFileRepository = taskResultFileRepository;
+		this.taskStatusHistoryRepository = taskStatusHistoryRepository;
 		this.taskStatusDomainService = taskStatusDomainService;
 		this.schedulerClient = schedulerClient;
 		this.solverClient = solverClient;
@@ -125,7 +130,7 @@ public class TaskDispatchManager {
 		return buildDispatchAck(task, nodeId);
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = BizException.class)
 	public TaskStatusAckDTO markFailed(Long taskId, Long nodeId, String failType, String reason, Boolean recoverable) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
@@ -134,6 +139,7 @@ public class TaskDispatchManager {
 		if (!Set.of(TaskStatusEnum.SCHEDULED.name(), TaskStatusEnum.DISPATCHED.name()).contains(task.getStatus())) {
 			if (TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
 				ensureTaskBoundToNode(task, nodeId);
+				recordRejectedDispatchFailureIfNeeded(task, failType, recoverable);
 				throw new BizException(
 						ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 						"dispatch-failed is not allowed after task entered RUNNING"
@@ -209,6 +215,33 @@ public class TaskDispatchManager {
 		} catch (IllegalArgumentException ex) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "unsupported failType: " + failType);
 		}
+	}
+
+	private void recordRejectedDispatchFailureIfNeeded(Task task, String failType, Boolean recoverable) {
+		if (task == null || task.getId() == null || !TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
+			return;
+		}
+		com.example.cae.task.domain.model.TaskStatusHistory history = new com.example.cae.task.domain.model.TaskStatusHistory();
+		history.setTaskId(task.getId());
+		history.setFromStatus(task.getStatus());
+		history.setToStatus(task.getStatus());
+		history.setChangeReason(buildRejectedDispatchFailureReason(failType, recoverable, task.getStatus()));
+		history.setOperatorType(OperatorTypeEnum.NODE.name());
+		history.setOperatorId(null);
+		taskStatusHistoryRepository.save(history);
+	}
+
+	private String buildRejectedDispatchFailureReason(String failType, Boolean recoverable, String currentStatus) {
+		String normalizedFailType = failType == null || failType.isBlank() ? "UNKNOWN" : failType.trim().toUpperCase();
+		String reason = "ignored late dispatch-failed("
+				+ normalizedFailType
+				+ ", recoverable="
+				+ Boolean.TRUE.equals(recoverable)
+				+ "), current="
+				+ (currentStatus == null ? "UNKNOWN" : currentStatus);
+		return reason.length() <= MAX_HISTORY_REASON_LENGTH
+				? reason
+				: reason.substring(0, MAX_HISTORY_REASON_LENGTH);
 	}
 
 
