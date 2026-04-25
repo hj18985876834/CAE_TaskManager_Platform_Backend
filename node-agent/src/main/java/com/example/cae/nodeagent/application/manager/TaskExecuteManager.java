@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class TaskExecuteManager {
+	private static final String UNSUPPORTED_RUNTIME_CANCEL_MESSAGE = "task execution interrupted by unsupported runtime cancel";
+
 	private final WorkDirManager workDirManager;
 	private final InputFilePrepareService inputFilePrepareService;
 	private final ExecutorSelectDomainService executorSelectDomainService;
@@ -36,7 +38,7 @@ public class TaskExecuteManager {
 		try {
 			taskRuntimeRegistry.attachWorker(context.getTaskId(), Thread.currentThread());
 			if (taskRuntimeRegistry.isCancelRequested(context.getTaskId())) {
-				taskReportManager.reportCanceled(context, taskRuntimeRegistry.getCancelReason(context.getTaskId()));
+				reportUnsupportedRuntimeCancel(context, false, null);
 				return;
 			}
 			prepareWorkDir(context);
@@ -53,7 +55,7 @@ public class TaskExecuteManager {
 			}
 		} catch (Exception ex) {
 			if (taskRuntimeRegistry.isCancelRequested(context.getTaskId()) || ex instanceof ProcessCanceledException) {
-				taskReportManager.reportCanceled(context, taskRuntimeRegistry.getCancelReason(context.getTaskId()));
+				reportUnsupportedRuntimeCancel(context, runningReported, ex);
 			} else if (!runningReported) {
 				taskReportManager.reportPreRunFailure(context, ex);
 			} else if (solverSucceeded) {
@@ -76,5 +78,16 @@ public class TaskExecuteManager {
 
 	public SolverExecutor selectExecutor(ExecutionContext context) {
 		return executorSelectDomainService.selectExecutor(context);
+	}
+
+	private void reportUnsupportedRuntimeCancel(ExecutionContext context, boolean runningReported, Exception cause) {
+		RuntimeException failure = cause == null
+				? new RuntimeException(UNSUPPORTED_RUNTIME_CANCEL_MESSAGE)
+				: new RuntimeException(UNSUPPORTED_RUNTIME_CANCEL_MESSAGE, cause);
+		if (runningReported) {
+			taskReportManager.reportFail(context, failure);
+		} else {
+			taskReportManager.reportPreRunFailure(context, failure);
+		}
 	}
 }
