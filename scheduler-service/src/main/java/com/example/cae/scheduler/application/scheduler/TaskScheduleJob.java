@@ -27,6 +27,11 @@ public class TaskScheduleJob {
 	private static final long TASK_CONFIRM_RETRY_INTERVAL_MS = 100L;
 	private static final int NODE_DISPATCH_MAX_ATTEMPTS = 3;
 	private static final long NODE_DISPATCH_RETRY_INTERVAL_MS = 200L;
+	private enum DispatchRetryDecision {
+		RETRY,
+		ACCEPTED,
+		STOP_RETRY
+	}
 	private final TaskClient taskClient;
 	private final NodeAgentClient nodeAgentClient;
 	private final TaskScheduleManager taskScheduleManager;
@@ -122,10 +127,11 @@ public class TaskScheduleJob {
 				if (!shouldRetryNodeDispatch(ex)) {
 					throw ex;
 				}
-				if (attempt == NODE_DISPATCH_MAX_ATTEMPTS) {
-					if (recoverNodeAcceptedAfterDispatchFailure(nodeId, taskId, ex)) {
-						return;
-					}
+				DispatchRetryDecision retryDecision = resolveDispatchRetryDecision(nodeId, taskId, ex);
+				if (retryDecision == DispatchRetryDecision.ACCEPTED) {
+					return;
+				}
+				if (retryDecision == DispatchRetryDecision.STOP_RETRY || attempt == NODE_DISPATCH_MAX_ATTEMPTS) {
 					throw ex;
 				}
 				sleepBeforeRetry("node-agent dispatch", taskId, nodeId, attempt, ex, NODE_DISPATCH_RETRY_INTERVAL_MS);
@@ -135,6 +141,13 @@ public class TaskScheduleJob {
 			throw runtimeException;
 		}
 		throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent dispatch failed");
+	}
+
+	private DispatchRetryDecision resolveDispatchRetryDecision(Long nodeId, Long taskId, Exception dispatchException) {
+		if (recoverNodeAcceptedAfterDispatchFailure(nodeId, taskId, dispatchException)) {
+			return DispatchRetryDecision.ACCEPTED;
+		}
+		return inspectCentralTaskBeforeDispatchRetry(nodeId, taskId, dispatchException);
 	}
 
 	private boolean recoverNodeAcceptedAfterDispatchFailure(Long nodeId, Long taskId, Exception dispatchException) {
@@ -150,6 +163,43 @@ public class TaskScheduleJob {
 					dispatchException == null ? null : dispatchException.getMessage(),
 					probeEx);
 			return false;
+		}
+	}
+
+	private DispatchRetryDecision inspectCentralTaskBeforeDispatchRetry(Long nodeId, Long taskId, Exception dispatchException) {
+		if (nodeId == null || taskId == null) {
+			return DispatchRetryDecision.RETRY;
+		}
+		try {
+			Map<Long, TaskBasicDTO> taskBasics = taskClient.getTaskBasics(List.of(taskId));
+			TaskBasicDTO taskBasic = taskBasics.get(taskId);
+			if (taskBasic == null || taskBasic.getStatus() == null || taskBasic.getStatus().isBlank()) {
+				return DispatchRetryDecision.RETRY;
+			}
+			String status = taskBasic.getStatus().trim().toUpperCase();
+			if (nodeId.equals(taskBasic.getNodeId())
+					&& TaskStatusEnum.SCHEDULED.name().equals(status)) {
+				return DispatchRetryDecision.RETRY;
+			}
+			if (nodeId.equals(taskBasic.getNodeId())
+					&& (TaskStatusEnum.DISPATCHED.name().equals(status)
+					|| TaskStatusEnum.RUNNING.name().equals(status))) {
+				return DispatchRetryDecision.ACCEPTED;
+			}
+			log.info("stop retrying node-agent dispatch because central task state changed, taskId={}, nodeId={}, currentNodeId={}, status={}, dispatchReason={}",
+					taskId,
+					nodeId,
+					taskBasic.getNodeId(),
+					status,
+					dispatchException == null ? null : dispatchException.getMessage());
+			return DispatchRetryDecision.STOP_RETRY;
+		} catch (Exception recoverEx) {
+			log.warn("failed to inspect central task state before node-agent dispatch retry, taskId={}, nodeId={}, dispatchReason={}",
+					taskId,
+					nodeId,
+					dispatchException == null ? null : dispatchException.getMessage(),
+					recoverEx);
+			return DispatchRetryDecision.RETRY;
 		}
 	}
 
