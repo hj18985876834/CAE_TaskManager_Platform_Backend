@@ -20,6 +20,7 @@ import com.example.cae.scheduler.interfaces.response.AvailableNodeResponse;
 import com.example.cae.scheduler.interfaces.response.NodeDetailResponse;
 import com.example.cae.scheduler.interfaces.response.NodeListItemResponse;
 import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
+import com.example.cae.scheduler.interfaces.response.NodeReservationReconcileResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverResponse;
 import com.example.cae.scheduler.interfaces.response.NodeSolverStatusResponse;
 import org.springframework.stereotype.Service;
@@ -180,6 +181,10 @@ public class NodeAppService {
 		return nodeCapacityManager.release(nodeId, taskId);
 	}
 
+	@Transactional
+	public NodeReservationReconcileResponse reconcileReservation(Long nodeId) {
+		return nodeCapacityManager.reconcileReservedCount(nodeId);
+	}
 	public String getNodeToken(Long nodeId) {
 		if (nodeId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");

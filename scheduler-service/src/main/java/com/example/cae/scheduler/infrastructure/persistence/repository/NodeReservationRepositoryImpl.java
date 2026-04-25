@@ -34,6 +34,11 @@ public class NodeReservationRepositoryImpl implements NodeReservationRepository 
 		nodeReservationMapper.updateById(toPO(reservation));
 	}
 
+	@Override
+	public int countReservedByNodeId(Long nodeId) {
+		return nodeReservationMapper.countReservedByNodeId(nodeId);
+	}
+
 	private NodeReservation fromPO(NodeReservationPO po) {
 		NodeReservation reservation = new NodeReservation();
 		reservation.setId(po.getId());

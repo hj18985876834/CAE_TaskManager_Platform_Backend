@@ -7,6 +7,7 @@ import com.example.cae.scheduler.domain.model.NodeReservation;
 import com.example.cae.scheduler.domain.repository.ComputeNodeRepository;
 import com.example.cae.scheduler.domain.repository.NodeReservationRepository;
 import com.example.cae.scheduler.interfaces.response.NodeReservationActionResponse;
+import com.example.cae.scheduler.interfaces.response.NodeReservationReconcileResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -66,6 +67,27 @@ public class NodeCapacityManager {
 		return buildResponse(taskId, nodeId, reservation.getStatus(), safeReservedCount(node));
 	}
 
+	@Transactional
+	public NodeReservationReconcileResponse reconcileReservedCount(Long nodeId) {
+		if (nodeId == null) {
+			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId is required");
+		}
+		ComputeNode node = computeNodeRepository.findByIdForUpdate(nodeId)
+				.orElseThrow(() -> new BizException(ErrorCodeConstants.NODE_NOT_FOUND, "node not found"));
+		int before = safeReservedCount(node);
+		int actual = nodeReservationRepository.countReservedByNodeId(nodeId);
+		if (before != actual) {
+			node.setReservedCount(actual);
+			computeNodeRepository.update(node);
+		}
+		NodeReservationReconcileResponse response = new NodeReservationReconcileResponse();
+		response.setNodeId(nodeId);
+		response.setBeforeReservedCount(before);
+		response.setActualReservedCount(actual);
+		response.setAfterReservedCount(actual);
+		response.setChanged(before != actual);
+		return response;
+	}
 	private void validateRequest(Long nodeId, Long taskId) {
 		if (nodeId == null || taskId == null) {
 			throw new BizException(ErrorCodeConstants.BAD_REQUEST, "nodeId and taskId are required");

@@ -19,4 +19,7 @@ public interface NodeReservationMapper {
 
 	@Update("UPDATE node_reservation SET status = #{status}, released_at = #{releasedAt} WHERE id = #{id}")
 	int updateById(NodeReservationPO po);
+
+	@Select("SELECT COUNT(1) FROM node_reservation WHERE node_id = #{nodeId} AND status = 'RESERVED'")
+	int countReservedByNodeId(@Param("nodeId") Long nodeId);
 }

@@ -10,4 +10,6 @@ public interface NodeReservationRepository {
 	void save(NodeReservation reservation);
 
 	void update(NodeReservation reservation);
+
+	int countReservedByNodeId(Long nodeId);
 }
