@@ -33,6 +33,7 @@ public class TaskReportManager {
 	private static final int LOG_REPORT_MAX_ATTEMPTS = 3;
 	private static final long LOG_REPORT_RETRY_INTERVAL_MS = 100L;
 	private static final int MAX_RESULT_FILE_NAME_LENGTH = 255;
+	private static final int MAX_CALLBACK_MESSAGE_LENGTH = 255;
 	private static final int RESULT_FILE_HASH_LENGTH = 16;
 	private final TaskReportAppService taskReportAppService;
 	private final TaskRuntimeRegistry taskRuntimeRegistry;
@@ -157,14 +158,19 @@ public class TaskReportManager {
 			return;
 		}
 		retryTerminalReport(context == null ? null : context.getTaskId(), "mark failed",
-				() -> taskReportAppService.markFailed(context.getTaskId(), FailTypeEnum.RUNTIME_ERROR.name(), ex.getMessage()));
+				() -> taskReportAppService.markFailed(
+						context.getTaskId(),
+						FailTypeEnum.RUNTIME_ERROR.name(),
+						normalizeCallbackMessage(ex == null ? null : ex.getMessage(), "solver runtime failed")
+				));
 	}
 
 	public void reportPreRunFailure(ExecutionContext context, Exception ex) {
 		Long taskId = context == null ? null : context.getTaskId();
-		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
-				? "node-agent prepare task failed"
-				: ex.getMessage();
+		String message = normalizeCallbackMessage(
+				ex == null ? null : ex.getMessage(),
+				"node-agent prepare task failed"
+		);
 		if (isRecoverablePreRunFailure(ex)) {
 			try {
 				retryDispatchFailureReport(
@@ -184,7 +190,10 @@ public class TaskReportManager {
 						() -> taskReportAppService.markFailed(
 								taskId,
 								FailTypeEnum.RUNTIME_ERROR.name(),
-								buildAmbiguousPreRunFailureMessage(message, dispatchReportEx)
+								normalizeCallbackMessage(
+										buildAmbiguousPreRunFailureMessage(message, dispatchReportEx),
+										"running report outcome ambiguous before solver start"
+								)
 						));
 			}
 			return;
@@ -208,9 +217,10 @@ public class TaskReportManager {
 
 	public void reportPostSuccessCallbackFailure(ExecutionContext context, Exception ex) {
 		Long taskId = context == null ? null : context.getTaskId();
-		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
-				? "post-success callback reporting failed"
-				: ex.getMessage();
+		String message = normalizeCallbackMessage(
+				ex == null ? null : ex.getMessage(),
+				"post-success callback reporting failed"
+		);
 		log.error("task finished successfully but callback reporting did not complete, taskId={}, message={}",
 				taskId,
 				message,
@@ -265,6 +275,18 @@ public class TaskReportManager {
 				? "running report failed before solver start"
 				: originalMessage;
 		return "running report outcome ambiguous before solver start; " + message + "; " + dispatchMessage;
+	}
+
+	private String normalizeCallbackMessage(String message, String defaultMessage) {
+		String normalized = message == null || message.isBlank()
+				? defaultMessage
+				: message.trim();
+		if (normalized == null || normalized.isBlank()) {
+			normalized = "node-agent callback failed";
+		}
+		return normalized.length() <= MAX_CALLBACK_MESSAGE_LENGTH
+				? normalized
+				: normalized.substring(0, MAX_CALLBACK_MESSAGE_LENGTH);
 	}
 
 	private void retryTerminalReport(Long taskId, String action, Runnable runnable) {
