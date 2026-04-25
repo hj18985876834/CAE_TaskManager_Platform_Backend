@@ -9,6 +9,7 @@ import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureReleaseException;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import org.slf4j.Logger;
@@ -350,6 +351,9 @@ public class TaskScheduleJob {
 					isRecoverableDispatchError(ex)
 			);
 		} catch (Exception callbackEx) {
+			if (callbackEx instanceof DispatchFailureReleaseException) {
+				return;
+			}
 			recordScheduleFailureQuietly(taskId, nodeId, callbackEx);
 		}
 	}

@@ -6,6 +6,7 @@ import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureReleaseException;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,6 +20,9 @@ import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -92,6 +96,29 @@ class TaskScheduleJobTest {
 				eq(21L),
 				contains("node accepted task, mark-dispatched confirm failed"));
 		verify(taskScheduleManager, never()).confirmScheduleSuccess(eq(1001L), eq(21L), org.mockito.ArgumentMatchers.anyString());
+	}
+
+	@Test
+	void runShouldNotRecordGenericFailureAgainWhenDispatchFailureReleaseAlreadyAudited() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
+		doThrow(new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent dispatch request failed"))
+				.when(nodeAgentClient).notifyDispatch(21L, task);
+		when(taskScheduleManager.handleDispatchFailure(eq(1001L), eq(21L), eq("DISPATCH_ERROR"), anyString(), anyBoolean()))
+				.thenThrow(new DispatchFailureReleaseException(
+						"reservation release failed after dispatch-failed: scheduler release failed",
+						new BizException(ErrorCodeConstants.BAD_GATEWAY, "scheduler release failed")
+				));
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager, never()).recordScheduleFailure(
+				eq(1001L),
+				eq(21L),
+				contains("reservation release failed after dispatch-failed"));
 	}
 
 	private TaskScheduleClaimDTO scheduleClaim(boolean claimed, Long nodeId, String status) {

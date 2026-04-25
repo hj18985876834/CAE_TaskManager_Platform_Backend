@@ -22,11 +22,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -125,9 +127,9 @@ class ScheduleAppServiceTest {
 		stubEnabledSolverAndProfile(task);
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
-		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
-		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
-		when(nodeCapacityManager.reserve(selected.getId(), task.getTaskId())).thenReturn(reservation);
+		when(scheduleDomainService.filterAvailableNodes(anyList(), eq(task.getSolverId()), anyList())).thenReturn(List.of(selected));
+		when(scheduleStrategy.selectNode(eq(task), anyList())).thenReturn(selected);
+		when(nodeCapacityManager.reserve(eq(selected.getId()), eq(task.getTaskId()))).thenReturn(reservation);
 
 		Long nodeId = scheduleAppService.scheduleTask(task);
 
@@ -143,14 +145,43 @@ class ScheduleAppServiceTest {
 		stubEnabledSolverAndProfile(task);
 		when(computeNodeRepository.listByStatus("ONLINE")).thenReturn(List.of(selected));
 		when(nodeSolverCapabilityRepository.listBySolverId(task.getSolverId())).thenReturn(List.of(capability));
-		when(scheduleDomainService.filterAvailableNodes(List.of(selected), task.getSolverId(), List.of(capability))).thenReturn(List.of(selected));
-		when(scheduleStrategy.selectNode(task, List.of(selected))).thenReturn(selected);
-		when(nodeCapacityManager.reserve(selected.getId(), task.getTaskId()))
+		when(scheduleDomainService.filterAvailableNodes(anyList(), eq(task.getSolverId()), anyList())).thenReturn(List.of(selected));
+		when(scheduleStrategy.selectNode(eq(task), anyList())).thenReturn(selected);
+		when(nodeCapacityManager.reserve(eq(selected.getId()), eq(task.getTaskId())))
 				.thenThrow(new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, "no available node"));
 
 		BizException exception = assertThrows(BizException.class, () -> scheduleAppService.scheduleTask(task));
 
 		assertEquals(ErrorCodeConstants.NO_AVAILABLE_NODE, exception.getCode());
+	}
+
+	@Test
+	void handleDispatchFailureShouldRecordReleaseFailureAuditBeforeThrowing() {
+		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
+		ack.setTaskId(1001L);
+		ack.setStatus("QUEUED");
+		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", "dispatch watchdog timeout, node-agent runtime missing", true))
+				.thenReturn(ack);
+		when(nodeCapacityManager.release(31L, 1001L))
+				.thenThrow(new BizException(ErrorCodeConstants.BAD_GATEWAY, "scheduler release failed"));
+
+		DispatchFailureReleaseException exception = assertThrows(
+				DispatchFailureReleaseException.class,
+				() -> scheduleAppService.handleDispatchFailure(
+						1001L,
+						31L,
+						"DISPATCH_ERROR",
+						"dispatch watchdog timeout, node-agent runtime missing",
+						true
+				)
+		);
+
+		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
+				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
+		verify(scheduleRecordRepository).save(captor.capture());
+		assertEquals("FAILED", captor.getValue().getScheduleStatus());
+		assertTrue(captor.getValue().getScheduleMessage().startsWith("reservation release failed after dispatch-failed: "));
+		assertTrue(exception.getMessage().startsWith("reservation release failed after dispatch-failed: "));
 	}
 
 	private TaskDTO buildTask() {
@@ -168,6 +199,7 @@ class ScheduleAppServiceTest {
 		SolverClient.ProfileMeta profileMeta = new SolverClient.ProfileMeta();
 		profileMeta.setProfileId(task.getProfileId());
 		profileMeta.setEnabled(1);
+		profileMeta.setSolverId(task.getSolverId());
 		when(solverClient.getSolverMeta(task.getSolverId())).thenReturn(solverMeta);
 		when(solverClient.getProfileMeta(task.getProfileId())).thenReturn(profileMeta);
 	}
