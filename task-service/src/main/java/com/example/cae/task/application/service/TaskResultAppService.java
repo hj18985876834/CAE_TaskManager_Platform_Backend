@@ -1,6 +1,7 @@
 package com.example.cae.task.application.service;
 
 import com.example.cae.common.constant.ErrorCodeConstants;
+import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.task.application.assembler.TaskResultAssembler;
 import com.example.cae.task.domain.model.Task;
@@ -21,9 +22,16 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class TaskResultAppService {
+	private static final Set<String> RESULT_EXPOSURE_ALLOWED_STATUSES = Set.of(
+			TaskStatusEnum.RUNNING.name(),
+			TaskStatusEnum.SUCCESS.name(),
+			TaskStatusEnum.TIMEOUT.name()
+	);
+
 	private final TaskRepository taskRepository;
 	private final TaskResultSummaryRepository taskResultSummaryRepository;
 	private final TaskResultFileRepository taskResultFileRepository;
@@ -54,6 +62,7 @@ public class TaskResultAppService {
 	public TaskResultSummaryResponse getResultSummary(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		ensureResultExposureAllowed(task);
 		return taskResultSummaryRepository.findByTaskId(taskId)
 				.map(taskResultAssembler::toSummaryResponse)
 				.orElseThrow(() -> new BizException(ErrorCodeConstants.NOT_FOUND, "task result summary not found"));
@@ -62,6 +71,7 @@ public class TaskResultAppService {
 	public List<TaskResultFileResponse> getResultFiles(Long taskId, Long userId, String roleCode) {
 		Task task = taskRepository.findById(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		ensureResultExposureAllowed(task);
 		return taskResultFileRepository.listByTaskId(taskId).stream().map(taskResultAssembler::toFileResponse).toList();
 	}
 
@@ -69,6 +79,7 @@ public class TaskResultAppService {
 		TaskResultFile file = taskResultFileRepository.findById(fileId).orElseThrow(() -> new BizException(ErrorCodeConstants.RESULT_FILE_NOT_FOUND, "result file not found"));
 		Task task = taskRepository.findById(file.getTaskId()).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		taskPermissionChecker.checkCanAccess(task, userId, roleCode);
+		ensureResultExposureAllowed(task);
 		return file;
 	}
 
@@ -115,5 +126,11 @@ public class TaskResultAppService {
 			}
 		}
 		return false;
+	}
+
+	private void ensureResultExposureAllowed(Task task) {
+		if (task == null || task.getStatus() == null || !RESULT_EXPOSURE_ALLOWED_STATUSES.contains(task.getStatus())) {
+			throw new BizException(ErrorCodeConstants.NOT_FOUND, "task result is not available in current status");
+		}
 	}
 }
