@@ -7,6 +7,7 @@ import com.example.cae.common.dto.TaskDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureMessageConstants;
 import com.example.cae.scheduler.application.service.DispatchFailureReleaseException;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
@@ -230,7 +231,27 @@ class TaskScheduleJobTest {
 		verify(taskScheduleManager, never()).recordScheduleFailure(
 				eq(1001L),
 				eq(21L),
-				contains("reservation release failed after dispatch-failed"));
+				contains(DispatchFailureMessageConstants.DISPATCH_FAILURE_RELEASE_FAILED_PREFIX));
+	}
+
+	@Test
+	void runShouldMapNodeAgentRejectedToFormalDispatchFailureReason() {
+		TaskDTO task = new TaskDTO();
+		task.setTaskId(1001L);
+		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
+		when(taskScheduleManager.schedule(task)).thenReturn(21L);
+		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
+		doThrow(new BizException(ErrorCodeConstants.NODE_AGENT_REJECTED, "node is busy"))
+				.when(nodeAgentClient).notifyDispatch(21L, task);
+
+		taskScheduleJob.run();
+
+		verify(taskScheduleManager).handleDispatchFailure(
+				1001L,
+				21L,
+				"DISPATCH_ERROR",
+				DispatchFailureMessageConstants.NODE_AGENT_REJECTED_DISPATCH_REQUEST,
+				true);
 	}
 
 	private TaskScheduleClaimDTO scheduleClaim(boolean claimed, Long nodeId, String status) {

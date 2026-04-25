@@ -9,6 +9,7 @@ import com.example.cae.common.enums.FailTypeEnum;
 import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.scheduler.application.manager.TaskScheduleManager;
+import com.example.cae.scheduler.application.service.DispatchFailureMessageConstants;
 import com.example.cae.scheduler.application.service.DispatchFailureReleaseException;
 import com.example.cae.scheduler.infrastructure.client.NodeAgentClient;
 import com.example.cae.scheduler.infrastructure.client.TaskClient;
@@ -451,15 +452,15 @@ public class TaskScheduleJob {
 	private String buildDispatchFailureReason(Exception ex) {
 		if (ex instanceof BizException bizException && bizException.getCode() != null) {
 			if (bizException.getCode() == ErrorCodeConstants.NODE_AGENT_REJECTED) {
-				return "node-agent rejected dispatch request";
+				return DispatchFailureMessageConstants.NODE_AGENT_REJECTED_DISPATCH_REQUEST;
 			}
 			if (bizException.getCode() == ErrorCodeConstants.NODE_AGENT_EMPTY_RESPONSE
 					|| bizException.getCode() == ErrorCodeConstants.BAD_GATEWAY) {
-				return "node-agent dispatch request failed";
+				return DispatchFailureMessageConstants.NODE_AGENT_DISPATCH_REQUEST_FAILED;
 			}
 		}
 		if (ex instanceof RestClientException) {
-			return "node-agent dispatch request failed";
+			return DispatchFailureMessageConstants.NODE_AGENT_DISPATCH_REQUEST_FAILED;
 		}
 		if (ex == null || ex.getMessage() == null || ex.getMessage().isBlank()) {
 			return "task dispatch failed";

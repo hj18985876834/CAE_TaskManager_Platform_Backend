@@ -42,8 +42,6 @@ public class ScheduleAppService {
 	private static final String NO_ENABLED_CAPABILITY_MESSAGE = "no enabled node solver capability";
 	private static final String NO_DISPATCHABLE_NODE_MESSAGE = "no dispatchable node with capacity";
 	private static final String CAPACITY_CONFLICT_MESSAGE = "candidate nodes are full or reservation conflicted";
-	private static final String DISPATCH_FAILED_REJECTED_RUNNING_MESSAGE = "dispatch-failed rejected, task already running";
-	private static final String DISPATCH_FAILURE_RELEASE_FAILED_PREFIX = "reservation release failed after dispatch-failed: ";
 	private final ComputeNodeRepository computeNodeRepository;
 	private final NodeSolverCapabilityRepository nodeSolverCapabilityRepository;
 	private final ScheduleRecordRepository scheduleRecordRepository;
@@ -269,14 +267,14 @@ public class ScheduleAppService {
 		if (!isRejectedRunningDispatchFailure(ex) || taskId == null || nodeId == null) {
 			return;
 		}
-		recordScheduleFailure(taskId, nodeId, DISPATCH_FAILED_REJECTED_RUNNING_MESSAGE);
+		recordScheduleFailure(taskId, nodeId, DispatchFailureMessageConstants.DISPATCH_FAILED_REJECTED_RUNNING);
 	}
 
 	private String buildDispatchFailureReleaseFailureMessage(Exception ex) {
 		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
 				? "reservation release failed"
 				: ex.getMessage();
-		return DISPATCH_FAILURE_RELEASE_FAILED_PREFIX + message;
+		return DispatchFailureMessageConstants.DISPATCH_FAILURE_RELEASE_FAILED_PREFIX + message;
 	}
 
 	private boolean isRejectedRunningDispatchFailure(BizException ex) {

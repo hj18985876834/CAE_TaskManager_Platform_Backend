@@ -156,46 +156,15 @@ class ScheduleAppServiceTest {
 	}
 
 	@Test
-	void handleDispatchFailureShouldRecordWatchdogReasonAfterSuccessfulRecovery() {
-		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
-		ack.setTaskId(1001L);
-		ack.setStatus("QUEUED");
+	void handleDispatchFailureShouldRecordFormalRejectedRunningAudit() {
 		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", "dispatch watchdog timeout, node-agent runtime missing", true))
-				.thenReturn(ack);
-		NodeReservationActionResponse release = new NodeReservationActionResponse();
-		release.setTaskId(1001L);
-		release.setNodeId(31L);
-		release.setReservationStatus("RELEASED");
-		release.setReservedCount(0);
-		when(nodeCapacityManager.release(31L, 1001L)).thenReturn(release);
+				.thenThrow(new BizException(
+						ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
+						"dispatch-failed is not allowed after task entered RUNNING"
+				));
 
-		scheduleAppService.handleDispatchFailure(
-				1001L,
-				31L,
-				"DISPATCH_ERROR",
-				"dispatch watchdog timeout, node-agent runtime missing",
-				true
-		);
-
-		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
-				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
-		verify(scheduleRecordRepository).save(captor.capture());
-		assertEquals("FAILED", captor.getValue().getScheduleStatus());
-		assertEquals("dispatch watchdog timeout, node-agent runtime missing", captor.getValue().getScheduleMessage());
-	}
-
-	@Test
-	void handleDispatchFailureShouldRecordReleaseFailureAuditBeforeThrowing() {
-		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
-		ack.setTaskId(1001L);
-		ack.setStatus("QUEUED");
-		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", "dispatch watchdog timeout, node-agent runtime missing", true))
-				.thenReturn(ack);
-		when(nodeCapacityManager.release(31L, 1001L))
-				.thenThrow(new BizException(ErrorCodeConstants.BAD_GATEWAY, "scheduler release failed"));
-
-		DispatchFailureReleaseException exception = assertThrows(
-				DispatchFailureReleaseException.class,
+		assertThrows(
+				BizException.class,
 				() -> scheduleAppService.handleDispatchFailure(
 						1001L,
 						31L,
@@ -208,9 +177,65 @@ class ScheduleAppServiceTest {
 		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
 				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
 		verify(scheduleRecordRepository).save(captor.capture());
+		assertEquals(DispatchFailureMessageConstants.DISPATCH_FAILED_REJECTED_RUNNING, captor.getValue().getScheduleMessage());
+	}
+
+	@Test
+	void handleDispatchFailureShouldRecordWatchdogReasonAfterSuccessfulRecovery() {
+		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
+		ack.setTaskId(1001L);
+		ack.setStatus("QUEUED");
+		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING, true))
+				.thenReturn(ack);
+		NodeReservationActionResponse release = new NodeReservationActionResponse();
+		release.setTaskId(1001L);
+		release.setNodeId(31L);
+		release.setReservationStatus("RELEASED");
+		release.setReservedCount(0);
+		when(nodeCapacityManager.release(31L, 1001L)).thenReturn(release);
+
+		scheduleAppService.handleDispatchFailure(
+				1001L,
+				31L,
+				"DISPATCH_ERROR",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
+				true
+		);
+
+		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
+				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
+		verify(scheduleRecordRepository).save(captor.capture());
 		assertEquals("FAILED", captor.getValue().getScheduleStatus());
-		assertTrue(captor.getValue().getScheduleMessage().startsWith("reservation release failed after dispatch-failed: "));
-		assertTrue(exception.getMessage().startsWith("reservation release failed after dispatch-failed: "));
+		assertEquals(DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING, captor.getValue().getScheduleMessage());
+	}
+
+	@Test
+	void handleDispatchFailureShouldRecordReleaseFailureAuditBeforeThrowing() {
+		com.example.cae.common.dto.TaskStatusAckDTO ack = new com.example.cae.common.dto.TaskStatusAckDTO();
+		ack.setTaskId(1001L);
+		ack.setStatus("QUEUED");
+		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING, true))
+				.thenReturn(ack);
+		when(nodeCapacityManager.release(31L, 1001L))
+				.thenThrow(new BizException(ErrorCodeConstants.BAD_GATEWAY, "scheduler release failed"));
+
+		DispatchFailureReleaseException exception = assertThrows(
+				DispatchFailureReleaseException.class,
+				() -> scheduleAppService.handleDispatchFailure(
+						1001L,
+						31L,
+						"DISPATCH_ERROR",
+						DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
+						true
+				)
+		);
+
+		ArgumentCaptor<com.example.cae.scheduler.domain.model.ScheduleRecord> captor =
+				ArgumentCaptor.forClass(com.example.cae.scheduler.domain.model.ScheduleRecord.class);
+		verify(scheduleRecordRepository).save(captor.capture());
+		assertEquals("FAILED", captor.getValue().getScheduleStatus());
+		assertTrue(captor.getValue().getScheduleMessage().startsWith(DispatchFailureMessageConstants.DISPATCH_FAILURE_RELEASE_FAILED_PREFIX));
+		assertTrue(exception.getMessage().startsWith(DispatchFailureMessageConstants.DISPATCH_FAILURE_RELEASE_FAILED_PREFIX));
 	}
 
 	private TaskDTO buildTask() {
