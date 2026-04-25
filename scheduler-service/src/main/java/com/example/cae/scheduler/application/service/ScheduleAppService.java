@@ -87,7 +87,10 @@ public class ScheduleAppService {
 
 		List<ComputeNode> orderedCandidates = scheduleStrategy.orderNodes(task, availableNodes);
 		if (orderedCandidates.isEmpty()) {
-			throw new BizException(ErrorCodeConstants.NO_AVAILABLE_NODE, CAPACITY_CONFLICT_MESSAGE);
+			throw new BizException(
+					ErrorCodeConstants.NO_AVAILABLE_NODE,
+					buildNoAvailableNodeMessage(task, onlineNodes, solverCapabilities, availableNodes)
+			);
 		}
 
 		BizException lastCapacityFailure = null;
