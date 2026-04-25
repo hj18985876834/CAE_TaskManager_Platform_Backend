@@ -44,6 +44,7 @@ public class TaskExecuteManager {
 			prepareWorkDir(context);
 			prepareInputFiles(context);
 			taskReportManager.reportRunning(context);
+			taskRuntimeRegistry.markRunningReported(context.getTaskId());
 			runningReported = true;
 			SolverExecutor executor = selectExecutor(context);
 			ExecutionResult result = executor.execute(context);

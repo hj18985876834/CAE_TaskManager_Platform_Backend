@@ -42,7 +42,7 @@ public class TaskDispatchManager {
 		if (taskRuntimeRegistry.isRunning(request.getTaskId())) {
 			return;
 		}
-		if (taskRuntimeRegistry.runningCount() >= maxConcurrency()) {
+		if (taskRuntimeRegistry.activeCount() >= maxConcurrency()) {
 			throw new BizException(ErrorCodeConstants.CONFLICT, "node is busy");
 		}
 		if (!taskRuntimeRegistry.register(request.getTaskId())) {

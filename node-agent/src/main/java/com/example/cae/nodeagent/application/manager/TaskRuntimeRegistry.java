@@ -26,8 +26,21 @@ public class TaskRuntimeRegistry {
 		return taskId != null && activeTasks.containsKey(taskId);
 	}
 
-	public int runningCount() {
+	public int activeCount() {
 		return activeTasks.size();
+	}
+
+	public int runningCount() {
+		return (int) activeTasks.values().stream()
+				.filter(TaskRuntime::isRunningReported)
+				.count();
+	}
+
+	public void markRunningReported(Long taskId) {
+		TaskRuntime runtime = activeTasks.get(taskId);
+		if (runtime != null) {
+			runtime.setRunningReported(true);
+		}
 	}
 
 	public void attachWorker(Long taskId, Thread workerThread) {
@@ -89,6 +102,7 @@ public class TaskRuntimeRegistry {
 
 	private static class TaskRuntime {
 		private volatile boolean cancelRequested;
+		private volatile boolean runningReported;
 		private volatile String cancelReason;
 		private volatile Thread workerThread;
 		private volatile Process process;
@@ -99,6 +113,14 @@ public class TaskRuntimeRegistry {
 
 		public void setCancelRequested(boolean cancelRequested) {
 			this.cancelRequested = cancelRequested;
+		}
+
+		public boolean isRunningReported() {
+			return runningReported;
+		}
+
+		public void setRunningReported(boolean runningReported) {
+			this.runningReported = runningReported;
 		}
 
 		public String getCancelReason() {
