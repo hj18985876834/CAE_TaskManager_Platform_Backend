@@ -13,6 +13,7 @@ import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.domain.service.TaskValidationDomainService;
 import com.example.cae.task.application.support.TaskParamSchemaValidator;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
@@ -118,7 +119,13 @@ public class TaskValidationManager {
 
         mergeDerivedParams(task, validationOutcome);
         if (!TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
-            taskStatusDomainService.transfer(task, TaskStatusEnum.VALIDATED.name(), "validation passed", OperatorTypeEnum.USER.name(), userId);
+            taskStatusDomainService.transfer(
+                    task,
+                    TaskStatusEnum.VALIDATED.name(),
+                    TaskStatusHistoryMessageConstants.VALIDATION_PASSED,
+                    OperatorTypeEnum.USER.name(),
+                    userId
+            );
         }
         taskRepository.update(task);
 

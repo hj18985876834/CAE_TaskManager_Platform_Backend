@@ -21,6 +21,7 @@ import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +105,13 @@ public class TaskDispatchManager {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for scheduling: " + task.getStatus());
 		}
 		task.bindNode(nodeId);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.SCHEDULED.name(), "scheduler selected node", OperatorTypeEnum.SYSTEM.name(), null);
+		taskStatusDomainService.transfer(
+				task,
+				TaskStatusEnum.SCHEDULED.name(),
+				TaskStatusHistoryMessageConstants.SCHEDULER_SELECTED_NODE,
+				OperatorTypeEnum.SYSTEM.name(),
+				null
+		);
 		taskRepository.update(task);
 		return buildScheduleClaimResult(Boolean.TRUE, task, nodeId);
 	}
@@ -125,7 +132,13 @@ public class TaskDispatchManager {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for dispatch confirm: " + task.getStatus());
 		}
 		ensureTaskBoundToNode(task, nodeId);
-		taskStatusDomainService.transfer(task, TaskStatusEnum.DISPATCHED.name(), "task dispatched", OperatorTypeEnum.SYSTEM.name(), null);
+		taskStatusDomainService.transfer(
+				task,
+				TaskStatusEnum.DISPATCHED.name(),
+				TaskStatusHistoryMessageConstants.TASK_DISPATCHED,
+				OperatorTypeEnum.SYSTEM.name(),
+				null
+		);
 		taskRepository.update(task);
 		return buildDispatchAck(task, nodeId);
 	}
@@ -232,13 +245,15 @@ public class TaskDispatchManager {
 	}
 
 	private String buildRejectedDispatchFailureReason(String failType, Boolean recoverable, String currentStatus) {
-		String normalizedFailType = failType == null || failType.isBlank() ? "UNKNOWN" : failType.trim().toUpperCase();
-		String reason = "ignored late dispatch-failed("
+		String normalizedFailType = failType == null || failType.isBlank()
+				? TaskStatusHistoryMessageConstants.UNKNOWN
+				: failType.trim().toUpperCase();
+		String reason = TaskStatusHistoryMessageConstants.IGNORED_LATE_DISPATCH_FAILED_PREFIX
 				+ normalizedFailType
 				+ ", recoverable="
 				+ Boolean.TRUE.equals(recoverable)
 				+ "), current="
-				+ (currentStatus == null ? "UNKNOWN" : currentStatus);
+				+ (currentStatus == null ? TaskStatusHistoryMessageConstants.UNKNOWN : currentStatus);
 		return reason.length() <= MAX_HISTORY_REASON_LENGTH
 				? reason
 				: reason.substring(0, MAX_HISTORY_REASON_LENGTH);
@@ -253,7 +268,7 @@ public class TaskDispatchManager {
 			throw new BizException(ErrorCodeConstants.CONFLICT, "node is not offline");
 		}
 		String effectiveReason = reason == null || reason.isBlank()
-				? "node offline, task terminated by scheduler"
+				? TaskStatusHistoryMessageConstants.NODE_OFFLINE_TASK_TERMINATED_BY_SCHEDULER
 				: reason;
 		List<Task> affectedTasks = taskRepository.listByNodeIdAndStatuses(nodeId, List.copyOf(NODE_OFFLINE_AFFECTED_STATUSES));
 		int changedCount = 0;

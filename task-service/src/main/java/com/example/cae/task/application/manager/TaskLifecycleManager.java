@@ -7,6 +7,7 @@ import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.exception.BizException;
 import com.example.cae.common.utils.JsonUtil;
 import com.example.cae.task.application.assembler.TaskAssembler;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.domain.model.Task;
 import com.example.cae.task.domain.model.TaskFile;
 import com.example.cae.task.domain.model.TaskStatusHistory;
@@ -131,7 +132,13 @@ public class TaskLifecycleManager {
 			task.setParamsJson(JsonUtil.toJson(request.getParams()));
 		}
 		if (paramsChanged && TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
-			taskStatusDomainService.transfer(task, TaskStatusEnum.CREATED.name(), "task parameters updated, re-validation required", OperatorTypeEnum.USER.name(), userId);
+			taskStatusDomainService.transfer(
+					task,
+					TaskStatusEnum.CREATED.name(),
+					TaskStatusHistoryMessageConstants.TASK_PARAMETERS_UPDATED_REVALIDATION_REQUIRED,
+					OperatorTypeEnum.USER.name(),
+					userId
+			);
 		}
 		taskRepository.update(task);
 		return taskAssembler.toUpdateResponse(task);
@@ -183,7 +190,13 @@ public class TaskLifecycleManager {
 		Task task = loadAndCheckOwner(taskId, userId);
 		taskValidationDomainService.checkTaskCanSubmit(task);
 		validateTaskDefinition(task.getSolverId(), task.getProfileId(), task.getTaskType());
-		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), "task submitted", OperatorTypeEnum.USER.name(), userId);
+		taskStatusDomainService.transfer(
+				task,
+				TaskStatusEnum.QUEUED.name(),
+				TaskStatusHistoryMessageConstants.TASK_SUBMITTED,
+				OperatorTypeEnum.USER.name(),
+				userId
+		);
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(taskId);
 		return buildTaskSubmitResponse(task);
@@ -219,7 +232,7 @@ public class TaskLifecycleManager {
 		history.setTaskId(task.getId());
 		history.setFromStatus(task.getStatus());
 		history.setToStatus(task.getStatus());
-		history.setChangeReason("priority adjusted: " + oldPriority + " -> " + newPriority);
+		history.setChangeReason(TaskStatusHistoryMessageConstants.PRIORITY_ADJUSTED_PREFIX + oldPriority + " -> " + newPriority);
 		history.setOperatorType(OperatorTypeEnum.ADMIN.name());
 		history.setOperatorId(adminUserId);
 		taskStatusHistoryRepository.save(history);
@@ -235,7 +248,9 @@ public class TaskLifecycleManager {
 		resetTaskExecutionArtifacts(task.getId());
 		taskValidationManager.rebuildValidatedWorkspace(task.getId());
 		task = loadTask(taskId);
-		String effectiveReason = reason == null || reason.isBlank() ? "admin retried task" : reason;
+		String effectiveReason = reason == null || reason.isBlank()
+				? TaskStatusHistoryMessageConstants.ADMIN_RETRIED_TASK
+				: reason;
 		taskStatusDomainService.transfer(task, TaskStatusEnum.QUEUED.name(), effectiveReason, OperatorTypeEnum.ADMIN.name(), adminUserId);
 		taskRepository.update(task);
 		schedulerClient.notifyTaskSubmitted(task.getId());
@@ -376,7 +391,13 @@ public class TaskLifecycleManager {
 			return;
 		}
 		if (TaskStatusEnum.VALIDATED.name().equals(task.getStatus())) {
-			taskStatusDomainService.transfer(task, TaskStatusEnum.CREATED.name(), "input archive replaced, re-validation required", OperatorTypeEnum.USER.name(), userId);
+			taskStatusDomainService.transfer(
+					task,
+					TaskStatusEnum.CREATED.name(),
+					TaskStatusHistoryMessageConstants.INPUT_ARCHIVE_REPLACED_REVALIDATION_REQUIRED,
+					OperatorTypeEnum.USER.name(),
+					userId
+			);
 			taskRepository.update(task);
 		}
 		deleteOtherTaskFiles(task.getId(), uploadedArchive.getId());

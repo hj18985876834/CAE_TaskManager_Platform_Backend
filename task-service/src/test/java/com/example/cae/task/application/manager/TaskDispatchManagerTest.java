@@ -4,6 +4,7 @@ import com.example.cae.common.enums.TaskStatusEnum;
 import com.example.cae.common.dto.TaskDispatchAckDTO;
 import com.example.cae.common.dto.TaskScheduleClaimDTO;
 import com.example.cae.task.domain.model.Task;
+import com.example.cae.task.domain.model.TaskStatusHistory;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
 import com.example.cae.task.domain.repository.TaskResultFileRepository;
@@ -11,6 +12,7 @@ import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.rule.TaskStatusRule;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.client.SolverClient;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
@@ -121,10 +123,12 @@ class TaskDispatchManagerTest {
 		assertEquals(TaskStatusEnum.DISPATCHED.name(), ack.getStatus());
 		assertEquals(21L, ack.getNodeId());
 		ArgumentCaptor<Task> captor = ArgumentCaptor.forClass(Task.class);
+		ArgumentCaptor<TaskStatusHistory> historyCaptor = ArgumentCaptor.forClass(TaskStatusHistory.class);
 		verify(taskRepository).update(captor.capture());
 		assertEquals(TaskStatusEnum.DISPATCHED.name(), captor.getValue().getStatus());
 		assertEquals(21L, captor.getValue().getNodeId());
-		verify(taskStatusHistoryRepository).save(org.mockito.ArgumentMatchers.any());
+		verify(taskStatusHistoryRepository).save(historyCaptor.capture());
+		assertEquals(TaskStatusHistoryMessageConstants.TASK_DISPATCHED, historyCaptor.getValue().getChangeReason());
 	}
 
 	@Test
@@ -182,7 +186,13 @@ class TaskDispatchManagerTest {
 				() -> taskDispatchManager.markFailed(1001L, 21L, "DISPATCH_ERROR", "late failure", true)
 		);
 
-		verify(taskStatusHistoryRepository).save(org.mockito.ArgumentMatchers.any());
+		ArgumentCaptor<TaskStatusHistory> historyCaptor = ArgumentCaptor.forClass(TaskStatusHistory.class);
+		verify(taskStatusHistoryRepository).save(historyCaptor.capture());
+		assertEquals(
+				TaskStatusHistoryMessageConstants.IGNORED_LATE_DISPATCH_FAILED_PREFIX
+						+ "DISPATCH_ERROR, recoverable=true), current=RUNNING",
+				historyCaptor.getValue().getChangeReason()
+		);
 	}
 
 	private Task buildTask(String status) {

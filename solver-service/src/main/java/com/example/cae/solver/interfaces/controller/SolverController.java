@@ -7,11 +7,10 @@ import com.example.cae.solver.interfaces.request.CreateSolverRequest;
 import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverStatusRequest;
-import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverProfileOptionResponse;
 import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
-import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.validation.annotation.Validated;
@@ -65,12 +64,7 @@ public class SolverController {
 	}
 
 	@GetMapping("/{solverId}/profiles")
-	public Result<List<ProfileListItemResponse>> getSolverProfiles(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
-		return Result.success(solverFacade.getSolverProfiles(solverId));
-	}
-
-	@GetMapping("/{solverId}/task-options")
-	public Result<List<SolverTaskOptionResponse>> getSolverTaskOptions(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
-		return Result.success(solverFacade.getSolverTaskOptions(solverId));
+	public Result<List<SolverProfileOptionResponse>> getSolverProfiles(@PathVariable("solverId") @Positive(message = "solverId must be greater than 0") Long solverId) {
+		return Result.success(solverFacade.getSolverProfileOptions(solverId));
 	}
 }

@@ -13,11 +13,10 @@ import com.example.cae.solver.interfaces.request.CreateSolverRequest;
 import com.example.cae.solver.interfaces.request.SolverPageQueryRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverRequest;
 import com.example.cae.solver.interfaces.request.UpdateSolverStatusRequest;
-import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
+import com.example.cae.solver.interfaces.response.SolverProfileOptionResponse;
 import com.example.cae.solver.interfaces.response.SolverCreateResponse;
 import com.example.cae.solver.interfaces.response.SolverDetailResponse;
 import com.example.cae.solver.interfaces.response.SolverListItemResponse;
-import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -82,12 +81,8 @@ public class SolverAppService {
 		solverRepository.update(solver);
 	}
 
-	public List<SolverTaskOptionResponse> getSolverTaskOptions(Long solverId) {
-		return profileRepository.listEnabledBySolverId(solverId).stream().map(ProfileAssembler::toTaskOptionResponse).toList();
-	}
-
-	public List<ProfileListItemResponse> getSolverProfiles(Long solverId) {
-		return profileRepository.listBySolverId(solverId).stream().map(ProfileAssembler::toListItemResponse).toList();
+	public List<SolverProfileOptionResponse> getSolverProfileOptions(Long solverId) {
+		return profileRepository.listEnabledBySolverId(solverId).stream().map(ProfileAssembler::toProfileOptionResponse).toList();
 	}
 
 	private void normalizePageQuery(SolverPageQueryRequest request) {

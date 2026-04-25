@@ -68,7 +68,7 @@ class DispatchStallCheckerTest {
 				1001L,
 				21L,
 				FailTypeEnum.DISPATCH_ERROR.name(),
-				"dispatch watchdog timeout, node-agent runtime missing",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
 				true
 		);
 	}
@@ -97,7 +97,7 @@ class DispatchStallCheckerTest {
 				1001L,
 				21L,
 				FailTypeEnum.DISPATCH_ERROR.name(),
-				"dispatch watchdog timeout, node-agent runtime missing",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
 				true
 		);
 	}
@@ -120,7 +120,7 @@ class DispatchStallCheckerTest {
 				1002L,
 				21L,
 				FailTypeEnum.DISPATCH_ERROR.name(),
-				"dispatch watchdog timeout, node-agent runtime missing",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
 				true
 		);
 	}

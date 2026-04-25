@@ -157,7 +157,13 @@ class ScheduleAppServiceTest {
 
 	@Test
 	void handleDispatchFailureShouldRecordFormalRejectedRunningAudit() {
-		when(taskClient.markTaskFailed(1001L, 31L, "DISPATCH_ERROR", "dispatch watchdog timeout, node-agent runtime missing", true))
+		when(taskClient.markTaskFailed(
+				1001L,
+				31L,
+				"DISPATCH_ERROR",
+				DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
+				true
+		))
 				.thenThrow(new BizException(
 						ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 						"dispatch-failed is not allowed after task entered RUNNING"
@@ -169,7 +175,7 @@ class ScheduleAppServiceTest {
 						1001L,
 						31L,
 						"DISPATCH_ERROR",
-						"dispatch watchdog timeout, node-agent runtime missing",
+						DispatchFailureMessageConstants.DISPATCH_WATCHDOG_TIMEOUT_RUNTIME_MISSING,
 						true
 				)
 		);

@@ -6,7 +6,7 @@ import com.example.cae.solver.interfaces.request.CreateProfileRequest;
 import com.example.cae.solver.interfaces.response.ProfileCreateResponse;
 import com.example.cae.solver.interfaces.response.ProfileDetailResponse;
 import com.example.cae.solver.interfaces.response.ProfileListItemResponse;
-import com.example.cae.solver.interfaces.response.SolverTaskOptionResponse;
+import com.example.cae.solver.interfaces.response.SolverProfileOptionResponse;
 
 public class ProfileAssembler {
 	private ProfileAssembler() {
@@ -75,8 +75,8 @@ public class ProfileAssembler {
 		return response;
 	}
 
-	public static SolverTaskOptionResponse toTaskOptionResponse(SolverTaskProfile profile) {
-		SolverTaskOptionResponse response = new SolverTaskOptionResponse();
+	public static SolverProfileOptionResponse toProfileOptionResponse(SolverTaskProfile profile) {
+		SolverProfileOptionResponse response = new SolverProfileOptionResponse();
 		response.setProfileId(profile.getId());
 		response.setTaskType(profile.getTaskType());
 		response.setProfileName(profile.getProfileName());

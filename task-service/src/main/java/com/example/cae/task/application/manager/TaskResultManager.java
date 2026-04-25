@@ -18,6 +18,7 @@ import com.example.cae.task.domain.repository.TaskResultFileRepository;
 import com.example.cae.task.domain.repository.TaskResultSummaryRepository;
 import com.example.cae.task.domain.repository.TaskStatusHistoryRepository;
 import com.example.cae.task.domain.service.TaskStatusDomainService;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.infrastructure.client.SchedulerClient;
 import com.example.cae.task.infrastructure.support.TaskPathResolver;
 import com.example.cae.task.infrastructure.support.TaskStoragePathSupport;
@@ -111,14 +112,20 @@ public class TaskResultManager {
 		Task task = taskRepository.findByIdForUpdate(taskId).orElseThrow(() -> new BizException(ErrorCodeConstants.TASK_NOT_FOUND, "task not found"));
 		String target = normalizeAllowedFinalStatus(finalStatus);
 		if (shouldIgnoreTerminalReport(task, target)) {
-			recordIgnoredTerminalCallback(task, "mark-finished", target, null);
+			recordIgnoredTerminalCallback(task, TaskStatusHistoryMessageConstants.MARK_FINISHED_ACTION, target, null);
 			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
 		if (!TaskStatusEnum.RUNNING.name().equals(task.getStatus())) {
 			throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL, "illegal status for terminal report: " + task.getStatus());
 		}
-		taskStatusDomainService.transfer(task, target, "task finished", OperatorTypeEnum.NODE.name(), null);
+		taskStatusDomainService.transfer(
+				task,
+				target,
+				TaskStatusHistoryMessageConstants.TASK_FINISHED,
+				OperatorTypeEnum.NODE.name(),
+				null
+		);
 		taskRepository.update(task);
 		releaseReservationQuietly(task);
 		return buildTaskStatusAck(task);
@@ -130,7 +137,7 @@ public class TaskResultManager {
 		String normalizedFailType = normalizeAllowedFailType(failType);
 		String targetStatus = TaskStatusEnum.FAILED.name();
 		if (shouldIgnoreTerminalReport(task, targetStatus)) {
-			recordIgnoredTerminalCallback(task, "mark-failed", targetStatus, normalizedFailType);
+			recordIgnoredTerminalCallback(task, TaskStatusHistoryMessageConstants.MARK_FAILED_ACTION, targetStatus, normalizedFailType);
 			releaseReservationQuietly(task);
 			return buildTaskStatusAck(task);
 		}
@@ -219,8 +226,12 @@ public class TaskResultManager {
 		if (task == null || task.getId() == null || task.getStatus() == null || !task.isFinished()) {
 			return;
 		}
-		String requested = requestedStatus == null || requestedStatus.isBlank() ? "UNKNOWN" : requestedStatus.trim().toUpperCase();
-		String effectiveAction = action == null || action.isBlank() ? "terminal-callback" : action.trim();
+		String requested = requestedStatus == null || requestedStatus.isBlank()
+				? TaskStatusHistoryMessageConstants.UNKNOWN
+				: requestedStatus.trim().toUpperCase();
+		String effectiveAction = action == null || action.isBlank()
+				? TaskStatusHistoryMessageConstants.TERMINAL_CALLBACK_DEFAULT_ACTION
+				: action.trim();
 		String reason = buildIgnoredTerminalCallbackReason(effectiveAction, requested, requestedFailType, task.getStatus());
 		com.example.cae.task.domain.model.TaskStatusHistory history = new com.example.cae.task.domain.model.TaskStatusHistory();
 		history.setTaskId(task.getId());
@@ -233,15 +244,15 @@ public class TaskResultManager {
 	}
 
 	private String buildIgnoredTerminalCallbackReason(String action, String requestedStatus, String requestedFailType, String currentStatus) {
-		StringBuilder builder = new StringBuilder("ignored late ");
+		StringBuilder builder = new StringBuilder(TaskStatusHistoryMessageConstants.IGNORED_LATE_PREFIX);
 		builder.append(action);
-		builder.append(", requested=");
+		builder.append(TaskStatusHistoryMessageConstants.REQUESTED_EQUALS);
 		builder.append(requestedStatus);
 		if (requestedFailType != null && !requestedFailType.isBlank()) {
 			builder.append('(').append(requestedFailType.trim().toUpperCase()).append(')');
 		}
-		builder.append(", current=");
-		builder.append(currentStatus == null ? "UNKNOWN" : currentStatus);
+		builder.append(TaskStatusHistoryMessageConstants.CURRENT_EQUALS);
+		builder.append(currentStatus == null ? TaskStatusHistoryMessageConstants.UNKNOWN : currentStatus);
 		String reason = builder.toString();
 		return reason.length() <= MAX_HISTORY_REASON_LENGTH
 				? reason
@@ -265,7 +276,7 @@ public class TaskResultManager {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
-		recordRejectedResultCallbackIfNeeded(task, "result-summary-report");
+		recordRejectedResultCallbackIfNeeded(task, TaskStatusHistoryMessageConstants.RESULT_SUMMARY_REPORT_ACTION);
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 				"illegal status for result summary report: " + task.getStatus());
 	}
@@ -274,7 +285,7 @@ public class TaskResultManager {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
-		recordRejectedResultCallbackIfNeeded(task, "result-file-report");
+		recordRejectedResultCallbackIfNeeded(task, TaskStatusHistoryMessageConstants.RESULT_FILE_REPORT_ACTION);
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 				"illegal status for result file report: " + task.getStatus());
 	}
@@ -294,9 +305,13 @@ public class TaskResultManager {
 	}
 
 	private String buildRejectedResultCallbackReason(String action, String currentStatus) {
-		String effectiveAction = action == null || action.isBlank() ? "result-report" : action.trim();
-		String reason = "ignored late " + effectiveAction + ", current="
-				+ (currentStatus == null ? "UNKNOWN" : currentStatus);
+		String effectiveAction = action == null || action.isBlank()
+				? TaskStatusHistoryMessageConstants.RESULT_REPORT_DEFAULT_ACTION
+				: action.trim();
+		String reason = TaskStatusHistoryMessageConstants.IGNORED_LATE_PREFIX
+				+ effectiveAction
+				+ TaskStatusHistoryMessageConstants.CURRENT_EQUALS
+				+ (currentStatus == null ? TaskStatusHistoryMessageConstants.UNKNOWN : currentStatus);
 		return reason.length() <= MAX_HISTORY_REASON_LENGTH
 				? reason
 				: reason.substring(0, MAX_HISTORY_REASON_LENGTH);

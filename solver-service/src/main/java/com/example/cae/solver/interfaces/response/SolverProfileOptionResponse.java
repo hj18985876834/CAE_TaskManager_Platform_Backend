@@ -1,6 +1,6 @@
 package com.example.cae.solver.interfaces.response;
 
-public class SolverTaskOptionResponse {
+public class SolverProfileOptionResponse {
 	private Long profileId;
 	private String taskType;
 	private String profileName;

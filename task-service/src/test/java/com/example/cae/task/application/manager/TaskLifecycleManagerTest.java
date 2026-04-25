@@ -1,8 +1,10 @@
 package com.example.cae.task.application.manager;
 
 import com.example.cae.common.enums.TaskStatusEnum;
+import com.example.cae.task.application.support.TaskStatusHistoryMessageConstants;
 import com.example.cae.task.application.assembler.TaskAssembler;
 import com.example.cae.task.domain.model.Task;
+import com.example.cae.task.domain.model.TaskStatusHistory;
 import com.example.cae.task.domain.repository.TaskFileRepository;
 import com.example.cae.task.domain.repository.TaskLogRepository;
 import com.example.cae.task.domain.repository.TaskRepository;
@@ -119,5 +121,23 @@ class TaskLifecycleManagerTest {
 		assertNotNull(captor.getValue().getStartTime());
 		verify(schedulerClient).releaseNodeReservation(21L, 1001L);
 		verify(taskStatusHistoryRepository).save(org.mockito.ArgumentMatchers.any());
+	}
+
+	@Test
+	void adjustPriorityShouldRecordStructuredHistoryReason() {
+		Task task = new Task();
+		task.setId(1001L);
+		task.setStatus(TaskStatusEnum.QUEUED.name());
+		task.setPriority(1);
+		when(taskRepository.findById(1001L)).thenReturn(Optional.of(task));
+
+		taskLifecycleManager.adjustPriority(1001L, 5, 9L);
+
+		ArgumentCaptor<TaskStatusHistory> historyCaptor = ArgumentCaptor.forClass(TaskStatusHistory.class);
+		verify(taskStatusHistoryRepository).save(historyCaptor.capture());
+		assertEquals(
+				TaskStatusHistoryMessageConstants.PRIORITY_ADJUSTED_PREFIX + "1 -> 5",
+				historyCaptor.getValue().getChangeReason()
+		);
 	}
 }

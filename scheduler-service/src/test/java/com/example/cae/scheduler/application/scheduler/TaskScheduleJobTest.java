@@ -126,7 +126,7 @@ class TaskScheduleJobTest {
 		verify(taskScheduleManager, never()).recordScheduleFailure(
 				eq(1001L),
 				eq(21L),
-				contains("node accepted task, mark-dispatched confirm failed"));
+				contains(ScheduleAuditMessageConstants.NODE_ACCEPTED_MARK_DISPATCHED_CONFIRM_FAILED_PREFIX));
 		verify(taskScheduleManager, never()).confirmScheduleSuccess(eq(1001L), eq(21L), org.mockito.ArgumentMatchers.anyString());
 	}
 
@@ -218,11 +218,14 @@ class TaskScheduleJobTest {
 		when(taskClient.listPendingTasks(20)).thenReturn(List.of(task));
 		when(taskScheduleManager.schedule(task)).thenReturn(21L);
 		when(taskClient.markTaskScheduled(1001L, 21L)).thenReturn(scheduleClaim(true, 21L, "SCHEDULED"));
-		doThrow(new BizException(ErrorCodeConstants.BAD_GATEWAY, "node-agent dispatch request failed"))
+		doThrow(new BizException(
+				ErrorCodeConstants.BAD_GATEWAY,
+				DispatchFailureMessageConstants.NODE_AGENT_DISPATCH_REQUEST_FAILED
+		))
 				.when(nodeAgentClient).notifyDispatch(21L, task);
 		when(taskScheduleManager.handleDispatchFailure(eq(1001L), eq(21L), eq("DISPATCH_ERROR"), anyString(), anyBoolean()))
 				.thenThrow(new DispatchFailureReleaseException(
-						"reservation release failed after dispatch-failed: scheduler release failed",
+						DispatchFailureMessageConstants.DISPATCH_FAILURE_RELEASE_FAILED_PREFIX + "scheduler release failed",
 						new BizException(ErrorCodeConstants.BAD_GATEWAY, "scheduler release failed")
 				));
 
