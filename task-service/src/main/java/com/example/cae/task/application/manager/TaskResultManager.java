@@ -81,7 +81,7 @@ public class TaskResultManager {
 		taskLogRepository.save(chunk);
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = BizException.class)
 	public void saveResultSummary(Long taskId, ResultSummaryReportRequest request) {
 		ensureResultSummaryAllowed(loadTaskForResultWrite(taskId));
 		TaskResultSummary summary = new TaskResultSummary();
@@ -93,7 +93,7 @@ public class TaskResultManager {
 		taskResultSummaryRepository.saveOrUpdate(summary);
 	}
 
-	@Transactional
+	@Transactional(noRollbackFor = BizException.class)
 	public void saveResultFile(Long taskId, ResultFileReportRequest request) {
 		ensureResultFileAllowed(loadTaskForResultWrite(taskId));
 		Path resultPath = validateResultFilePath(taskId, request);
@@ -265,6 +265,7 @@ public class TaskResultManager {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
+		recordRejectedResultCallbackIfNeeded(task, "result-summary-report");
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 				"illegal status for result summary report: " + task.getStatus());
 	}
@@ -273,8 +274,32 @@ public class TaskResultManager {
 		if (RESULT_REPORT_ALLOWED_STATUSES.contains(task.getStatus())) {
 			return;
 		}
+		recordRejectedResultCallbackIfNeeded(task, "result-file-report");
 		throw new BizException(ErrorCodeConstants.TASK_STATUS_TRANSFER_ILLEGAL,
 				"illegal status for result file report: " + task.getStatus());
+	}
+
+	private void recordRejectedResultCallbackIfNeeded(Task task, String action) {
+		if (task == null || task.getId() == null || task.getStatus() == null || !task.isFinished()) {
+			return;
+		}
+		com.example.cae.task.domain.model.TaskStatusHistory history = new com.example.cae.task.domain.model.TaskStatusHistory();
+		history.setTaskId(task.getId());
+		history.setFromStatus(task.getStatus());
+		history.setToStatus(task.getStatus());
+		history.setChangeReason(buildRejectedResultCallbackReason(action, task.getStatus()));
+		history.setOperatorType(OperatorTypeEnum.NODE.name());
+		history.setOperatorId(null);
+		taskStatusHistoryRepository.save(history);
+	}
+
+	private String buildRejectedResultCallbackReason(String action, String currentStatus) {
+		String effectiveAction = action == null || action.isBlank() ? "result-report" : action.trim();
+		String reason = "ignored late " + effectiveAction + ", current="
+				+ (currentStatus == null ? "UNKNOWN" : currentStatus);
+		return reason.length() <= MAX_HISTORY_REASON_LENGTH
+				? reason
+				: reason.substring(0, MAX_HISTORY_REASON_LENGTH);
 	}
 
 	private Task loadTaskForResultWrite(Long taskId) {
