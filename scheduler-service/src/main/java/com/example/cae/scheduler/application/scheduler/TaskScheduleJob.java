@@ -70,7 +70,7 @@ public class TaskScheduleJob {
 		}
 		if (taskMarkedScheduled && task != null && task.getTaskId() != null) {
 			if (nodeAccepted) {
-				recordScheduleFailureQuietly(task.getTaskId(), nodeId, ex);
+				recordScheduleFailureQuietly(task.getTaskId(), nodeId, buildAcceptedDispatchConfirmFailureMessage(ex));
 				return;
 			}
 			handleDispatchFailureQuietly(task.getTaskId(), nodeId, ex);
@@ -140,11 +140,22 @@ public class TaskScheduleJob {
 	}
 
 	private void recordScheduleFailureQuietly(Long taskId, Long nodeId, Exception ex) {
+		recordScheduleFailureQuietly(taskId, nodeId, ex == null ? null : ex.getMessage());
+	}
+
+	private void recordScheduleFailureQuietly(Long taskId, Long nodeId, String message) {
 		try {
-			taskScheduleManager.recordScheduleFailure(taskId, nodeId, ex == null ? null : ex.getMessage());
+			taskScheduleManager.recordScheduleFailure(taskId, nodeId, message);
 		} catch (Exception recordEx) {
 			log.warn("failed to record schedule failure, taskId={}, nodeId={}", taskId, nodeId, recordEx);
 		}
+	}
+
+	private String buildAcceptedDispatchConfirmFailureMessage(Exception ex) {
+		String reason = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
+				? "mark-dispatched confirm failed"
+				: ex.getMessage();
+		return "node accepted task, mark-dispatched confirm failed; wait for node RUNNING or dispatch-failed callback: " + reason;
 	}
 
 	private String buildDispatchSuccessMessage(TaskDispatchAckDTO dispatchAck) {
