@@ -21,6 +21,8 @@ import java.util.Map;
 @Component
 public class SchedulerClient {
 	private static final int NODE_PAGE_SIZE = 200;
+	private static final int SCHEDULE_MESSAGE_MAX_LENGTH = 255;
+	private static final String DEFAULT_STRATEGY_NAME = "FCFS_MIN_LOAD";
 	private final RestTemplate restTemplate;
 	private final String schedulerServiceBaseUrl;
 
@@ -61,6 +63,40 @@ public class SchedulerClient {
 			throw new BizException(ErrorCodeConstants.BAD_GATEWAY, "release node reservation response identity mismatch");
 		}
 		return actionResult;
+	}
+
+	public void recordScheduleFailure(Long taskId, Long nodeId, String scheduleMessage) {
+		recordSchedule(taskId, nodeId, "FAILED", scheduleMessage);
+	}
+
+	private void recordSchedule(Long taskId, Long nodeId, String scheduleStatus, String scheduleMessage) {
+		if (taskId == null) {
+			return;
+		}
+		String url = schedulerServiceBaseUrl + "/internal/schedules";
+		Map<String, Object> body = new java.util.HashMap<>();
+		body.put("taskId", taskId);
+		body.put("nodeId", nodeId);
+		body.put("strategyName", DEFAULT_STRATEGY_NAME);
+		body.put("scheduleStatus", scheduleStatus);
+		body.put("scheduleMessage", truncateScheduleMessage(scheduleMessage));
+		Result<Void> result = restTemplate.exchange(
+				url,
+				HttpMethod.POST,
+				new HttpEntity<>(body),
+				new ParameterizedTypeReference<Result<Void>>() {
+				}
+		).getBody();
+		ensureSuccess(result, "record schedule failure");
+	}
+
+	private String truncateScheduleMessage(String scheduleMessage) {
+		String message = scheduleMessage == null || scheduleMessage.isBlank()
+				? "reservation release failed"
+				: scheduleMessage.trim();
+		return message.length() <= SCHEDULE_MESSAGE_MAX_LENGTH
+				? message
+				: message.substring(0, SCHEDULE_MESSAGE_MAX_LENGTH);
 	}
 
 	@SuppressWarnings("unchecked")

@@ -366,7 +366,12 @@ public class TaskDispatchManager {
 		if (nodeId == null || taskId == null) {
 			return;
 		}
-		schedulerClient.releaseNodeReservation(nodeId, taskId);
+		try {
+			schedulerClient.releaseNodeReservation(nodeId, taskId);
+		} catch (Exception ex) {
+			recordReservationReleaseFailure(nodeId, taskId, ex);
+			throw ex;
+		}
 	}
 
 	private void releaseReservationQuietly(Long nodeId, Long taskId) {
@@ -377,6 +382,22 @@ public class TaskDispatchManager {
 			schedulerClient.releaseNodeReservation(nodeId, taskId);
 		} catch (Exception ex) {
 			log.warn("offline compensation state updated but reservation release failed, nodeId={}, taskId={}", nodeId, taskId, ex);
+			recordReservationReleaseFailure(nodeId, taskId, ex);
 		}
+	}
+
+	private void recordReservationReleaseFailure(Long nodeId, Long taskId, Exception ex) {
+		try {
+			schedulerClient.recordScheduleFailure(taskId, nodeId, buildReservationReleaseFailureMessage(ex));
+		} catch (Exception recordEx) {
+			log.warn("failed to record reservation release failure, nodeId={}, taskId={}", nodeId, taskId, recordEx);
+		}
+	}
+
+	private String buildReservationReleaseFailureMessage(Exception ex) {
+		String message = ex == null || ex.getMessage() == null || ex.getMessage().isBlank()
+				? "reservation release failed after task state transition"
+				: ex.getMessage();
+		return "reservation release failed after task state transition: " + message;
 	}
 }
